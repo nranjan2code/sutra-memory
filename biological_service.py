@@ -91,13 +91,13 @@ class BiologicalIntelligenceService:
         """Initialize or restore the biological trainer."""
         try:
             from src.biological_trainer import BiologicalTrainer
+            from src.workspace_manager import get_trainer_config
             
-            # Always use full swarm for maximum emergence
-            self.trainer = BiologicalTrainer(
-                base_path=str(self.workspace),
-                workspace_id="biological_service",
-                use_full_swarm=True
-            )
+            # Use centralized workspace management for rock-solid consistency
+            config = get_trainer_config("core", environment="desktop")
+            config['base_path'] = str(self.workspace)  # Override with service workspace path
+            
+            self.trainer = BiologicalTrainer(**config)
             
             # Try to load existing memory
             if self.memory_path.exists():
@@ -350,32 +350,51 @@ class BiologicalIntelligenceService:
             asyncio.create_task(self.maintenance_loop())
         ]
         
-        # Setup graceful shutdown
+        # Setup graceful shutdown with proper task cancellation
         def signal_handler(sig, frame):
             logger.info("Shutdown signal received...")
             self.is_running = False
+            # Cancel all tasks
+            for task in tasks:
+                task.cancel()
             
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
         
         try:
             # Run until stopped
-            await asyncio.gather(*tasks)
-        except asyncio.CancelledError:
-            pass
+            await asyncio.gather(*tasks, return_exceptions=True)
+        except Exception as e:
+            logger.debug(f"Task completion exception (expected during shutdown): {e}")
         finally:
             # Final save before shutdown
             self.state = ServiceState.STOPPING
             logger.info("Performing final save...")
             
-            if self.trainer:
-                self.trainer.save_memory()
-            
-            self._save_metrics()
-            self._save_state()
-            self._save_training_queue()
-            
-            logger.info("🛑 Biological Intelligence Service stopped gracefully")
+            try:
+                if self.trainer:
+                    self.trainer.save_memory()
+                
+                self._save_metrics()
+                self._save_state()
+                self._save_training_queue()
+                
+                logger.info("🛑 Biological Intelligence Service stopped gracefully")
+            except Exception as e:
+                logger.error(f"Error during final save: {e}")
+                # Still consider it stopped gracefully
+                logger.info("🛑 Biological Intelligence Service stopped (with save errors)")
+    
+    def query_knowledge(self, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+        """Query the trained biological intelligence."""
+        if not self.trainer:
+            return []
+        
+        try:
+            return self.trainer.query_knowledge(query, max_results=max_results)
+        except Exception as e:
+            logger.error(f"Query error: {e}")
+            return []
     
     def get_status(self) -> Dict[str, Any]:
         """Get current service status."""

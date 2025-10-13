@@ -522,7 +522,8 @@ class BiologicalTrainer:
 
     def __init__(self, base_path: Optional[str] = None, workspace_id: Optional[str] = None, audit_enabled: Optional[bool] = None, use_full_swarm: bool = False):
         from .config import settings
-        self.base_path = base_path or settings.BASE_PATH
+        # CRITICAL FIX: Use provided base_path directly, don't fall back to settings
+        self.base_path = base_path if base_path is not None else settings.BASE_PATH
         self.workspace_id = workspace_id or settings.WORKSPACE_ID
         self.use_full_swarm = use_full_swarm
         use_audit = settings.AUDIT_ENABLED if audit_enabled is None else bool(audit_enabled)
@@ -570,18 +571,27 @@ class BiologicalTrainer:
         try:
             from .persistence_pbss import AssociativeMemoryPersistence
             path = base_path or self.base_path
+            print(f"🔧 Saving memory to: {path} (workspace: {self.workspace_id})")
+            print(f"   Concepts to save: {len(self.memory_system.concepts)}")
+            print(f"   Associations to save: {len(self.memory_system.associations)}")
             p = AssociativeMemoryPersistence(path, self.workspace_id)
             p.save(self.memory_system)
+            print(f"✅ Memory saved successfully to {path}")
         except Exception as e:
-            print(f"Persistence save error: {e}")
+            print(f"❌ Persistence save error: {e}")
+            import traceback
+            traceback.print_exc()
 
     def load_memory(self, base_path: Optional[str] = None) -> None:
         """Load memory system from PBSS and replace current in-memory state."""
         try:
             from .persistence_pbss import AssociativeMemoryPersistence
             path = base_path or self.base_path
+            print(f"🔧 Loading memory from: {path} (workspace: {self.workspace_id})")
             p = AssociativeMemoryPersistence(path, self.workspace_id)
             loaded = p.load()
+            print(f"   Concepts loaded: {len(loaded.concepts)}")
+            print(f"   Associations loaded: {len(loaded.associations)}")
             # Replace internal state
             self.memory_system = loaded
             # Rebuild token index after load
@@ -591,8 +601,11 @@ class BiologicalTrainer:
                 'molecular': MolecularLearningAgent(self.memory_system),
                 'semantic': SemanticLearningAgent(self.memory_system),
             }
+            print(f"✅ Memory loaded successfully from {path}")
         except Exception as e:
-            print(f"Persistence load error: {e}")
+            print(f"❌ Persistence load error: {e}")
+            import traceback
+            traceback.print_exc()
 
     async def train_from_stream(self, text_stream: List[str]) -> Dict[str, Any]:
         """Train using swarm intelligence on text stream."""

@@ -179,6 +179,7 @@ class PiConfig:
 # Pi-specific biological trainer configuration
 PI_BIOLOGICAL_CONFIG = {
     'base_path': PiConfig.HDD_WORKSPACE,
+    'workspace_id': 'core',  # Use consistent workspace ID
     'use_full_swarm': True,  # Still use all 7 agents!
     'audit_enabled': True,
     'dream_interval': PiConfig.DREAM_INTERVAL,

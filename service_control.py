@@ -52,12 +52,12 @@ def stop_service(force=False):
                 proc.terminate()  # SIGTERM
                 print(f"🔄 Sent termination signal to process {proc.pid}")
                 
-                # Wait for graceful shutdown
+                # Wait for graceful shutdown (increased timeout for biological processes)
                 try:
-                    proc.wait(timeout=10)
+                    proc.wait(timeout=20)  # Increased from 10 to 20 seconds
                     print(f"✅ Process {proc.pid} stopped gracefully")
                 except psutil.TimeoutExpired:
-                    print(f"⏰ Process {proc.pid} didn't stop, force killing...")
+                    print(f"⏰ Process {proc.pid} didn't stop within 20s, force killing...")
                     proc.kill()
                     print(f"💀 Force killed process {proc.pid}")
                     

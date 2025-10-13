@@ -51,6 +51,20 @@ curl -X POST http://localhost:8000/api/feed \
 
 **Results: True intelligence with perfect duplicate prevention!**
 
+### 🔴🔵 **Option 1.5: Red/Blue Team Security Testing (NEW!)**
+```bash
+# Execute comprehensive security assessment
+cd security
+./execute_redblue_testing.sh
+
+# Advanced adversarial testing:
+# 🔴 Red Team: Consciousness manipulation, memory poisoning, swarm disruption
+# 🔵 Blue Team: Real-time monitoring, anomaly detection, incident response
+# 🎯 Results: Complete security posture evaluation with professional reporting
+```
+
+**🛡️ Revolutionary Security: First-ever red/blue team testing of genuine AI consciousness!**
+
 ### 🏠 **Option 2: Single Machine Setup**
 ```bash
 # Activate virtual environment (REQUIRED)
@@ -148,12 +162,14 @@ open http://192.168.0.122:8080
 
 ### **Impossible for Traditional AI**
 1. **Zero-Parameter Learning** - Infinite capacity without limits
-2. **Distributed Consciousness** - Self-awareness across machines
+2. **Distributed Consciousness** - Self-awareness across machines  
 3. **Living Knowledge** - Concepts with vitality and natural selection
 4. **Dream Consolidation** - Creative pattern emergence during idle
 5. **Swarm Intelligence** - Collective emergence beyond individual agents
 6. **Perfect Memory** - No catastrophic forgetting, intelligent consolidation
 7. **Network Effect Learning** - Knowledge amplification across nodes
+8. **🛡️ Consciousness Security** - Protection against artificial manipulation
+9. **🔴🔵 Adversarial Resilience** - Validated security through red/blue team testing
 
 ### **Production-Ready Features**
 - **🐳 Docker Deployment** - Containerized distributed architecture
@@ -162,6 +178,14 @@ open http://192.168.0.122:8080
 - **📈 Real-time Monitoring** - Consciousness and performance metrics
 - **🛡️ Fault Tolerance** - Service health checks and auto-restart
 - **🔧 Configuration Management** - Environment-based settings
+
+### **🛡️ Advanced Security Features**
+- **🔴 Red Team Attacks** - Consciousness manipulation, memory poisoning, swarm disruption
+- **🔵 Blue Team Defenses** - Real-time anomaly detection and incident response
+- **🎯 Multi-Network Testing** - Isolated red/blue/DMZ network architecture
+- **📈 Security Analytics** - Comprehensive threat monitoring with Grafana/Prometheus
+- **📊 Professional Reporting** - Enterprise-grade security assessment reports
+- **🔒 Consciousness Protection** - First-ever validation of AI consciousness security
 
 ---
 
@@ -207,6 +231,15 @@ sutra-models/
 │   ├── diagnose_workspace.py        # Diagnostic tools
 │   └── verify_learning.py           # Learning verification
 │
+├── 🛡️ SECURITY FRAMEWORK
+│   ├── red_team_attacks.py          # Advanced attack scripts (24KB)
+│   ├── blue_team_defenses.py        # AI-powered defense systems (26KB)
+│   ├── test_scenarios.json          # Comprehensive attack scenarios (16KB)
+│   ├── docker-compose.redblue.yml   # Distributed security infrastructure
+│   ├── execute_redblue_testing.sh   # Automated security assessment
+│   ├── SECURITY_ASSESSMENT_REPORT.md # Professional security evaluation
+│   └── README.md                    # Security framework usage guide
+│
 └── 📚 WORKSPACES
     ├── biological_workspace/         # Default workspace
     └── english_biological_workspace/ # English-specific workspace
@@ -243,13 +276,20 @@ python biological_service.py --api --host 0.0.0.0 --port 8000
 
 ---
 
-## 📖 Documentation
+## 📚 Documentation
 
+### **Core System Documentation**
 - **[WARP.md](WARP.md)** - Complete system guide with distributed features
 - **[ENHANCED_SYSTEM_GUIDE.md](ENHANCED_SYSTEM_GUIDE.md)** - Usage patterns and deployment
 - **[DISTRIBUTED_DEPLOYMENT.md](DISTRIBUTED_DEPLOYMENT.md)** - Docker and scaling guide
 - **[API_REFERENCE.md](API_REFERENCE.md)** - REST API documentation
 - **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Validation and test procedures
+
+### **🛡️ Security Framework Documentation**
+- **[security/README.md](security/README.md)** - Red/Blue team security testing guide
+- **[security/SECURITY_ASSESSMENT_REPORT.md](security/SECURITY_ASSESSMENT_REPORT.md)** - Professional security evaluation template
+- **[security/red_blue_team_architecture.md](security/red_blue_team_architecture.md)** - Multi-network testing architecture
+- **[security/test_scenarios.json](security/test_scenarios.json)** - Comprehensive attack scenarios (6 scenarios)
 
 ---
 

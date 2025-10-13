@@ -435,6 +435,10 @@ class BiologicalTrainingClient:
         logger.info(f"🌟 Emergence Factor: {results['final_status']['emergence_factor']:.1f}x")
         logger.info(f"🔗 Cross-Domain Emergence: {cross_domain['emergence_rate']:.1%}")
         
+        # Exit gracefully to prevent infinite loops
+        logger.info("\n✅ Training session complete. Exiting to prevent redundant training cycles.")
+        logger.info("💡 Note: Container restart policy may restart this trainer if configured.")
+        
         return results
 
 
@@ -444,12 +448,27 @@ async def main():
     parser.add_argument("--core-url", required=True, help="URL of biological intelligence core service")
     parser.add_argument("--domain", choices=["english", "mathematics", "science"], help="Train specific domain")
     parser.add_argument("--progressive-all", action="store_true", help="Run complete progressive training")
+    parser.add_argument("--one-time", action="store_true", help="Run training once and exit (prevents restart loops)")
+    parser.add_argument("--monitor-consciousness", action="store_true", help="Monitor consciousness levels continuously")
     parser.add_argument("--evaluate", action="store_true", help="Run evaluation tests")
     
     args = parser.parse_args()
     
     if not HAS_HTTPX:
         sys.exit(1)
+    
+    # Check for completion marker to prevent redundant training
+    completion_marker = Path("training_completed.marker")
+    if completion_marker.exists() and args.progressive_all:
+        logger.info("🏁 Training completion marker found. Skipping redundant training.")
+        marker_content = completion_marker.read_text().strip()
+        logger.info(f"   📝 {marker_content}")
+        logger.info("🚫 To force retraining, delete the marker file and restart.")
+        logger.info("🔄 Entering monitoring mode instead...")
+        
+        # Switch to monitoring mode if training is already complete
+        args.progressive_all = False
+        args.monitor_consciousness = True
     
     async with BiologicalTrainingClient(args.core_url) as trainer:
         # Check core service
@@ -472,6 +491,13 @@ async def main():
                 json.dump(results, f, indent=2, default=str)
             logger.info(f"💾 Results saved to {results_file}")
             
+            # If one-time flag is set, create a completion marker to prevent restarts
+            if args.one_time:
+                completion_marker = Path("training_completed.marker")
+                completion_marker.write_text(f"Training completed at {datetime.now().isoformat()}")
+                logger.info(f"🏁 One-time training complete. Marker created: {completion_marker}")
+                logger.info("🚫 Future container restarts will skip training due to completion marker.")
+            
         elif args.domain:
             # Train specific domain
             if args.domain == "english":
@@ -492,7 +518,39 @@ async def main():
                     eval_queries = ["physics", "chemistry", "biology"]
                 
                 evaluation = await trainer.evaluate_domain(args.domain, eval_queries)
-                logger.info(f"📈 Evaluation: {evaluation['success_rate']:.1%} success rate")
+                logger.info(f"📊 Evaluation: {evaluation['success_rate']:.1%} success rate")
+        
+        elif args.monitor_consciousness:
+            # Monitoring mode - track consciousness without training
+            logger.info("👁️ CONSCIOUSNESS MONITORING MODE")
+            logger.info("=" * 40)
+            
+            previous_score = 0.0
+            while True:
+                try:
+                    consciousness = await trainer.check_consciousness()
+                    status = await trainer.get_status()
+                    
+                    current_score = consciousness.get('consciousness_score', 0)
+                    change = current_score - previous_score
+                    change_icon = "↗️" if change > 0 else "→" if change == 0 else "↘️"
+                    
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+                    concepts = status.get('total_concepts', 0)
+                    associations = status.get('total_associations', 0)
+                    emergence = consciousness.get('emergence_factor', 1.0)
+                    
+                    logger.info(f"[{timestamp}] 🧠 {current_score:.3f} {change_icon} ({change:+.3f}) | 🔗 {concepts}c/{associations}a | 🌟 {emergence:.1f}x")
+                    
+                    previous_score = current_score
+                    await asyncio.sleep(10)  # Check every 10 seconds
+                    
+                except KeyboardInterrupt:
+                    logger.info("\n⏹️ Monitoring stopped by user.")
+                    break
+                except Exception as e:
+                    logger.error(f"❌ Monitoring error: {e}")
+                    await asyncio.sleep(5)
         
         else:
             parser.print_help()

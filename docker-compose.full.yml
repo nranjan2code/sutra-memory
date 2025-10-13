@@ -36,8 +36,8 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./enhanced_english_curriculum:/app/enhanced_english_curriculum
-    command: ["python", "distributed_trainer.py", "--core-url", "http://core-service:8000", "--progressive-all"]
-    restart: unless-stopped
+    command: ["python", "distributed_trainer.py", "--core-url", "http://core-service:8000", "--progressive-all", "--one-time"]
+    restart: "no"  # Prevent infinite training loops
     networks:
       - biological-network
 

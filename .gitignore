@@ -196,3 +196,31 @@ logs/
 # Temporary files
 tmp/
 temp/
+
+# Biological Intelligence Runtime Artifacts
+knowledge_store/
+*.pb
+*.knowledge
+*.memory
+*.swarm
+
+# Checkpoint files
+*.checkpoint
+*.ckpt.*
+checkpoints/
+
+# Cache directories
+.cache/
+__cache__/
+
+# Debug outputs
+debug/
+*.debug
+
+# Test outputs
+test_outputs/
+test_results/
+
+# Generated documentation
+docs/generated/
+docs/_build/

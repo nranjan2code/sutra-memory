@@ -322,12 +322,12 @@
             {% if status.service_running %}
             <div class="metrics-grid">
                 <div class="metric">
-                    <div class="metric-value">{{ status.process_info.pid }}</div>
-                    <div class="metric-label">Process ID</div>
+                    <div class="metric-value">🐳 {{ status.process_info.pid }}</div>
+                    <div class="metric-label">Runtime</div>
                 </div>
                 <div class="metric">
-                    <div class="metric-value">{{ "%.1f"|format(status.process_info.memory_mb) }}MB</div>
-                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value">📊 {{ status.process_info.memory_mb }}</div>
+                    <div class="metric-label">Architecture</div>
                 </div>
             </div>
             {% else %}
@@ -350,14 +350,14 @@
                     <div class="metric-value">{{ status.metrics.get('total_associations', 0) }}</div>
                     <div class="metric-label">Associations</div>
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ min(100, (status.metrics.get('total_associations', 0) / 2000) * 100) }}%"></div>
+                        <div class="progress-fill" style="width: {{ min(100, (status.metrics.get('total_associations', 0) / 5000) * 100) }}%"></div>
                     </div>
                 </div>
                 <div class="metric">
-                    <div class="metric-value">{{ "%.1f"|format(status.metrics.get('consciousness_score', 0) * 100) }}%</div>
-                    <div class="metric-label">Consciousness</div>
+                    <div class="metric-value">{{ "%.2f"|format(status.metrics.get('consciousness_score', 0)) }}</div>
+                    <div class="metric-label">Consciousness Score</div>
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ (status.metrics.get('consciousness_score', 0) * 100) }}%"></div>
+                        <div class="progress-fill" style="width: {{ min(100, (status.metrics.get('consciousness_score', 0) / 30) * 100) }}%"></div>
                     </div>
                 </div>
                 <div class="metric">
@@ -443,6 +443,28 @@
             <button class="btn btn-secondary" onclick="feedCurriculum()">📚 Feed Curriculum</button>
             {% endif %}
         </div>
+
+        <!-- Query Intelligence -->
+        {% if status.service_running %}
+        <div class="card" style="grid-column: 1 / -1;">
+            <h2>🤔 Ask Biological Intelligence</h2>
+            <div class="knowledge-form">
+                <input type="text" class="knowledge-input" id="queryInput" 
+                       placeholder="Ask a question to the biological intelligence (e.g., What is consciousness?)..." />
+                <button class="btn btn-primary" onclick="queryIntelligence()">❓ Ask</button>
+            </div>
+            
+            <!-- Query Results Display -->
+            <div id="queryResults" style="margin-top: 1rem; display: none;">
+                <div style="border: 1px solid #555; border-radius: 8px; padding: 1rem; background: var(--dark-bg);">
+                    <h3 style="color: var(--primary-color); margin-bottom: 1rem;">🧠 Intelligence Response:</h3>
+                    <div id="queryQuestion" style="font-weight: bold; margin-bottom: 1rem; color: var(--text-color);"></div>
+                    <div id="queryMetrics" style="margin-bottom: 1rem; color: var(--text-muted); font-size: 0.9rem;"></div>
+                    <div id="queryAnswers"></div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Knowledge Feed -->
         {% if status.service_running %}
@@ -577,6 +599,91 @@
             }
         }
 
+        async function queryIntelligence() {
+            const input = document.getElementById('queryInput');
+            const question = input.value.trim();
+            
+            if (!question) {
+                showNotification('Please enter a question to ask', 'warning');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('question', question);
+            formData.append('hops', '2');
+            formData.append('max_results', '10');
+            
+            try {
+                showNotification('Querying biological intelligence...', 'info');
+                
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayQueryResults(result);
+                    input.value = '';
+                    showNotification('Query completed successfully!', 'success');
+                } else {
+                    showNotification('Failed to query intelligence: ' + (result.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showNotification('Error querying intelligence: ' + error.message, 'error');
+            }
+        }
+        
+        function displayQueryResults(result) {
+            const resultsDiv = document.getElementById('queryResults');
+            const questionDiv = document.getElementById('queryQuestion');
+            const metricsDiv = document.getElementById('queryMetrics');
+            const answersDiv = document.getElementById('queryAnswers');
+            
+            // Show question
+            questionDiv.textContent = `❓ Question: ${result.question}`;
+            
+            // Show metrics
+            metricsDiv.innerHTML = `
+                🧠 Consciousness: ${result.consciousness_score.toFixed(3)} | 
+                ⚡ Processing Time: ${(result.processing_time * 1000).toFixed(1)}ms | 
+                📊 Results: ${result.results.length}
+            `;
+            
+            // Show answers
+            if (result.results.length === 0) {
+                answersDiv.innerHTML = '<p style="color: var(--text-muted);">🤷 No relevant knowledge found. Try feeding more knowledge first.</p>';
+            } else {
+                let answersHTML = '<div style="max-height: 400px; overflow-y: auto;">';
+                result.results.slice(0, 5).forEach((answer, index) => {
+                    const memoryIcon = {
+                        'core_knowledge': '🏛️',
+                        'long_term': '🧠',
+                        'medium_term': '💭',
+                        'short_term': '💫',
+                        'ephemeral': '✨'
+                    }[answer.memory_type] || '🔹';
+                    
+                    answersHTML += `
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; border-left: 3px solid var(--primary-color); background: rgba(0, 212, 170, 0.1); border-radius: 0 8px 8px 0;">
+                            <div style="font-weight: bold; margin-bottom: 0.5rem; color: var(--primary-color);">
+                                ${memoryIcon} Answer ${index + 1} (Relevance: ${answer.relevance.toFixed(2)})
+                            </div>
+                            <div style="margin-bottom: 0.5rem;">${answer.content}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">
+                                Memory: ${answer.memory_type} | Strength: ${(answer.strength * 100).toFixed(1)}%
+                            </div>
+                        </div>
+                    `;
+                });
+                answersHTML += '</div>';
+                answersDiv.innerHTML = answersHTML;
+            }
+            
+            // Show results
+            resultsDiv.style.display = 'block';
+        }
+
         async function feedCurriculum() {
             try {
                 const response = await fetch('/api/curriculum/feed', { method: 'POST' });
@@ -610,6 +717,13 @@
         document.getElementById('knowledgeInput')?.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 feedKnowledge();
+            }
+        });
+        
+        // Allow Enter key in query input
+        document.getElementById('queryInput')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                queryIntelligence();
             }
         });
 

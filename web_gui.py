@@ -20,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List
 import logging
+import os
 
 from fastapi import FastAPI, WebSocket, Request, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -27,14 +28,18 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import uvicorn
 
+try:
+    import httpx
+    HAS_HTTPX = True
+except ImportError:
+    HAS_HTTPX = False
+
 # Import our components
 try:
     from pi_config import PiConfig
     PI_MODE = True
 except:
     PI_MODE = False
-    
-from service_control import find_biological_processes, stop_service, start_service
 
 
 # Setup logging
@@ -52,15 +57,35 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory="web_static"), name="static")
 templates = Jinja2Templates(directory="web_templates")
 
+# Add Python builtin functions to template globals
+def format_number(num, decimals=0):
+    """Format numbers with K/M suffixes."""
+    if num >= 1000000:
+        return f"{num/1000000:.1f}M"
+    elif num >= 1000:
+        return f"{num/1000:.1f}K"
+    else:
+        return str(int(num))
+
+templates.env.globals.update({
+    'min': min,
+    'max': max,
+    'round': round,
+    'int': int,
+    'float': float,
+    'formatNumber': format_number
+})
+
 # Global state
 current_mode = "general"
 websocket_connections = []
 
 
 class WebGUIManager:
-    """Manager for web-based biological intelligence control."""
+    """Manager for web-based biological intelligence control via API."""
     
     def __init__(self):
+        self.core_service_url = os.getenv("CORE_SERVICE_URL", "http://localhost:8000")
         self.workspace = Path("./biological_workspace")
         self.english_workspace = Path("./english_biological_workspace")
         
@@ -73,58 +98,80 @@ class WebGUIManager:
         """Get current workspace based on mode."""
         return self.english_workspace if current_mode == "english" else self.workspace
     
-    def get_system_status(self) -> Dict[str, Any]:
-        """Get comprehensive system status."""
-        processes = find_biological_processes()
-        service_running = len(processes) > 0
-        
-        # Read state files
-        workspace = self.get_workspace()
-        state_path = workspace / "service_state.json"
-        metrics_path = workspace / "metrics.json"
-        
-        service_state = {}
-        metrics = {}
-        
-        try:
-            if state_path.exists():
-                with open(state_path, 'r') as f:
-                    service_state = json.load(f)
-        except:
-            pass
+    async def check_core_service_health(self) -> bool:
+        """Check if core service is healthy."""
+        if not HAS_HTTPX:
+            logger.warning("httpx not available for health check")
+            return False
             
         try:
-            if metrics_path.exists():
-                with open(metrics_path, 'r') as f:
-                    metrics = json.load(f)
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{self.core_service_url}/api/health")
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("status") == "alive"
+                return False
+        except Exception as e:
+            logger.warning(f"Health check failed: {e}")
+            return False
+    
+    async def get_core_service_status(self) -> Dict[str, Any]:
+        """Get status from core service API."""
+        if not HAS_HTTPX:
+            return {}
+            
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{self.core_service_url}/api/status")
+                if response.status_code == 200:
+                    return response.json()
         except:
             pass
+        return {}
+    
+    async def get_system_status(self) -> Dict[str, Any]:
+        """Get comprehensive system status via API."""
+        # Check if core service is running
+        service_running = await self.check_core_service_health()
         
-        # Process info
-        process_info = {}
-        if processes:
-            proc = processes[0]
-            try:
-                process_info = {
-                    'pid': proc.pid,
-                    'memory_mb': proc.memory_info().rss / 1024 / 1024,
-                    'cpu_percent': proc.cpu_percent(),
-                    'start_time': datetime.fromtimestamp(proc.create_time()).isoformat()
-                }
-            except:
-                process_info = {'pid': proc.pid}
+        # Get status from core service if available
+        core_status = await self.get_core_service_status()
+        
+        # Extract data from core service response
+        service_state = core_status.get('service_state', {})
+        metrics = {
+            'total_concepts': core_status.get('total_concepts', 0),
+            'total_associations': core_status.get('total_associations', 0),
+            'total_training_cycles': core_status.get('training_cycles', 0),
+            'total_dreams': core_status.get('dreams_completed', 0),
+            'consciousness_score': core_status.get('consciousness_score', 0),
+            'emergence_factor': core_status.get('emergence_factor', 1),
+            'uptime_seconds': core_status.get('uptime_seconds', 0),
+            'last_update': core_status.get('timestamp', datetime.now().isoformat())
+        }
+        
+        # Process info - show Docker container info instead
+        process_info = {
+            'pid': 'Docker Container',
+            'memory_mb': 'Container Mode',
+            'cpu_percent': 'Distributed',
+            'start_time': 'Container Runtime'
+        }
         
         # Pi-specific hardware info
         hardware_info = {}
         if PI_MODE:
-            pi_status = PiConfig.get_system_status()
-            hardware_info = {
-                'cpu_temp': pi_status['hardware']['cpu_temp'],
-                'memory_info': pi_status['memory'],
-                'disk_info': pi_status['disk'],
-                'thermal_status': pi_status['thermal'],
-                'optimal_batch_size': pi_status['performance']['optimal_batch_size']
-            }
+            try:
+                pi_status = PiConfig.get_system_status()
+                hardware_info = {
+                    'cpu_temp': pi_status['hardware']['cpu_temp'],
+                    'memory_info': pi_status['memory'],
+                    'disk_info': pi_status['disk'],
+                    'thermal_status': pi_status['thermal'],
+                    'optimal_batch_size': pi_status['performance']['optimal_batch_size']
+                }
+            except:
+                pass
         
         return {
             'service_running': service_running,
@@ -137,6 +184,15 @@ class WebGUIManager:
             'pi_mode': PI_MODE,
             'timestamp': datetime.now().isoformat()
         }
+    
+    def get_system_status_sync(self) -> Dict[str, Any]:
+        """Synchronous wrapper for get_system_status."""
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(self.get_system_status())
+        except:
+            return asyncio.run(self.get_system_status())
 
 
 # Global manager instance
@@ -169,71 +225,133 @@ manager = ConnectionManager()
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    """Main dashboard page."""
-    status = web_manager.get_system_status()
-    return templates.TemplateResponse("dashboard.html", {
+    """Main dashboard page - Material Design 3."""
+    status = await web_manager.get_system_status()
+    return templates.TemplateResponse("dashboard_md3.html", {
         "request": request,
         "status": status,
-        "pi_mode": PI_MODE
+        "pi_mode": PI_MODE,
+        "active_section": "dashboard"
+    })
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_redirect(request: Request):
+    """Dashboard page redirect."""
+    return await dashboard(request)
+
+@app.get("/intelligence", response_class=HTMLResponse)
+async def intelligence_page(request: Request):
+    """Intelligence chat interface."""
+    status = await web_manager.get_system_status()
+    return templates.TemplateResponse("intelligence_md3.html", {
+        "request": request,
+        "status": status,
+        "pi_mode": PI_MODE,
+        "active_section": "intelligence"
+    })
+
+@app.get("/knowledge", response_class=HTMLResponse)
+async def knowledge_page(request: Request):
+    """Knowledge management interface."""
+    status = await web_manager.get_system_status()
+    return templates.TemplateResponse("knowledge_md3.html", {
+        "request": request,
+        "status": status,
+        "pi_mode": PI_MODE,
+        "active_section": "knowledge"
+    })
+
+@app.get("/health", response_class=HTMLResponse)
+async def health_page(request: Request):
+    """System health monitoring interface."""
+    status = await web_manager.get_system_status()
+    return templates.TemplateResponse("health_md3.html", {
+        "request": request,
+        "status": status,
+        "pi_mode": PI_MODE,
+        "active_section": "health"
+    })
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    """Settings and configuration interface."""
+    status = await web_manager.get_system_status()
+    return templates.TemplateResponse("settings_md3.html", {
+        "request": request,
+        "status": status,
+        "pi_mode": PI_MODE,
+        "active_section": "settings"
     })
 
 
 @app.get("/api/status")
 async def get_status():
     """Get current system status API."""
-    return JSONResponse(web_manager.get_system_status())
+    status = await web_manager.get_system_status()
+    return JSONResponse(status)
 
 
 @app.post("/api/service/start")
 async def start_service_api(mode: str = Form(...)):
-    """Start biological service API."""
+    """Start biological service API - Docker mode communicates with core service."""
     global current_mode
     current_mode = mode
     
-    workspace = str(web_manager.get_workspace())
-    english_mode = mode == "english"
-    
+    # In Docker architecture, the core service is always running
+    # We just need to check if it's healthy
     try:
-        success = start_service(workspace, english_mode)
+        success = await web_manager.check_core_service_health()
+        message = f"Core service is {'healthy' if success else 'not responding'} - {mode} mode selected"
+        
         await manager.broadcast({
             "type": "service_status",
-            "message": f"Service {'started' if success else 'failed to start'} in {mode} mode",
+            "message": message,
             "success": success
         })
-        return {"success": success, "mode": mode}
+        return {"success": success, "mode": mode, "message": message}
     except Exception as e:
-        logger.error(f"Error starting service: {e}")
+        logger.error(f"Error checking service: {e}")
         return {"success": False, "error": str(e)}
 
 
 @app.post("/api/service/stop")
 async def stop_service_api():
-    """Stop biological service API."""
+    """Stop biological service API - In Docker mode, core service runs independently."""
     try:
-        success = stop_service()
+        # In Docker architecture, we can't stop the core service from web GUI
+        # The core service runs in its own container
+        message = "Core service runs independently in Docker mode - use 'docker-compose down' to stop"
+        
         await manager.broadcast({
             "type": "service_status", 
-            "message": f"Service {'stopped' if success else 'failed to stop'}",
-            "success": success
+            "message": message,
+            "success": False
         })
-        return {"success": success}
+        return {"success": False, "message": message}
     except Exception as e:
-        logger.error(f"Error stopping service: {e}")
+        logger.error(f"Error: {e}")
         return {"success": False, "error": str(e)}
 
 
 @app.post("/api/knowledge/feed")
 async def feed_knowledge_api(knowledge: str = Form(...)):
-    """Feed knowledge to the system API."""
-    if not web_manager.get_system_status()['service_running']:
-        return {"success": False, "error": "Service must be running"}
+    """Feed knowledge to the system via core service API."""
+    status = await web_manager.get_system_status()
+    if not status['service_running']:
+        return {"success": False, "error": "Core service must be running"}
     
-    workspace = str(web_manager.get_workspace())
-    cmd = ["python", "biological_feeder.py", "text", knowledge, "--workspace", workspace]
+    if not HAS_HTTPX:
+        return {"success": False, "error": "HTTP client not available"}
     
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
-        success = result.returncode == 0
+        # Feed knowledge directly to core service API
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{web_manager.core_service_url}/api/feed",
+                json={"content": knowledge}
+            )
+            success = response.status_code == 200
+            result_data = response.json() if success else {}
         
         await manager.broadcast({
             "type": "knowledge_fed",
@@ -244,17 +362,63 @@ async def feed_knowledge_api(knowledge: str = Form(...)):
         
         return {
             "success": success,
-            "message": result.stdout if success else result.stderr
+            "message": result_data.get("status", "Knowledge processed") if success else "Failed to feed knowledge"
         }
     except Exception as e:
         logger.error(f"Error feeding knowledge: {e}")
         return {"success": False, "error": str(e)}
 
 
+@app.post("/api/query")
+async def query_intelligence_api(question: str = Form(...), hops: int = Form(2), max_results: int = Form(10)):
+    """Query the biological intelligence via core service API."""
+    status = await web_manager.get_system_status()
+    if not status['service_running']:
+        return {"success": False, "error": "Core service must be running"}
+    
+    if not HAS_HTTPX:
+        return {"success": False, "error": "HTTP client not available"}
+    
+    try:
+        # Query biological intelligence directly via core service API
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{web_manager.core_service_url}/api/query",
+                json={
+                    "query": question, 
+                    "max_results": max_results, 
+                    "hops": hops,
+                    "alpha": 0.5
+                }
+            )
+            success = response.status_code == 200
+            result_data = response.json() if success else {}
+        
+        await manager.broadcast({
+            "type": "query_completed",
+            "message": f"Query {'completed successfully' if success else 'failed'}",
+            "question": question[:100] + "..." if len(question) > 100 else question,
+            "success": success
+        })
+        
+        return {
+            "success": success,
+            "question": question,
+            "results": result_data.get("results", []) if success else [],
+            "consciousness_score": result_data.get("consciousness_score", 0) if success else 0,
+            "processing_time": result_data.get("processing_time", 0) if success else 0,
+            "message": "Query processed successfully" if success else "Failed to process query"
+        }
+    except Exception as e:
+        logger.error(f"Error querying intelligence: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @app.post("/api/curriculum/feed")
 async def feed_curriculum_api():
     """Feed curriculum API."""
-    if not web_manager.get_system_status()['service_running']:
+    status = await web_manager.get_system_status()
+    if not status['service_running']:
         return {"success": False, "error": "Service must be running"}
     
     try:
@@ -301,7 +465,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             # Send periodic status updates
-            status = web_manager.get_system_status()
+            status = await web_manager.get_system_status()
             await websocket.send_json({
                 "type": "status_update",
                 "data": status
@@ -316,7 +480,7 @@ async def system_monitor():
     """Background task for system monitoring."""
     while True:
         try:
-            status = web_manager.get_system_status()
+            status = await web_manager.get_system_status()
             
             # Check for thermal issues on Pi
             if PI_MODE and status.get('hardware_info', {}).get('thermal_status', {}).get('emergency_shutdown'):
@@ -354,9 +518,10 @@ def setup_web_directories():
 if __name__ == "__main__":
     setup_web_directories()
     
-    # Determine host and port
-    host = PiConfig.WEB_HOST if PI_MODE else "127.0.0.1"
-    port = PiConfig.WEB_PORT if PI_MODE else 8080
+    # Determine host and port - allow Docker container access
+    import os
+    host = os.getenv("WEB_HOST", PiConfig.WEB_HOST if PI_MODE else "0.0.0.0")
+    port = int(os.getenv("WEB_PORT", PiConfig.WEB_PORT if PI_MODE else 8080))
     
     print(f"🌐 Starting Biological Intelligence Web GUI on {host}:{port}")
     print(f"🥧 Pi Mode: {'Enabled' if PI_MODE else 'Disabled'}")

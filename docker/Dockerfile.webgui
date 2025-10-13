@@ -1,0 +1,43 @@
+FROM python:3.11-slim
+
+# Install system dependencies including curl for health checks
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install additional web GUI dependencies
+RUN pip install fastapi uvicorn jinja2 python-multipart websockets aiofiles
+
+# Copy source code and templates
+COPY src/ ./src/
+COPY web_gui.py .
+COPY service_control.py .
+COPY web_templates/ ./web_templates/
+COPY web_static/ ./web_static/
+
+# Create necessary directories
+RUN mkdir -p biological_workspace logs web_static web_templates
+
+# Create basic static and template directories if they don't exist
+RUN mkdir -p web_static/css web_static/js
+RUN touch web_static/css/.gitkeep web_static/js/.gitkeep
+
+# Set Python path
+ENV PYTHONPATH=/app
+
+# Expose web GUI port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD curl -f http://localhost:8080/ || exit 1
+
+# Default command
+CMD ["python", "web_gui.py"]

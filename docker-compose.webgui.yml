@@ -1,9 +1,10 @@
 services:
+  # Core biological intelligence service
   core-service:
     build: 
       context: .
       dockerfile: docker/Dockerfile.core
-    container_name: biological-core
+    container_name: biological-intelligence-core
     ports:
       - "8000:8000"
     environment:
@@ -22,6 +23,32 @@ services:
     networks:
       - biological-network
 
+  # Web GUI service
+  web-gui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.webgui
+    container_name: biological-web-gui
+    depends_on:
+      core-service:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      - PYTHONPATH=/app
+      - CORE_SERVICE_URL=http://core-service:8000
+      - WEB_HOST=0.0.0.0
+      - WEB_PORT=8080
+    volumes:
+      - ./biological_workspace:/app/biological_workspace
+      - ./logs:/app/logs
+      - ./web_templates:/app/web_templates
+      - ./web_static:/app/web_static
+    restart: unless-stopped
+    networks:
+      - biological-network
+
+  # Optional: Distributed trainer (remove if not needed)
   distributed-trainer:
     build:
       context: .
@@ -41,11 +68,12 @@ services:
     networks:
       - biological-network
 
+  # Optional: Interactive client (remove if not needed)
   distributed-client:
     build:
       context: .
       dockerfile: docker/Dockerfile.client
-    container_name: biological-client
+    container_name: biological-client-interactive
     depends_on:
       core-service:
         condition: service_healthy
@@ -56,48 +84,7 @@ services:
       - ./logs:/app/logs
     stdin_open: true
     tty: true
-    command: ["python", "distributed_client.py", "--core-url", "http://core-service:8000", "--monitor-consciousness"]
-    restart: unless-stopped
-    networks:
-      - biological-network
-
-  observer:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.core
-    container_name: biological-observer
-    depends_on:
-      core-service:
-        condition: service_healthy
-    environment:
-      - PYTHONPATH=/app
-      - WORKSPACE_PATH=/app/biological_workspace
-    volumes:
-      - ./biological_workspace:/app/biological_workspace
-      - ./logs:/app/logs
-    command: ["python", "biological_observer.py", "--workspace", "/app/biological_workspace"]
-    restart: unless-stopped
-    networks:
-      - biological-network
-
-  web-gui:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.webgui
-    container_name: biological-web-gui
-    depends_on:
-      core-service:
-        condition: service_healthy
-    ports:
-      - "8080:8080"
-    environment:
-      - PYTHONPATH=/app
-      - CORE_SERVICE_URL=http://core-service:8000
-    volumes:
-      - ./biological_workspace:/app/biological_workspace
-      - ./logs:/app/logs
-      - ./web_templates:/app/web_templates
-      - ./web_static:/app/web_static
+    command: ["python", "distributed_client.py", "--core-url", "http://core-service:8000", "--interactive"]
     restart: unless-stopped
     networks:
       - biological-network

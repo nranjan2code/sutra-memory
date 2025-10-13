@@ -1,0 +1,624 @@
+{% extends "base_md3.html" %}
+
+{% block title %}Knowledge Management - Biological Intelligence{% endblock %}
+
+{% block header_title %}Knowledge Management{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .knowledge-layout {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        gap: 24px;
+        height: calc(100vh - 64px - 48px);
+    }
+    
+    .main-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+    
+    .sidebar-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .feed-area {
+        min-height: 300px;
+    }
+    
+    .knowledge-input {
+        width: 100%;
+        min-height: 200px;
+        padding: 16px;
+        border: 2px solid var(--md-sys-color-outline-variant);
+        border-radius: 12px;
+        background: var(--md-sys-color-surface-container-low);
+        color: var(--md-sys-color-on-surface);
+        font-family: inherit;
+        font-size: 14px;
+        line-height: 1.5;
+        resize: vertical;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    
+    .knowledge-input:focus {
+        border-color: var(--md-sys-color-primary);
+        background: var(--md-sys-color-surface);
+    }
+    
+    .knowledge-input::placeholder {
+        color: var(--md-sys-color-on-surface-variant);
+    }
+    
+    .feed-controls {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-top: 16px;
+    }
+    
+    .validation-options {
+        display: flex;
+        gap: 16px;
+        margin: 16px 0;
+    }
+    
+    .validation-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--md-sys-color-on-surface);
+    }
+    
+    .concepts-browser {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    
+    .concept-item {
+        padding: 12px 16px;
+        margin: 4px 0;
+        border-radius: 8px;
+        background: var(--md-sys-color-surface-container-low);
+        cursor: pointer;
+        transition: all 0.2s;
+        border-left: 4px solid transparent;
+    }
+    
+    .concept-item:hover {
+        background: var(--md-sys-color-surface-container);
+        border-left-color: var(--md-sys-color-primary);
+    }
+    
+    .concept-content {
+        font-size: 14px;
+        margin-bottom: 6px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    
+    .concept-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: var(--md-sys-color-on-surface-variant);
+    }
+    
+    .memory-badge {
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+    
+    .memory-core { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+    .memory-long { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+    .memory-medium { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+    .memory-short { background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); }
+    .memory-ephemeral { background: var(--md-sys-color-surface-variant); color: var(--md-sys-color-on-surface-variant); }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+    }
+    
+    .stat-item {
+        text-align: center;
+        padding: 16px;
+        background: var(--md-sys-color-surface-container-low);
+        border-radius: 12px;
+    }
+    
+    .stat-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--md-sys-color-primary);
+        margin-bottom: 4px;
+    }
+    
+    .stat-label {
+        font-size: 12px;
+        color: var(--md-sys-color-on-surface-variant);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .search-bar {
+        position: relative;
+        margin-bottom: 16px;
+    }
+    
+    .search-input {
+        width: 100%;
+        height: 48px;
+        padding: 12px 16px 12px 48px;
+        border: 1px solid var(--md-sys-color-outline-variant);
+        border-radius: 24px;
+        background: var(--md-sys-color-surface-container-low);
+        color: var(--md-sys-color-on-surface);
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    
+    .search-input:focus {
+        border-color: var(--md-sys-color-primary);
+        border-width: 2px;
+        padding-left: 47px;
+    }
+    
+    .search-icon {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--md-sys-color-on-surface-variant);
+    }
+    
+    .filter-chips {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+    
+    .filter-chip {
+        padding: 8px 16px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid var(--md-sys-color-outline);
+        background: transparent;
+        color: var(--md-sys-color-on-surface);
+    }
+    
+    .filter-chip.active {
+        background: var(--md-sys-color-primary-container);
+        color: var(--md-sys-color-on-primary-container);
+        border-color: var(--md-sys-color-primary);
+    }
+    
+    .associations-view {
+        margin-top: 16px;
+    }
+    
+    .association-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px;
+        border-radius: 8px;
+        margin: 4px 0;
+        background: var(--md-sys-color-surface-container-lowest);
+    }
+    
+    .association-strength {
+        width: 60px;
+        height: 4px;
+        background: var(--md-sys-color-surface-variant);
+        border-radius: 2px;
+        overflow: hidden;
+    }
+    
+    .association-strength-fill {
+        height: 100%;
+        background: var(--md-sys-color-primary);
+        transition: width 0.3s;
+    }
+    
+    @media (max-width: 768px) {
+        .knowledge-layout {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr auto;
+        }
+        
+        .sidebar-panel {
+            order: -1;
+            max-height: 300px;
+        }
+        
+        .concepts-browser {
+            max-height: 200px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="knowledge-layout">
+    <!-- Main Panel -->
+    <div class="main-panel">
+        <!-- Knowledge Feed Section -->
+        <div class="md3-card feed-area">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="material-icons">edit_note</span>
+                    Feed Knowledge
+                </div>
+                <div class="status-chip {{ 'status-running' if status.service_running else 'status-stopped' }}">
+                    {{ 'Ready' if status.service_running else 'Offline' }}
+                </div>
+            </div>
+            <div class="card-content">
+                <textarea 
+                    class="knowledge-input" 
+                    id="knowledge-content"
+                    placeholder="Enter knowledge content here...\n\nExamples:\n• Facts: 'The human brain contains approximately 86 billion neurons.'\n• Concepts: 'Machine learning is a subset of artificial intelligence that enables computers to learn without explicit programming.'\n• Relationships: 'Photosynthesis converts carbon dioxide and water into glucose using sunlight.'\n\nThe system will automatically detect duplicates and validate content quality."
+                    {% if not status.service_running %}disabled{% endif %}></textarea>
+                
+                <div class="validation-options">
+                    <div class="validation-toggle">
+                        <input type="checkbox" id="check-duplicates" checked>
+                        <label for="check-duplicates">Check for duplicates</label>
+                    </div>
+                    <div class="validation-toggle">
+                        <input type="checkbox" id="validate-quality" checked>
+                        <label for="validate-quality">Validate content quality</label>
+                    </div>
+                    <div class="validation-toggle">
+                        <input type="checkbox" id="extract-concepts">
+                        <label for="extract-concepts">Auto-extract concepts</label>
+                    </div>
+                </div>
+                
+                <div class="feed-controls">
+                    <button class="md3-button button-filled" 
+                            onclick="feedKnowledge()" 
+                            id="feed-button"
+                            {% if not status.service_running %}disabled{% endif %}>
+                        <span class="material-icons">upload</span>
+                        Feed Knowledge
+                    </button>
+                    <button class="md3-button button-outlined" onclick="clearInput()">
+                        <span class="material-icons">clear</span>
+                        Clear
+                    </button>
+                    <button class="md3-button button-text" onclick="loadSample()">
+                        <span class="material-icons">example</span>
+                        Load Sample
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Knowledge Analytics -->
+        <div class="md3-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="material-icons">analytics</span>
+                    Knowledge Analytics
+                </div>
+            </div>
+            <div class="card-content">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ formatNumber(status.metrics.total_concepts) }}</div>
+                        <div class="stat-label">Total Concepts</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ formatNumber(status.metrics.total_associations) }}</div>
+                        <div class="stat-label">Associations</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ status.metrics.total_dreams }}</div>
+                        <div class="stat-label">Dream Cycles</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ "%.1f"|format(status.metrics.consciousness_score) }}</div>
+                        <div class="stat-label">Consciousness</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar Panel -->
+    <div class="sidebar-panel">
+        <!-- Concept Browser -->
+        <div class="md3-card" style="flex: 1;">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="material-icons">explore</span>
+                    Browse Concepts
+                </div>
+            </div>
+            <div class="card-content">
+                <div class="search-bar">
+                    <span class="material-icons search-icon">search</span>
+                    <input type="text" 
+                           class="search-input" 
+                           id="concept-search"
+                           placeholder="Search concepts..."
+                           onkeyup="searchConcepts()"
+                           {% if not status.service_running %}disabled{% endif %}>
+                </div>
+                
+                <div class="filter-chips">
+                    <div class="filter-chip active" onclick="filterByMemory('all')">All</div>
+                    <div class="filter-chip" onclick="filterByMemory('core')">Core</div>
+                    <div class="filter-chip" onclick="filterByMemory('long')">Long-term</div>
+                    <div class="filter-chip" onclick="filterByMemory('recent')">Recent</div>
+                </div>
+                
+                <div class="concepts-browser" id="concepts-list">
+                    {% if status.service_running %}
+                    <!-- Sample concepts - will be populated via API -->
+                    <div class="concept-item">
+                        <div class="concept-content">Biological intelligence systems use living computational processes...</div>
+                        <div class="concept-meta">
+                            <span class="memory-badge memory-core">Core</span>
+                            <span>0.89 strength</span>
+                        </div>
+                    </div>
+                    <div class="concept-item">
+                        <div class="concept-content">Neural networks process information through interconnected nodes...</div>
+                        <div class="concept-meta">
+                            <span class="memory-badge memory-long">Long-term</span>
+                            <span>0.76 strength</span>
+                        </div>
+                    </div>
+                    <div class="concept-item">
+                        <div class="concept-content">Machine learning algorithms improve through experience...</div>
+                        <div class="concept-meta">
+                            <span class="memory-badge memory-medium">Medium-term</span>
+                            <span>0.65 strength</span>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div style="text-align: center; color: var(--md-sys-color-on-surface-variant); padding: 40px;">
+                        <span class="material-icons" style="font-size: 48px; opacity: 0.5; margin-bottom: 16px;">library_books</span>
+                        <div>Start the system to browse concepts</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Associations View -->
+        <div class="md3-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="material-icons">account_tree</span>
+                    Associations
+                </div>
+            </div>
+            <div class="card-content">
+                <div class="associations-view" id="associations-list">
+                    {% if status.service_running %}
+                    <!-- Sample associations -->
+                    <div class="association-item">
+                        <span style="flex: 1; font-size: 12px;">Intelligence → Learning</span>
+                        <div class="association-strength">
+                            <div class="association-strength-fill" style="width: 85%;"></div>
+                        </div>
+                    </div>
+                    <div class="association-item">
+                        <span style="flex: 1; font-size: 12px;">Consciousness → Awareness</span>
+                        <div class="association-strength">
+                            <div class="association-strength-fill" style="width: 72%;"></div>
+                        </div>
+                    </div>
+                    <div class="association-item">
+                        <span style="flex: 1; font-size: 12px;">Neural → Network</span>
+                        <div class="association-strength">
+                            <div class="association-strength-fill" style="width: 91%;"></div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div style="text-align: center; color: var(--md-sys-color-on-surface-variant); padding: 20px;">
+                        <span class="material-icons" style="font-size: 32px; opacity: 0.5; margin-bottom: 8px;">account_tree</span>
+                        <div style="font-size: 12px;">No associations available</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block primary_action %}
+// Focus on knowledge input for quick content entry
+document.getElementById('knowledge-content')?.focus();
+{% endblock %}
+
+{% block websocket_handler %}
+if (data.type === 'knowledge_fed') {
+    handleKnowledgeFed(data);
+} else if (data.type === 'status_update') {
+    updateKnowledgeStats(data.data);
+}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let isFeeding = false;
+    
+    async function feedKnowledge() {
+        const content = document.getElementById('knowledge-content').value.trim();
+        
+        if (!content || isFeeding) return;
+        
+        {% if not status.service_running %}
+        showSnackbar('System must be running to feed knowledge', 'START');
+        return;
+        {% endif %}
+        
+        isFeeding = true;
+        const feedButton = document.getElementById('feed-button');
+        const originalText = feedButton.innerHTML;
+        
+        feedButton.innerHTML = '<span class="material-icons">hourglass_empty</span> Processing...';
+        feedButton.disabled = true;
+        
+        try {
+            const formData = new FormData();
+            formData.append('knowledge', content);
+            
+            // Add validation options
+            if (document.getElementById('check-duplicates').checked) {
+                formData.append('check_duplicates', 'true');
+            }
+            if (document.getElementById('validate-quality').checked) {
+                formData.append('validate_quality', 'true');
+            }
+            if (document.getElementById('extract-concepts').checked) {
+                formData.append('extract_concepts', 'true');
+            }
+            
+            const response = await fetch('/api/knowledge/feed', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showSnackbar('Knowledge processed successfully', 'VIEW');
+                document.getElementById('knowledge-content').value = '';
+                // Refresh concepts list
+                loadConcepts();
+            } else {
+                showSnackbar('Failed to process knowledge: ' + (result.error || 'Unknown error'), 'RETRY');
+            }
+            
+        } catch (error) {
+            showSnackbar('Error processing knowledge: ' + error.message, 'RETRY');
+        } finally {
+            isFeeding = false;
+            feedButton.innerHTML = originalText;
+            feedButton.disabled = false;
+        }
+    }
+    
+    function clearInput() {
+        document.getElementById('knowledge-content').value = '';
+    }
+    
+    function loadSample() {
+        const samples = [
+            "Photosynthesis is the process by which plants convert light energy into chemical energy, producing glucose and oxygen from carbon dioxide and water.",
+            "Neural plasticity refers to the brain's ability to reorganize and form new neural connections throughout life in response to learning and experience.",
+            "Quantum entanglement is a physical phenomenon where pairs of particles become correlated in such a way that the quantum state of each particle cannot be described independently.",
+            "Machine learning algorithms improve their performance on a specific task through experience, without being explicitly programmed for every scenario."
+        ];
+        
+        const randomSample = samples[Math.floor(Math.random() * samples.length)];
+        document.getElementById('knowledge-content').value = randomSample;
+    }
+    
+    function searchConcepts() {
+        const query = document.getElementById('concept-search').value.toLowerCase();
+        const conceptItems = document.querySelectorAll('.concept-item');
+        
+        conceptItems.forEach(item => {
+            const content = item.querySelector('.concept-content').textContent.toLowerCase();
+            item.style.display = content.includes(query) ? 'block' : 'none';
+        });
+    }
+    
+    function filterByMemory(type) {
+        // Update active filter chip
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        // Filter concepts (in a real implementation, this would call the API)
+        const conceptItems = document.querySelectorAll('.concept-item');
+        conceptItems.forEach(item => {
+            const badge = item.querySelector('.memory-badge');
+            if (type === 'all') {
+                item.style.display = 'block';
+            } else {
+                const show = badge.classList.contains(`memory-${type}`);
+                item.style.display = show ? 'block' : 'none';
+            }
+        });
+    }
+    
+    async function loadConcepts() {
+        // In a real implementation, this would fetch concepts from the API
+        // For now, we'll just show a loading state
+        const conceptsList = document.getElementById('concepts-list');
+        conceptsList.innerHTML = '<div style="text-align: center; padding: 20px;">Loading concepts...</div>';
+        
+        // Simulate API call
+        setTimeout(() => {
+            // Restore sample content (in real app, this would be API data)
+            location.reload();
+        }, 1000);
+    }
+    
+    function handleKnowledgeFed(data) {
+        // Handle WebSocket notification for knowledge feeding
+        if (data.success) {
+            loadConcepts();
+        }
+    }
+    
+    function updateKnowledgeStats(status) {
+        // Update the statistics in real-time
+        const statValues = document.querySelectorAll('.stat-value');
+        if (statValues.length >= 4 && status.metrics) {
+            statValues[0].textContent = formatNumber(status.metrics.total_concepts || 0);
+            statValues[1].textContent = formatNumber(status.metrics.total_associations || 0);
+            statValues[2].textContent = status.metrics.total_dreams || 0;
+            statValues[3].textContent = (status.metrics.consciousness_score || 0).toFixed(1);
+        }
+    }
+    
+    // Utility functions
+    function formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return num.toString();
+    }
+    
+    // Handle Enter key in knowledge input (Ctrl+Enter to submit)
+    document.addEventListener('DOMContentLoaded', function() {
+        const knowledgeInput = document.getElementById('knowledge-content');
+        if (knowledgeInput) {
+            knowledgeInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    e.preventDefault();
+                    feedKnowledge();
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

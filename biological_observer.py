@@ -257,19 +257,28 @@ class BiologicalObserver:
 
 async def main():
     """Main entry point."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Biological Intelligence Observer")
+    parser.add_argument("--workspace", default="./biological_workspace",
+                       help="Workspace directory to observe")
+    
+    args = parser.parse_args()
+    
     console = Console()
     
     console.print(Panel.fit(
         "[bold cyan]🔭 BIOLOGICAL INTELLIGENCE OBSERVER[/bold cyan]\n"
         "[yellow]Watch the living system evolve[/yellow]\n\n"
-        "[dim]This observer reads the biological intelligence state\n"
+        f"[dim]Observing workspace: {args.workspace}\n"
+        "This observer reads the biological intelligence state\n"
         "without interfering with its evolution.[/dim]",
         border_style="cyan"
     ))
     
     await asyncio.sleep(1)
     
-    observer = BiologicalObserver()
+    observer = BiologicalObserver(workspace_path=args.workspace)
     await observer.observe()
 
 

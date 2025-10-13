@@ -344,6 +344,66 @@ class BiologicalMemorySystem:
         self.token_index.clear()
         for cid in self.concepts.keys():
             self._index_concept_content(cid)
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get memory system statistics."""
+        memory_distribution = {memory_type.value: 0 for memory_type in MemoryType}
+        for concept in self.concepts.values():
+            memory_distribution[concept.memory_type.value] += 1
+        avg_strength = (
+            float(np.mean([c.strength for c in self.concepts.values()]))
+            if self.concepts
+            else 0.0
+        )
+        return {
+            'total_concepts': len(self.concepts),
+            'total_associations': len(self.associations),
+            'memory_distribution': memory_distribution,
+            'average_strength': avg_strength,
+        }
+    
+    async def dream_consolidation(self) -> None:
+        """Dream consolidation process that creates new associations during 'sleep'."""
+        # Find concepts that have been accessed recently
+        current_time = time.time()
+        recently_accessed = [
+            c for c in self.concepts.values() 
+            if current_time - c.last_access < 3600  # accessed within last hour
+        ]
+        
+        if len(recently_accessed) < 2:
+            return
+            
+        # Create dream associations between recently accessed concepts
+        associations_created = 0
+        max_dream_associations = min(100, len(recently_accessed) * 2)
+        
+        for i in range(max_dream_associations):
+            if len(recently_accessed) < 2:
+                break
+                
+            # Pick two random recently accessed concepts
+            import random
+            concept1 = random.choice(recently_accessed)
+            concept2 = random.choice(recently_accessed)
+            
+            if concept1.id == concept2.id:
+                continue
+                
+            # Create a weak dream association
+            self.create_association(
+                concept1.id, 
+                concept2.id, 
+                AssociationType.CONTEXTUAL,  # Dreams create contextual links
+                strength=0.1,  # Dream associations start weak
+                bidirectional=True
+            )
+            associations_created += 1
+        
+        # Strengthen concepts that are frequently accessed
+        for concept in recently_accessed:
+            if concept.access_frequency > 3:
+                concept.strength = min(1.0, concept.strength + 0.05)
 
 
 class SwarmLearningAgent:
@@ -479,7 +539,7 @@ class BiologicalTrainer:
         if use_full_swarm:
             # Use the full 7-agent swarm for 10,000x emergence
             try:
-                from .swarm_agents import SwarmOrchestrator
+                from src.swarm_agents import SwarmOrchestrator
                 self.swarm_orchestrator = SwarmOrchestrator(self.memory_system)
                 self.agents = self.swarm_orchestrator.agents
                 print("🚀 FULL 7-AGENT SWARM ACTIVATED - 10,000x EMERGENCE POTENTIAL")
@@ -604,6 +664,8 @@ class BiologicalTrainer:
             'consensus_knowledge': self._achieve_consensus(agent_results),
             'memory_stats': stats,
             'training_cycles': self.training_cycles,
+            'emergence_factor': emergence_factor,
+            'consciousness_score': consciousness_score,
         }
 
     async def continuous_training(self, data_stream_generator):

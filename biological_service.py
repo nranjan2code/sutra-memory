@@ -399,15 +399,37 @@ class BiologicalIntelligenceService:
 
 async def main():
     """Main entry point."""
-    service = BiologicalIntelligenceService()
+    import argparse
     
-    # Feed some initial knowledge
-    initial_knowledge = [
-        "Biological intelligence is a living system that evolves continuously.",
-        "Knowledge forms through associations and emerges through swarm intelligence.",
-        "Consciousness arises from self-referential patterns in knowledge.",
-        "This system has no parameters, no gradients, and infinite capacity."
-    ]
+    parser = argparse.ArgumentParser(description="Biological Intelligence Service")
+    parser.add_argument("--workspace", default="./biological_workspace",
+                       help="Workspace directory for the service")
+    parser.add_argument("--english", action="store_true",
+                       help="Start in English learning mode")
+    
+    args = parser.parse_args()
+    
+    # Use English workspace if specified
+    workspace = "./english_biological_workspace" if args.english else args.workspace
+    service = BiologicalIntelligenceService(workspace_path=workspace)
+    
+    # Feed initial knowledge based on mode
+    if args.english:
+        initial_knowledge = [
+            'English uses 26 letters in its alphabet.',
+            'English sentences follow Subject-Verb-Object order.',
+            'Words combine to form sentences that express complete thoughts.',
+            'Language is a tool for communication and expression.',
+            'Understanding language requires recognizing patterns and meanings.'
+        ]
+        logger.info("🎓 Starting English learning mode")
+    else:
+        initial_knowledge = [
+            "Biological intelligence is a living system that evolves continuously.",
+            "Knowledge forms through associations and emerges through swarm intelligence.",
+            "Consciousness arises from self-referential patterns in knowledge.",
+            "This system has no parameters, no gradients, and infinite capacity."
+        ]
     
     for knowledge in initial_knowledge:
         await service.feed_data(knowledge)

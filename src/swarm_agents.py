@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from enum import Enum
 import numpy as np
 
-from biological_trainer import (
+from src.biological_trainer import (
     SwarmLearningAgent, 
     BiologicalMemorySystem,
     AssociationType,
@@ -672,7 +672,7 @@ class SwarmOrchestrator:
     def initialize_swarm(self):
         """Initialize all 7 agents"""
         # Import existing agents
-        from biological_trainer import MolecularLearningAgent, SemanticLearningAgent
+        from src.biological_trainer import MolecularLearningAgent, SemanticLearningAgent
         
         # Create the complete swarm
         self.agents = {

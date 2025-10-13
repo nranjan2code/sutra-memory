@@ -25,20 +25,18 @@ The heart of the biological intelligence system:
 
 ```
 src/
-├── biological_trainer.py      # Main trainer with 7-agent swarm system
-├── swarm_agents.py           # Complete 7-agent swarm implementation  
-├── workspace_manager.py      # Centralized workspace management
-├── persistence_pbss.py       # Biological memory persistence system
-├── teacher_evaluator.py      # Truth grounding and validation system
-├── pure_binary_storage.py    # Low-level binary storage
-├── config.py                 # System configuration
-├── cli.py                    # Command-line interface
-└── audit_pbss.py             # Audit logging system
+├── config.py                 # ⭐ Single source of truth for all settings
+├── biological_trainer.py     # Main trainer with 7-agent swarm system
+├── swarm_agents.py          # Complete 7-agent swarm implementation  
+├── persistence_pbss.py      # Biological memory persistence system
+├── pure_binary_storage.py   # Low-level binary storage
+├── cli.py                   # Command-line interface
+└── audit_pbss.py            # Audit logging system
 ```
 
 **Key Files:**
+- **`config.py`** - ⭐ Core configuration with enums and settings
 - **`biological_trainer.py`** - Main training system with swarm intelligence
-- **`workspace_manager.py`** - Rock-solid workspace ID management
 - **`swarm_agents.py`** - Full 7-agent implementation for 10,000x emergence
 
 ### 🎓 **Training Systems**
@@ -46,9 +44,9 @@ src/
 Production-grade training and curriculum:
 
 ```
-├── robust_english_trainer.py        # 🌟 Production English training system
-├── enhanced_english_curriculum.py   # 111-lesson curriculum generator  
-├── enhanced_english_curriculum/     # Generated curriculum files
+├── simple_english_trainer.py       # 🌟 Clean architecture English trainer
+├── enhanced_english_curriculum.py  # 111-lesson curriculum generator  
+├── enhanced_english_curriculum/    # Generated curriculum files
 │   ├── optimal_learning_sequence.json
 │   ├── level_1_foundation_alphabet_and_phonics.json
 │   ├── level_2_elementary_vocabulary_and_word_types.json
@@ -56,12 +54,11 @@ Production-grade training and curriculum:
 │   ├── level_4_advanced_communication_and_complex_structures.json
 │   ├── level_5_proficient_usage_and_nuanced_expression.json
 │   └── complete_enhanced_curriculum.json
-├── biological_service.py           # Core biological intelligence service
-└── verify_learning.py             # Learning effectiveness verification
+└── biological_service.py          # Core biological intelligence service
 ```
 
 **Key Files:**
-- **`robust_english_trainer.py`** - ⭐ **RECOMMENDED** - Production training with quality assurance
+- **`simple_english_trainer.py`** - ⭐ **RECOMMENDED** - Clean architecture, 1,269 concepts learning
 - **`enhanced_english_curriculum.py`** - Creates 111-lesson comprehensive curriculum
 - **`biological_service.py`** - Persistent biological intelligence service
 

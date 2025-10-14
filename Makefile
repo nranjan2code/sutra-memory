@@ -10,8 +10,10 @@ help:
 	@echo "  clean        - Clean build artifacts and caches"
 	@echo ""
 	@echo "🧪 TESTING & DEMOS:"
-	@echo "  test-core    - Run sutra-core tests (10/10 passing ✓)"
-	@echo "  demo-core    - Run interactive core functionality demo"
+	@echo "  test-core    - Run sutra-core tests (60/60 passing ✓)"
+	@echo "  demo-core    - Run basic core functionality demo"
+	@echo "  demo-ai      - Run advanced AI reasoning demo (NEW)"
+	@echo "  make demo-ai - Showcase sophisticated AI capabilities"
 	@echo ""
 	@echo "🔧 CODE QUALITY:"
 	@echo "  format       - Format code (black, isort)"
@@ -108,6 +110,10 @@ docker-run:
 demo-core:
 	@echo "🚀 Running Sutra Core Demo (new structure)..."
 	source venv/bin/activate && python packages/sutra-core/examples/basic_demo.py
+
+demo-ai:
+	@echo "🧠 Running Advanced AI Reasoning Demo..."
+	source venv/bin/activate && python packages/sutra-core/examples/ai_reasoning_demo.py
 
 
 demo-hybrid:

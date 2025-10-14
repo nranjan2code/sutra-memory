@@ -32,6 +32,7 @@ from .graph import (
     ReasoningStep,
 )
 from .learning import AdaptiveLearner, AssociationExtractor
+from .reasoning import ReasoningEngine, MultiPathAggregator, PathFinder, QueryProcessor
 from .utils import (
     calculate_word_overlap,
     clean_text,
@@ -51,6 +52,11 @@ __all__ = [
     # Learning components
     "AssociationExtractor",
     "AdaptiveLearner",
+    # Reasoning engine (NEW - AI capabilities)
+    "ReasoningEngine",
+    "MultiPathAggregator",
+    "PathFinder",
+    "QueryProcessor",
     # Utilities
     "extract_words",
     "get_association_patterns",

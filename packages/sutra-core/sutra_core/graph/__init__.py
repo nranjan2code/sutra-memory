@@ -8,17 +8,17 @@ This package contains the core graph data structures and algorithms:
 """
 
 from .concepts import (
-    Concept,
-    Association, 
+    Association,
     AssociationType,
+    Concept,
+    ReasoningPath,
     ReasoningStep,
-    ReasoningPath
 )
 
 __all__ = [
-    'Concept',
-    'Association',
-    'AssociationType', 
-    'ReasoningStep',
-    'ReasoningPath'
+    "Concept",
+    "Association",
+    "AssociationType",
+    "ReasoningStep",
+    "ReasoningPath",
 ]

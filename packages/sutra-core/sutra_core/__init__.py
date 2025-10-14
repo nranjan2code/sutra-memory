@@ -4,7 +4,7 @@ Sutra AI Core - Graph-based reasoning system.
 This is the core package for the Sutra AI system, providing:
 - Concept and Association data structures
 - Spreading activation reasoning algorithms
-- Multi-Path Plan Aggregation (MPPA) 
+- Multi-Path Plan Aggregation (MPPA)
 - Adaptive focus learning
 - Real-time knowledge integration
 
@@ -15,43 +15,53 @@ The system offers a genuine alternative to LLM limitations:
 - Ultra-efficient CPU-only operation
 """
 
+from .exceptions import (
+    AssociationError,
+    ConceptError,
+    ConfigurationError,
+    LearningError,
+    StorageError,
+    SutraError,
+    ValidationError,
+)
 from .graph import (
-    Concept,
     Association,
     AssociationType,
-    ReasoningStep, 
-    ReasoningPath
+    Concept,
+    ReasoningPath,
+    ReasoningStep,
 )
-
-from .learning import (
-    AssociationExtractor,
-    AdaptiveLearner
-)
-
+from .learning import AdaptiveLearner, AssociationExtractor
 from .utils import (
+    calculate_word_overlap,
+    clean_text,
     extract_words,
     get_association_patterns,
-    clean_text,
-    calculate_word_overlap
 )
 
 __version__ = "1.0.0"
 
 __all__ = [
     # Core data structures
-    'Concept',
-    'Association', 
-    'AssociationType',
-    'ReasoningStep',
-    'ReasoningPath',
-    
+    "Concept",
+    "Association",
+    "AssociationType",
+    "ReasoningStep",
+    "ReasoningPath",
     # Learning components
-    'AssociationExtractor',
-    'AdaptiveLearner',
-    
+    "AssociationExtractor",
+    "AdaptiveLearner",
     # Utilities
-    'extract_words',
-    'get_association_patterns',
-    'clean_text', 
-    'calculate_word_overlap'
+    "extract_words",
+    "get_association_patterns",
+    "clean_text",
+    "calculate_word_overlap",
+    # Exceptions
+    "SutraError",
+    "ConceptError",
+    "AssociationError",
+    "LearningError",
+    "ValidationError",
+    "StorageError",
+    "ConfigurationError",
 ]

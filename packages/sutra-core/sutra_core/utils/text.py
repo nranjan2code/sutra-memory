@@ -14,93 +14,128 @@ from typing import List
 def extract_words(text: str) -> List[str]:
     """
     Extract meaningful words from text.
-    
+
     Filters out short words and common stop words to focus on
     semantically meaningful terms.
-    
+
     Args:
         text: Input text to process
-        
+
     Returns:
         List of filtered words
     """
     # Simple tokenization - could be enhanced with NLP
-    words = re.findall(r'\b\w+\b', text.lower())
-    
+    words = re.findall(r"\b\w+\b", text.lower())
+
     # Filter out very short words and common stop words
     stop_words = {
-        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 
-        'to', 'for', 'of', 'with', 'by', 'is', 'was', 'are', 'were',
-        'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 
-        'did', 'will', 'would', 'could', 'should', 'may', 'might',
-        'can', 'must', 'shall', 'this', 'that', 'these', 'those'
+        "the",
+        "a",
+        "an",
+        "and",
+        "or",
+        "but",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "with",
+        "by",
+        "is",
+        "was",
+        "are",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "can",
+        "must",
+        "shall",
+        "this",
+        "that",
+        "these",
+        "those",
     }
-    
+
     return [w for w in words if len(w) > 2 and w not in stop_words]
 
 
 def get_association_patterns():
     """
     Get regex patterns for association extraction.
-    
+
     Returns patterns for different types of relationships:
     - Causal: X causes Y
-    - Hierarchical: X is a Y  
+    - Hierarchical: X is a Y
     - Compositional: X contains Y
     - Semantic: X similar to Y
     - Temporal: X before Y
-    
+
     Returns:
         List of (pattern, AssociationType) tuples
     """
     from ..graph.concepts import AssociationType
-    
+
     return [
-        (r'(.+?) causes (.+)', AssociationType.CAUSAL),
-        (r'(.+?) is (?:a|an) (.+)', AssociationType.HIERARCHICAL),
-        (r'(.+?) contains (.+)', AssociationType.COMPOSITIONAL),
-        (r'(.+?) similar to (.+)', AssociationType.SEMANTIC),
-        (r'(.+?) before (.+)', AssociationType.TEMPORAL)
+        (r"(.+?) causes (.+)", AssociationType.CAUSAL),
+        (r"(.+?) is (?:a|an) (.+)", AssociationType.HIERARCHICAL),
+        (r"(.+?) contains (.+)", AssociationType.COMPOSITIONAL),
+        (r"(.+?) similar to (.+)", AssociationType.SEMANTIC),
+        (r"(.+?) before (.+)", AssociationType.TEMPORAL),
     ]
 
 
 def clean_text(text: str) -> str:
     """
     Clean and normalize text for processing.
-    
+
     Args:
         text: Raw input text
-        
+
     Returns:
         Cleaned text
     """
     # Remove extra whitespace
-    text = re.sub(r'\s+', ' ', text.strip())
-    
+    text = re.sub(r"\s+", " ", text.strip())
+
     # Remove special characters that might interfere with parsing
-    text = re.sub(r'[^\w\s\-.,;:!?()]', '', text)
-    
+    text = re.sub(r"[^\w\s\-.,;:!?()]", "", text)
+
     return text
 
 
 def calculate_word_overlap(words1: List[str], words2: List[str]) -> float:
     """
     Calculate word overlap ratio between two word lists.
-    
+
     Args:
         words1: First word list
         words2: Second word list
-        
+
     Returns:
         Overlap ratio (0.0 to 1.0)
     """
     if not words1 or not words2:
         return 0.0
-        
+
     set1 = set(words1)
     set2 = set(words2)
-    
+
     overlap = len(set1 & set2)
     total = min(len(set1), len(set2))
-    
+
     return overlap / total if total > 0 else 0.0

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Revolutionary AI System - Clean Implementation
+Sutra AI System - Clean Implementation
 
 A genuine alternative to LLM limitations with:
 1. Associative reasoning with full explainability
@@ -22,7 +22,7 @@ import time
 import json
 import hashlib
 import heapq
-from typing import Dict, List, Set, Optional, Any, Tuple
+from typing import Dict, List, Set, Optional, Any, Tuple, DefaultDict
 from dataclasses import dataclass, field
 from pathlib import Path
 from collections import defaultdict, deque
@@ -34,7 +34,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger('RevolutionaryAI')
+logger = logging.getLogger('SutraAI')
 
 class AssociationType(Enum):
     """Types of associations between concepts"""
@@ -99,10 +99,11 @@ class ReasoningPath:
     confidence: float
     total_time: float
 
-class RevolutionaryAI:
-    """Revolutionary AI System - LLM Alternative"""
+class SutraAI:
+    """Sutra AI System - LLM Alternative"""
     
-    def __init__(self, storage_path: str = "./revolutionary_knowledge"):
+    def __init__(self, storage_path: str = "./sutra_knowledge"):
+
         self.storage_path = Path(storage_path)
         self.storage_path.mkdir(exist_ok=True)
         
@@ -123,21 +124,47 @@ class RevolutionaryAI:
             'start_time': time.time()
         }
         
-        logger.info(f"Revolutionary AI initialized at {storage_path}")
+        logger.info(f"Sutra AI initialized at {self.storage_path}")
     
     # ============================================================================
     # REAL-TIME LEARNING (vs. LLM retraining)
     # ============================================================================
     
-    def learn(self, content: str, source: str = None, category: str = None) -> str:
-        """Learn new knowledge instantly (vs. LLM's expensive retraining)"""
+    def learn(self, content: str, source: Optional[str] = None, category: Optional[str] = None,
+             use_adaptive_focus: bool = True) -> str:
+        """
+        Learn new knowledge instantly with Adaptive Focus (vs. LLM's expensive retraining)
+        
+        Args:
+            content: Knowledge to learn
+            source: Source of knowledge
+            category: Category/domain
+            use_adaptive_focus: Enable AdaKD-style adaptive learning focus
+        
+        The adaptive focus:
+        - Spends more compute on difficult concepts (low strength)
+        - Quick processing for well-established concepts (high strength)
+        - Based on "LLM-Oriented Token-Adaptive Knowledge Distillation" (Oct 2025)
+        """
         # Create concept ID
         concept_id = hashlib.md5(content.encode()).hexdigest()[:12]
         
         if concept_id in self.concepts:
             # Strengthen existing concept
-            self.concepts[concept_id].access()
-            logger.debug(f"Strengthened existing concept: {content[:30]}...")
+            existing_concept = self.concepts[concept_id]
+            existing_concept.access()
+            
+            # Adaptive reinforcement based on current strength
+            if use_adaptive_focus:
+                if existing_concept.strength < 4.0:
+                    # Difficult concept: strong reinforcement
+                    existing_concept.strength = min(10.0, existing_concept.strength * 1.15)
+                elif existing_concept.strength > 7.0:
+                    # Easy concept: minimal reinforcement
+                    existing_concept.strength = min(10.0, existing_concept.strength * 1.01)
+                # else: moderate concept uses default 1.02 from access()
+            
+            logger.debug(f"Strengthened existing concept: {content[:30]}... (strength={existing_concept.strength:.2f})")
         else:
             # Create new concept
             concept = Concept(
@@ -151,8 +178,14 @@ class RevolutionaryAI:
             self.stats['concepts_created'] += 1
             logger.debug(f"Created new concept: {content[:30]}...")
         
-        # Extract and create associations
-        self._extract_associations(content, concept_id)
+        # Extract and create associations with adaptive depth
+        if use_adaptive_focus:
+            concept = self.concepts[concept_id]
+            # New/weak concepts: deeper association extraction
+            extraction_depth = 2 if concept.strength < 4.0 else 1
+            self._extract_associations_adaptive(content, concept_id, depth=extraction_depth)
+        else:
+            self._extract_associations(content, concept_id)
         
         return concept_id
     
@@ -196,6 +229,42 @@ class RevolutionaryAI:
                 # Create association
                 self._create_association(source_id, target_id, assoc_type, 0.8)
     
+    def _extract_associations_adaptive(self, content: str, concept_id: str, depth: int = 1):
+        """
+        Adaptive association extraction based on concept difficulty
+        
+        Loss-Driven Adaptive Token Focusing (LATF) approach:
+        - Difficult concepts (depth=2): Extract more associations, deeper analysis
+        - Easy concepts (depth=1): Quick extraction, standard patterns
+        
+        Args:
+            content: Content to extract from
+            concept_id: Central concept ID
+            depth: Extraction depth (1=normal, 2=deep for difficult concepts)
+        """
+        # Always do standard extraction
+        self._extract_associations(content, concept_id)
+        
+        # For difficult concepts, do additional deep extraction
+        if depth > 1:
+            # Extract co-occurrence associations (appears together = related)
+            words = self._extract_words(content)
+            for i, word1 in enumerate(words):
+                for word2 in words[i+1:i+4]:  # Window of 3 words
+                    # Find concepts containing these words
+                    concepts1 = self.word_to_concepts.get(word1, set())
+                    concepts2 = self.word_to_concepts.get(word2, set())
+                    
+                    for c1 in list(concepts1)[:3]:  # Limit to avoid explosion
+                        for c2 in list(concepts2)[:3]:
+                            if c1 != c2:
+                                # Weaker association for co-occurrence
+                                self._create_association(
+                                    c1, c2, 
+                                    AssociationType.SEMANTIC, 
+                                    confidence=0.5
+                                )
+    
     def _find_or_create_concept(self, text: str) -> str:
         """Find existing concept or create new one"""
         concept_id = hashlib.md5(text.encode()).hexdigest()[:12]
@@ -231,8 +300,20 @@ class RevolutionaryAI:
     # EXPLAINABLE REASONING (vs. LLM black boxes)
     # ============================================================================
     
-    def reason(self, query: str, max_steps: int = 5) -> ReasoningPath:
-        """Perform explainable multi-step reasoning"""
+    def reason(self, query: str, max_steps: int = 5, use_multi_path: bool = True, 
+               num_paths: int = 3) -> ReasoningPath:
+        """
+        Perform explainable multi-step reasoning
+        
+        Args:
+            query: Question or query to reason about
+            max_steps: Maximum reasoning depth
+            use_multi_path: Enable Multi-Path Plan Aggregation (MPPA) - Oct 2025 research
+            num_paths: Number of diverse paths to explore and aggregate
+        
+        Returns:
+            ReasoningPath with aggregated multi-path reasoning or single-path fallback
+        """
         start_time = time.time()
         self.stats['queries_processed'] += 1
         
@@ -247,10 +328,16 @@ class RevolutionaryAI:
                 total_time=time.time() - start_time
             )
         
-        # Perform spreading activation to find reasoning path
-        reasoning_path = self._spreading_activation_search(
-            query, starting_concepts, max_steps
-        )
+        # Use Multi-Path Plan Aggregation for robustness (prevents CoT derailment)
+        if use_multi_path and num_paths > 1:
+            reasoning_path = self._multi_path_reasoning(
+                query, starting_concepts, max_steps, num_paths
+            )
+        else:
+            # Fallback to single-path reasoning
+            reasoning_path = self._spreading_activation_search(
+                query, starting_concepts, max_steps
+            )
         
         reasoning_path.total_time = time.time() - start_time
         self.stats['reasoning_paths_built'] += 1
@@ -260,7 +347,7 @@ class RevolutionaryAI:
     def _find_relevant_concepts(self, query: str, top_k: int = 5) -> List[Tuple[str, float]]:
         """Find concepts most relevant to query"""
         query_words = self._extract_words(query)
-        concept_scores = defaultdict(float)
+        concept_scores: DefaultDict[str, float] = defaultdict(float)
         
         # Score concepts by word overlap and strength
         for word in query_words:
@@ -284,8 +371,8 @@ class RevolutionaryAI:
         """Search for reasoning path using spreading activation"""
         
         # Priority queue: (-score, step_count, concept_id, path)
-        queue = []
-        visited = set()
+        queue: List[Tuple[float, int, str, List[str]]] = []
+        visited: Set[str] = set()
         best_answer = "No clear reasoning path found"
         best_confidence = 0.0
         best_path = []
@@ -329,6 +416,206 @@ class RevolutionaryAI:
             confidence=best_confidence,
             total_time=0.0  # Will be set by caller
         )
+    
+    def _multi_path_reasoning(self, query: str,
+                             starting_concepts: List[Tuple[str, float]],
+                             max_steps: int, num_paths: int) -> ReasoningPath:
+        """
+        Multi-Path Plan Aggregation (MPPA) - Oct 2025 Research
+        
+        Generate multiple diverse reasoning paths and aggregate them to prevent
+        Chain-of-Thought derailment. This addresses the problem where single-path
+        reasoning can go off track due to compounding errors.
+        
+        Based on: "Enhancing Long Chain-of-Thought Reasoning through Multi-Path 
+        Plan Aggregation" (arXiv:2510.11620)
+        
+        Args:
+            query: The query to reason about
+            starting_concepts: Initial concept candidates
+            max_steps: Maximum reasoning depth
+            num_paths: Number of diverse paths to explore
+            
+        Returns:
+            Aggregated reasoning path with consensus answer
+        """
+        paths: List[ReasoningPath] = []
+        concept_frequency: DefaultDict[str, int] = defaultdict(int)
+        concept_scores: DefaultDict[str, float] = defaultdict(float)
+        answer_candidates: DefaultDict[str, float] = defaultdict(float)
+        
+        # Generate diverse reasoning paths with variations
+        for path_idx in range(num_paths):
+            # Vary exploration parameters to get diverse paths
+            variation_factor = 1.0 - (path_idx * 0.15)  # Decay factor variation
+            
+            # Modify starting concept scores for diversity
+            varied_concepts = [
+                (cid, score * (0.9 + path_idx * 0.05)) 
+                for cid, score in starting_concepts
+            ]
+            
+            # Generate path with variation
+            path = self._spreading_activation_search_varied(
+                query, varied_concepts, max_steps, variation_factor
+            )
+            paths.append(path)
+            
+            # Track concept appearances across paths
+            for step in path.steps:
+                # Extract concept from step
+                concept_key = f"{step.source_concept}|{step.target_concept}"
+                concept_frequency[concept_key] += 1
+                concept_scores[concept_key] += step.confidence
+            
+            # Track answer candidates
+            if path.answer and path.confidence > 0.1:
+                answer_candidates[path.answer] += path.confidence
+        
+        # Aggregate paths using consensus voting
+        # Concepts appearing in multiple paths get boosted (consensus bias)
+        consensus_threshold = max(1, num_paths // 2)  # Majority voting
+        
+        best_answer = "No consensus answer found"
+        best_confidence = 0.0
+        aggregated_steps = []
+        
+        # Find consensus answer (appears in multiple paths)
+        for answer, total_confidence in answer_candidates.items():
+            # Count how many paths led to this answer
+            path_support = sum(1 for p in paths if p.answer == answer)
+            
+            # Consensus boost: prefer answers from multiple paths
+            if path_support >= consensus_threshold:
+                consensus_confidence = total_confidence * (1.0 + path_support * 0.2)
+                if consensus_confidence > best_confidence:
+                    best_answer = answer
+                    best_confidence = consensus_confidence
+        
+        # If no consensus, use highest confidence single path
+        if best_confidence == 0.0:
+            best_path = max(paths, key=lambda p: p.confidence)
+            best_answer = best_path.answer
+            best_confidence = best_path.confidence * 0.8  # Penalize non-consensus
+            aggregated_steps = best_path.steps
+        else:
+            # Build aggregated reasoning steps from consensus concepts
+            aggregated_steps = self._build_aggregated_steps(
+                concept_frequency, concept_scores, consensus_threshold
+            )
+        
+        # Track multi-path stats
+        if 'multi_path_queries' not in self.stats:
+            self.stats['multi_path_queries'] = 0
+            self.stats['consensus_achieved'] = 0
+        
+        self.stats['multi_path_queries'] += 1
+        if best_confidence > 0.0:
+            self.stats['consensus_achieved'] += 1
+        
+        return ReasoningPath(
+            query=query,
+            answer=best_answer,
+            steps=aggregated_steps,
+            confidence=best_confidence,
+            total_time=0.0  # Will be set by caller
+        )
+    
+    def _spreading_activation_search_varied(self, query: str,
+                                           starting_concepts: List[Tuple[str, float]],
+                                           max_steps: int,
+                                           variation_factor: float = 1.0) -> ReasoningPath:
+        """
+        Spreading activation search with variation factor for diversity
+        
+        Args:
+            variation_factor: Multiplier for score propagation (creates path diversity)
+        """
+        queue: List[Tuple[float, int, str, List[str]]] = []
+        visited: Set[str] = set()
+        best_answer = "No clear reasoning path found"
+        best_confidence = 0.0
+        best_path = []
+        
+        # Initialize with starting concepts
+        for concept_id, score in starting_concepts:
+            heapq.heappush(queue, (-score, 0, concept_id, [concept_id]))
+        
+        while queue:
+            neg_score, steps, current_id, path = heapq.heappop(queue)
+            current_score = -neg_score
+            
+            if current_id in visited or steps >= max_steps:
+                continue
+            visited.add(current_id)
+            
+            current_concept = self.concepts[current_id]
+            current_concept.access()
+            
+            # Check if this could be a good answer
+            if steps > 0 and self._is_answer_relevant(current_concept.content, query):
+                if current_score > best_confidence:
+                    best_answer = current_concept.content
+                    best_confidence = current_score
+                    best_path = self._build_reasoning_steps(path)
+            
+            # Explore neighbors with variation
+            for neighbor_id in self.concept_neighbors.get(current_id, set()):
+                if neighbor_id not in visited:
+                    association = self._get_association(current_id, neighbor_id)
+                    if association:
+                        # Apply variation factor for path diversity
+                        propagated_score = (current_score * association.confidence * 
+                                          0.9 * variation_factor)
+                        new_path = path + [neighbor_id]
+                        heapq.heappush(queue, 
+                                     (-propagated_score, steps + 1, neighbor_id, new_path))
+        
+        return ReasoningPath(
+            query=query,
+            answer=best_answer,
+            steps=best_path,
+            confidence=best_confidence,
+            total_time=0.0
+        )
+    
+    def _build_aggregated_steps(self, concept_frequency: Dict[str, int],
+                               concept_scores: Dict[str, float],
+                               threshold: int) -> List[ReasoningStep]:
+        """Build reasoning steps from aggregated multi-path concepts"""
+        aggregated_steps = []
+        step_num = 1
+        
+        # Get concepts that appear in multiple paths (consensus)
+        consensus_concepts = [
+            (concept, freq) 
+            for concept, freq in concept_frequency.items()
+            if freq >= threshold
+        ]
+        
+        # Sort by frequency and score
+        consensus_concepts.sort(
+            key=lambda x: (x[1], concept_scores[x[0]]), 
+            reverse=True
+        )
+        
+        # Build steps from top consensus concepts
+        for concept_key, frequency in consensus_concepts[:5]:  # Top 5 concepts
+            if '|' in concept_key:
+                source, target = concept_key.split('|', 1)
+                avg_confidence = concept_scores[concept_key] / frequency
+                
+                step = ReasoningStep(
+                    source_concept=source,
+                    relation="consensus",
+                    target_concept=target,
+                    confidence=min(1.0, avg_confidence * (1.0 + frequency * 0.1)),
+                    step_number=step_num
+                )
+                aggregated_steps.append(step)
+                step_num += 1
+        
+        return aggregated_steps
     
     def _is_answer_relevant(self, content: str, query: str) -> bool:
         """Check if content is relevant answer to query"""
@@ -413,7 +700,7 @@ class RevolutionaryAI:
             'storage_path': str(self.storage_path)
         }
     
-    def save(self, filename: str = "revolutionary_ai_knowledge.json"):
+    def save(self, filename: str = "sutra_ai_knowledge.json"):
         """Save knowledge base to persistent storage"""
         filepath = self.storage_path / filename
         
@@ -449,7 +736,7 @@ class RevolutionaryAI:
         
         logger.info(f"Saved {len(self.concepts)} concepts and {len(self.associations)} associations")
     
-    def load(self, filename: str = "revolutionary_ai_knowledge.json"):
+    def load(self, filename: str = "sutra_ai_knowledge.json"):
         """Load knowledge base from persistent storage"""
         filepath = self.storage_path / filename
         
@@ -502,15 +789,15 @@ class RevolutionaryAI:
 # DEMONSTRATION OF REVOLUTIONARY CAPABILITIES
 # ============================================================================
 
-async def demonstrate_revolutionary_ai():
+async def demonstrate_sutra_ai():
     """Show how this system beats LLMs on core limitations"""
-    print("🚀 REVOLUTIONARY AI SYSTEM - LLM ALTERNATIVE")
+    print("🚀 SUTRA AI SYSTEM - LLM ALTERNATIVE")
     print("=" * 60)
     print("Demonstrating genuine solutions to LLM limitations")
     print("=" * 60)
     
     # Initialize system
-    ai = RevolutionaryAI("./demo_knowledge")
+    ai = SutraAI("./demo_knowledge")
     ai.load()  # Load any existing knowledge
     
     print(f"\n📚 Starting with {len(ai.concepts)} concepts in knowledge base")
@@ -614,7 +901,7 @@ async def demonstrate_revolutionary_ai():
     print(f"\n💾 Knowledge saved to: {ai.storage_path}")
     
     print("\n" + "=" * 60)
-    print("🎉 REVOLUTIONARY AI CAPABILITIES DEMONSTRATED")
+    print("🎉 SUTRA AI CAPABILITIES DEMONSTRATED")
     print("✅ Real-time learning (vs. expensive retraining)")
     print("✅ 100% explainable reasoning (vs. black boxes)")
     print("✅ True compositional understanding (vs. memorization)")
@@ -628,10 +915,10 @@ if __name__ == "__main__":
     import sys
     
     if len(sys.argv) > 1 and sys.argv[1] == "--demo":
-        asyncio.run(demonstrate_revolutionary_ai())
+        asyncio.run(demonstrate_sutra_ai())
     else:
-        print("🚀 Revolutionary AI System")
-        print("Usage: python revolutionary_ai.py --demo")
+        print("🚀 Sutra AI System")
+        print("Usage: python sutra_ai.py --demo")
         print("")
         print("This system provides a genuine alternative to LLM limitations:")
         print("• Real-time learning without retraining")  

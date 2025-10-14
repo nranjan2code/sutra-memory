@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Revolutionary AI API Service - REST API for the Revolutionary AI System
+Sutra AI API Service - REST API for the Sutra AI System
 
-This API exposes the revolutionary AI capabilities as REST endpoints,
+This API exposes the sutra AI capabilities as REST endpoints,
 making it easy to integrate with other systems and compare with LLMs.
 
 Features:
@@ -24,16 +24,16 @@ import time
 import asyncio
 from contextlib import asynccontextmanager
 
-from revolutionary_ai import RevolutionaryAI, ReasoningPath, ReasoningStep
+from sutra_ai import SutraAI, ReasoningPath, ReasoningStep
 
 # ============================================================================
 # API Models
 # ============================================================================
 
 class LearnRequest(BaseModel):
-    content: str = Field(..., description="Content to learn")
-    source: Optional[str] = Field(None, description="Source of the content")
-    category: Optional[str] = Field(None, description="Category of the content")
+    content: str = Field(..., description="Content to learn", max_length=10000)
+    source: Optional[str] = Field(None, description="Source of the content", max_length=200)
+    category: Optional[str] = Field(None, description="Category of the content", max_length=100)
 
 class LearnResponse(BaseModel):
     concept_id: str
@@ -41,7 +41,7 @@ class LearnResponse(BaseModel):
     processing_time: float
 
 class QueryRequest(BaseModel):
-    query: str = Field(..., description="Question or query to answer")
+    query: str = Field(..., description="Question or query to answer", max_length=1000)
     max_steps: int = Field(5, description="Maximum reasoning steps", ge=1, le=10)
 
 class ReasoningStepModel(BaseModel):
@@ -60,8 +60,8 @@ class QueryResponse(BaseModel):
     explainability: str = "100% - Complete reasoning chain provided"
 
 class ComposeRequest(BaseModel):
-    concept_a: str = Field(..., description="First concept to compose")
-    concept_b: str = Field(..., description="Second concept to compose")
+    concept_a: str = Field(..., description="First concept to compose", max_length=500)
+    concept_b: str = Field(..., description="Second concept to compose", max_length=500)
 
 class ComposeResponse(BaseModel):
     composition: Optional[str]
@@ -110,8 +110,8 @@ async def lifespan(app: FastAPI):
     """Manage AI instance lifecycle"""
     global ai_instance
     
-    print("🚀 Initializing Revolutionary AI System...")
-    ai_instance = RevolutionaryAI("./api_knowledge")
+    print("🚀 Initializing Sutra AI System...")
+    ai_instance = SutraAI("./api_knowledge")
     ai_instance.load()  # Load existing knowledge
     print(f"📚 Loaded {len(ai_instance.concepts)} existing concepts")
     
@@ -126,7 +126,7 @@ async def lifespan(app: FastAPI):
 # ============================================================================
 
 app = FastAPI(
-    title="Revolutionary AI System API",
+    title="Sutra AI System API",
     description="""
     A genuine alternative to LLM limitations with:
     
@@ -163,6 +163,9 @@ async def learn_knowledge(request: LearnRequest):
     This demonstrates real-time learning - knowledge is immediately available
     for reasoning without any retraining process.
     """
+    if ai_instance is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    
     start_time = time.time()
     
     try:
@@ -186,6 +189,9 @@ async def learn_knowledge(request: LearnRequest):
 @app.post("/api/learn/batch")
 async def learn_batch(requests: List[LearnRequest]):
     """Learn multiple pieces of knowledge in batch"""
+    if ai_instance is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    
     start_time = time.time()
     results = []
     
@@ -226,6 +232,9 @@ async def query_ai(request: QueryRequest):
     Returns complete reasoning chains showing exactly how the answer
     was derived, unlike LLMs which provide no explainability.
     """
+    if ai_instance is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    
     start_time = time.time()
     
     try:
@@ -257,6 +266,9 @@ async def query_ai(request: QueryRequest):
 @app.get("/api/query/random")
 async def query_random():
     """Generate and answer a random query for demonstration"""
+    if ai_instance is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    
     import random
     
     sample_queries = [
@@ -281,6 +293,9 @@ async def compose_concepts(request: ComposeRequest):
     
     Demonstrates true compositional understanding beyond LLM memorization.
     """
+    if ai_instance is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    
     start_time = time.time()
     
     try:
@@ -307,6 +322,9 @@ async def get_system_stats():
     Shows persistent memory usage and performance metrics
     that demonstrate advantages over LLM context limitations.
     """
+    if ai_instance is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    
     try:
         stats = ai_instance.get_stats()
         return StatsResponse(**stats)
@@ -317,6 +335,9 @@ async def get_system_stats():
 @app.post("/api/save")
 async def save_knowledge():
     """Save current knowledge base to persistent storage"""
+    if ai_instance is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    
     try:
         ai_instance.save()
         return {
@@ -330,6 +351,9 @@ async def save_knowledge():
 @app.post("/api/reset")
 async def reset_system():
     """Reset the AI system (clear all knowledge)"""
+    if ai_instance is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    
     try:
         ai_instance.concepts.clear()
         ai_instance.associations.clear()
@@ -359,8 +383,11 @@ async def benchmark_performance(request: BenchmarkRequest):
     
     Demonstrates speed and cost advantages over traditional LLMs.
     """
+    if ai_instance is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    
     results = []
-    total_time = 0
+    total_time: float = 0.0
     
     for query in request.queries:
         times = []
@@ -407,7 +434,9 @@ async def benchmark_performance(request: BenchmarkRequest):
 
 @app.get("/api/demo/setup")
 async def setup_demo():
-    """Set up demonstration data showing Revolutionary AI capabilities"""
+    """Set up demonstration data showing Sutra AI capabilities"""
+    if ai_instance is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
     
     demo_knowledge = [
         "Photosynthesis converts sunlight into chemical energy in plants using chlorophyll",
@@ -452,7 +481,7 @@ async def compare_with_llm():
     """
     Show direct comparison with LLM limitations
     
-    This endpoint demonstrates the concrete advantages of Revolutionary AI
+    This endpoint demonstrates the concrete advantages of Sutra AI
     over traditional LLMs across all dimensions.
     """
     
@@ -480,7 +509,7 @@ async def compare_with_llm():
         "advantages": {
             "cost_efficiency": "300x cheaper per query",
             "speed": "40x faster response times",
-            "explainability": "Revolutionary AI: 100% vs LLMs: 0%",
+            "explainability": "Sutra AI: 100% vs LLMs: 0%",
             "learning": "Real-time vs expensive retraining",
             "memory": "Unlimited vs context window limits",
             "reliability": "Knowledge-grounded vs hallucination-prone"
@@ -496,7 +525,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "system": "Revolutionary AI System",
+        "system": "Sutra AI System",
         "version": "1.0.0",
         "concepts_loaded": len(ai_instance.concepts) if ai_instance else 0,
         "ready": ai_instance is not None
@@ -506,7 +535,7 @@ async def health_check():
 async def root():
     """Root endpoint with system information"""
     return {
-        "message": "Revolutionary AI System API",
+        "message": "Sutra AI System API",
         "description": "A genuine alternative to LLM limitations",
         "version": "1.0.0",
         "features": [
@@ -535,7 +564,7 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     
-    print("🚀 Starting Revolutionary AI API Server")
+    print("🚀 Starting Sutra AI API Server")
     print("📚 Visit http://localhost:8000/docs for interactive API documentation")
     print("🎯 Try the demo: GET /api/demo/setup then POST /api/query")
     

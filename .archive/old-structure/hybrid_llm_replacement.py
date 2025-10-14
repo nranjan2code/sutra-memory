@@ -23,13 +23,14 @@ import numpy as np
 import time
 import json
 import hashlib
+import math
 from typing import List, Dict, Optional, Tuple, Set, Any
 from dataclasses import dataclass, field
 from collections import defaultdict, deque
 from pathlib import Path
 import re
 
-from revolutionary_ai import RevolutionaryAI, Concept, AssociationType, ReasoningPath
+from sutra_ai import SutraAI, Concept, AssociationType, ReasoningPath
 
 
 # ============================================================================
@@ -50,7 +51,7 @@ class LightweightEmbeddings:
     
     def __init__(self, model_type: str = "auto"):
         self.model_type = model_type
-        self.model = None
+        self.model: Optional[Any] = None
         self.embedding_dim = 384
         
         self._initialize_model()
@@ -98,7 +99,7 @@ class LightweightEmbeddings:
     def encode(self, texts: List[str]) -> np.ndarray:
         """Encode texts into embeddings"""
         
-        if self.model_type == "sentence_transformers":
+        if self.model_type == "sentence_transformers" and self.model is not None:
             return self.model.encode(texts, convert_to_numpy=True)
         
         elif self.model_type == "tfidf":
@@ -162,8 +163,34 @@ class LightweightEmbeddings:
 
 @dataclass
 class SemanticConcept(Concept):
-    """Concept with semantic embedding"""
+    """Concept with semantic embedding and adaptive temperature"""
     embedding: Optional[np.ndarray] = None
+    embedding_version: Optional[int] = None  # Track embedding dimension for compatibility
+    
+    def get_adaptive_temperature(self) -> float:
+        """
+        Inverse Difficulty Temperature Scaling (IDTS) - Oct 2025 Research
+        
+        Based on: "LLM-Oriented Token-Adaptive Knowledge Distillation" (arXiv:2510.11615)
+        
+        Returns:
+            - Low temperature (0.3) for difficult/weak concepts → focused precision
+            - High temperature (1.0) for easy/strong concepts → broad exploration
+            - Medium temperature (0.7) for moderate concepts → balanced approach
+        
+        This counterintuitive strategy:
+        1. Uses LOW temp for hard tokens = targeted error correction
+        2. Uses HIGH temp for easy tokens = learn complete smooth distributions
+        """
+        if self.strength >= 7.0:
+            # Strong concepts: high temperature for exploration
+            return 1.0
+        elif self.strength <= 3.0:
+            # Weak concepts: low temperature for precision
+            return 0.3
+        else:
+            # Moderate concepts: balanced approach
+            return 0.7
     
     def to_dict(self) -> Dict:
         """Serialize concept"""
@@ -180,14 +207,17 @@ class SemanticConcept(Concept):
         }
         if self.embedding is not None:
             data['embedding'] = self.embedding.tolist()
+            data['embedding_version'] = len(self.embedding)  # Store dimension
         return data
     
     @staticmethod
     def from_dict(data: Dict) -> 'SemanticConcept':
         """Deserialize concept"""
         embedding = None
+        embedding_version = None
         if 'embedding' in data:
             embedding = np.array(data['embedding'])
+            embedding_version = data.get('embedding_version', len(embedding) if embedding is not None else None)
         
         return SemanticConcept(
             id=data['id'],
@@ -199,7 +229,8 @@ class SemanticConcept(Concept):
             source=data.get('source'),
             category=data.get('category'),
             confidence=data.get('confidence', 1.0),
-            embedding=embedding
+            embedding=embedding,
+            embedding_version=embedding_version
         )
 
 
@@ -207,9 +238,9 @@ class SemanticConcept(Concept):
 # HYBRID AI: Graph + Embeddings
 # ============================================================================
 
-class HybridAI(RevolutionaryAI):
+class HybridAI(SutraAI):
     """
-    Revolutionary AI enhanced with semantic embeddings
+    Sutra AI enhanced with semantic embeddings
     
     Benefits:
     - Better semantic matching (embeddings understand meaning)
@@ -223,16 +254,16 @@ class HybridAI(RevolutionaryAI):
         super().__init__(storage_path)
         
         self.use_embeddings = use_embeddings
+        self.embeddings_model: Optional[LightweightEmbeddings] = None
         
         if use_embeddings:
             self.embeddings_model = LightweightEmbeddings()
             print(f"🧠 Semantic embeddings enabled ({self.embeddings_model.embedding_dim} dims)")
         else:
-            self.embeddings_model = None
             print("📊 Using pure graph-based approach")
     
-    def learn_semantic(self, content: str, source: str = None, 
-                      category: str = None) -> str:
+    def learn_semantic(self, content: str, source: Optional[str] = None, 
+                      category: Optional[str] = None) -> str:
         """Learn with semantic embedding"""
         
         # Create concept ID
@@ -242,10 +273,12 @@ class HybridAI(RevolutionaryAI):
             self.concepts[concept_id].access()
             return concept_id
         
-        # Generate embedding
-        embedding = None
+        # Generate embedding with version tracking
+        embedding: Optional[np.ndarray] = None
+        embedding_version: Optional[int] = None
         if self.use_embeddings and self.embeddings_model:
             embedding = self.embeddings_model.encode([content])[0]
+            embedding_version = len(embedding)  # Store dimension for compatibility
         
         # Create semantic concept
         concept = SemanticConcept(
@@ -253,7 +286,8 @@ class HybridAI(RevolutionaryAI):
             content=content,
             source=source,
             category=category,
-            embedding=embedding
+            embedding=embedding,
+            embedding_version=embedding_version
         )
         
         self.concepts[concept_id] = concept
@@ -263,8 +297,8 @@ class HybridAI(RevolutionaryAI):
         # Extract associations
         self._extract_associations(content, concept_id)
         
-        # Create semantic associations
-        if self.use_embeddings:
+        # Create semantic associations only if embedding was generated
+        if self.use_embeddings and embedding is not None:
             self._create_semantic_associations(concept_id, embedding)
         
         return concept_id
@@ -298,8 +332,19 @@ class HybridAI(RevolutionaryAI):
                     confidence=float(similarity)
                 )
     
-    def semantic_search(self, query: str, top_k: int = 5) -> List[Tuple[str, float]]:
-        """Search using semantic similarity"""
+    def semantic_search(self, query: str, top_k: int = 5, 
+                       use_adaptive_temp: bool = True) -> List[Tuple[str, float]]:
+        """
+        Search using semantic similarity with Adaptive Temperature Scaling
+        
+        Args:
+            query: Search query
+            top_k: Number of results to return
+            use_adaptive_temp: Enable IDTS (Inverse Difficulty Temperature Scaling)
+        
+        Returns:
+            List of (concept_id, score) tuples with temperature-adjusted scores
+        """
         
         if not self.use_embeddings or not self.embeddings_model:
             # Fallback to word-based search
@@ -308,20 +353,59 @@ class HybridAI(RevolutionaryAI):
         # Encode query
         query_embedding = self.embeddings_model.encode([query])[0]
         
-        # Compute similarities
+        # Compute similarities with adaptive temperature
         concept_scores = []
         for concept_id, concept in self.concepts.items():
             if hasattr(concept, 'embedding') and concept.embedding is not None:
                 similarity = self.embeddings_model.similarity(
                     query_embedding, concept.embedding
                 )
+                
+                # Apply adaptive temperature scaling
+                if use_adaptive_temp and hasattr(concept, 'get_adaptive_temperature'):
+                    temperature = concept.get_adaptive_temperature()
+                    # Temperature modulates similarity sharpness
+                    # Low temp (0.3): Makes scores more extreme (focused)
+                    # High temp (1.0): Keeps scores smooth (exploratory)
+                    adjusted_similarity = self._apply_temperature(similarity, temperature)
+                else:
+                    adjusted_similarity = similarity
+                
                 # Combine with concept strength
-                score = similarity * concept.strength
+                score = adjusted_similarity * concept.strength
                 concept_scores.append((concept_id, float(score)))
         
         # Sort and return top k
         concept_scores.sort(key=lambda x: x[1], reverse=True)
         return concept_scores[:top_k]
+    
+    def _apply_temperature(self, score: float, temperature: float) -> float:
+        """
+        Apply temperature scaling to similarity scores
+        
+        Temperature effects:
+        - T < 1.0: Sharpens distribution (increases high scores, decreases low scores)
+        - T = 1.0: No change
+        - T > 1.0: Smooths distribution (makes scores more uniform)
+        
+        Args:
+            score: Original similarity score (0-1)
+            temperature: Temperature parameter
+            
+        Returns:
+            Temperature-adjusted score
+        """
+        if temperature == 1.0:
+            return score
+        
+        # Use exponential scaling with temperature
+        # Prevents extreme values while maintaining relative ordering
+        # Cap exponent to prevent overflow
+        safe_exp = min(score / temperature, 100.0)  # Cap at e^100
+        scaled = math.exp(safe_exp)
+        # Normalize back to reasonable range
+        normalized = scaled / (scaled + 1.0)
+        return normalized
     
     def hybrid_reason(self, query: str, max_steps: int = 5) -> ReasoningPath:
         """Reason using both semantics and graph"""
@@ -471,7 +555,7 @@ class ConversationManager:
         self.max_history = max_history
     
     def add_message(self, session_id: str, role: str, 
-                   content: str, concepts: List[str] = None):
+                   content: str, concepts: Optional[List[str]] = None):
         """Add message to conversation"""
         message = Message(
             role=role,
@@ -680,7 +764,7 @@ class HybridLLMReplacement:
         print(f"💾 Saved {len(self.ai.concepts)} concepts")
     
     def load(self):
-        """Load knowledge base"""
+        """Load knowledge base with embedding compatibility check"""
         filepath = self.ai.storage_path / "knowledge.json"
         
         if not filepath.exists():
@@ -690,9 +774,36 @@ class HybridLLMReplacement:
         with open(filepath, 'r') as f:
             data = json.load(f)
         
+        # Detect current embedding dimension
+        current_dim: Optional[int] = None
+        if self.ai.use_embeddings and self.ai.embeddings_model:
+            try:
+                test_embedding = self.ai.embeddings_model.encode(["test"])[0]
+                current_dim = len(test_embedding)
+            except Exception:
+                pass  # Silently fallback if model unavailable
+        
+        # Track mismatched concepts for re-encoding
+        mismatched_concepts: List[str] = []
+        incompatible_count = 0
+        
         # Load concepts
         for concept_data in data.get('concepts', []):
             concept = SemanticConcept.from_dict(concept_data)
+            
+            # Check embedding compatibility
+            if concept.embedding is not None and current_dim is not None:
+                saved_dim = concept.embedding_version or len(concept.embedding)
+                
+                if saved_dim != current_dim:
+                    # Dimension mismatch detected
+                    print(f"⚠️  Embedding dimension mismatch for concept {concept.id[:8]}: "
+                          f"saved={saved_dim}, current={current_dim}")
+                    mismatched_concepts.append(concept.id)
+                    concept.embedding = None  # Clear incompatible embedding
+                    concept.embedding_version = None
+                    incompatible_count += 1
+            
             self.ai.concepts[concept.id] = concept
             self.ai._index_concept(concept)
         
@@ -711,6 +822,29 @@ class HybridLLMReplacement:
             self.ai.concept_neighbors[tgt].add(src)
         
         print(f"📚 Loaded {len(self.ai.concepts)} concepts")
+        
+        # Re-encode mismatched concepts if possible
+        if mismatched_concepts and self.ai.use_embeddings and self.ai.embeddings_model:
+            print(f"🔄 Re-encoding {len(mismatched_concepts)} concepts with current model...")
+            
+            re_encoded = 0
+            for concept_id in mismatched_concepts:
+                concept = self.ai.concepts.get(concept_id)
+                if concept and isinstance(concept, SemanticConcept):
+                    try:
+                        # Re-encode with current model
+                        new_embedding = self.ai.embeddings_model.encode([concept.content])[0]
+                        concept.embedding = new_embedding
+                        concept.embedding_version = len(new_embedding)
+                        re_encoded += 1
+                    except Exception as e:
+                        print(f"⚠️  Failed to re-encode {concept_id[:8]}: {e}")
+            
+            print(f"✅ Successfully re-encoded {re_encoded}/{len(mismatched_concepts)} concepts")
+        elif incompatible_count > 0:
+            print(f"⚠️  {incompatible_count} concepts have incompatible embeddings "
+                  f"(will use graph-only reasoning)")
+
 
 
 # ============================================================================

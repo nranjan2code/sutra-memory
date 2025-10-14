@@ -6,86 +6,147 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 Sutra AI is an explainable graph-based AI system that positions itself as an alternative to traditional LLMs. The system uses associative reasoning, persistent memory graphs, and optional lightweight semantic embeddings (no GPU required).
 
-### Core Components
+### Monorepo Structure
 
-#### 1. Core Graph Engine (`sutra_ai.py`)
-- **Concepts**: Nodes with adaptive strength (1.0-10.0) that strengthen with repeated access
-- **Associations**: Typed edges (semantic, causal, temporal, hierarchical, compositional) with confidence scores
+This repository is organized as a **monorepo** with modular packages:
+
+```
+sutra-models/
+├── packages/                    # Core packages
+│   ├── sutra-core/             # ✅ Graph reasoning engine (IMPLEMENTED)
+│   ├── sutra-hybrid/           # 🚧 Semantic embeddings (TODO)
+│   ├── sutra-api/              # 🚧 REST API service (TODO) 
+│   └── sutra-cli/              # 🚧 Command-line interface (TODO)
+├── scripts/                     # Development utilities
+├── .archive/old-structure/      # Legacy code (preserved)
+└── venv/                        # Virtual environment
+```
+
+**Current Implementation Status**: The **sutra-core** package is fully implemented and tested (10/10 tests passing). Other packages are planned but not yet implemented.
+
+### Core Components (sutra-core package)
+
+#### 1. Graph Reasoning Engine
+- **Concepts** (`sutra_core.Concept`): Nodes with adaptive strength (1.0-10.0) that strengthen with repeated access
+- **Associations** (`sutra_core.Association`): Typed edges (semantic, causal, temporal, hierarchical, compositional) with confidence scores
 - **Spreading Activation Search**: BFS-like graph traversal with score propagation for explainable reasoning
 - **Multi-Path Plan Aggregation (MPPA)**: Generates diverse reasoning paths and uses consensus voting to prevent single-path derailment
 - **Adaptive Focus Learning**: Difficult concepts (strength < 4.0) get stronger reinforcement (1.15×), established concepts (> 7.0) get minimal reinforcement (1.01×)
 
-#### 2. Hybrid System (`hybrid_llm_replacement.py`)
-- **LightweightEmbeddings**: Auto-detects `sentence-transformers` (22MB model) or falls back to TF-IDF
-- **SemanticConcept**: Extended concept with `embedding` field and adaptive temperature scaling
-- **Inverse Difficulty Temperature Scaling (IDTS)**: 
-  - Strong concepts (≥7.0) → High temp (1.0) for exploration
-  - Weak concepts (≤3.0) → Low temp (0.3) for precision
-  - Medium concepts → Balanced temp (0.7)
-- **NaturalLanguageGenerator**: Template-based response generation (no LLM needed)
-- **ConversationManager**: Stateful multi-turn conversations with context
+#### 2. Learning System
+- **AssociationExtractor** (`sutra_core.learning.AssociationExtractor`): Pattern-based relationship extraction from natural language
+- **AdaptiveLearner** (`sutra_core.learning.AdaptiveLearner`): Real-time knowledge integration with adaptive reinforcement
 
-#### 3. API Service (`api_service.py`)
-- FastAPI REST interface with lifecycle management
-- Endpoints: `/api/learn`, `/api/query`, `/api/compose`, `/api/stats`, `/api/benchmark`
-- Auto-loads knowledge on startup, saves on shutdown
-- Demo setup: `/api/demo/setup` populates with biology knowledge
+#### 3. Text Processing
+- **Word extraction** (`sutra_core.utils.extract_words`): Tokenization and filtering
+- **Association patterns** (`sutra_core.utils.get_association_patterns`): Regex patterns for relationship detection
+- **Text cleaning** (`sutra_core.utils.clean_text`): Content normalization
+
+### Legacy Architecture (Archived)
+
+The original monolithic implementations are preserved in `.archive/old-structure/`:
+- `sutra_ai.py` - Original core engine
+- `hybrid_llm_replacement.py` - Original hybrid system with embeddings
+- `api_service.py` - Original FastAPI service
+
+These files contain the complete feature set that is being modularized into the new package structure.
 
 ## Development Commands
 
-### Running the System
+### Environment Setup
 
 ```bash
-# Demo mode with Multi-Path Plan Aggregation
-python sutra_ai.py --demo
+# One-time setup (creates virtual environment and installs packages)
+make setup
 
-# Hybrid system (graph + embeddings)
-python hybrid_llm_replacement.py
-
-# API server (development)
-python api_service.py
-# or
-uvicorn api_service:app --reload --port 8000
-
-# Docker (production)
-docker-compose up
-
-# Docker (development with hot reload)
-docker-compose --profile dev up
+# Alternative manual setup
+python3 -m venv venv
+source venv/bin/activate
+pip install -e packages/sutra-core/
+pip install -r requirements-dev.txt
 ```
 
-### Testing and Validation
+### Running Demos and Tests
 
 ```bash
-# Run basic tests (note: no formal test framework yet)
-python -c "from sutra_ai import SutraAI; ai = SutraAI(); print('✅ Core system working')"
+# Run core functionality demo (new modular structure)
+make demo-core
 
-# Test hybrid system
-python -c "from hybrid_llm_replacement import HybridAI; ai = HybridAI(); print('✅ Hybrid system working')"
+# Run tests (requires virtual environment activation)
+source venv/bin/activate
+make test-core              # Run sutra-core tests (10/10 passing)
+make test                   # Run all package tests
 
-# Benchmark API performance
-curl -X POST "http://localhost:8000/api/benchmark" \
-  -H "Content-Type: application/json" \
-  -d '{"queries": ["What is photosynthesis?"], "iterations": 10}'
+# Manual test running
+PYTHONPATH=packages/sutra-core python -m pytest packages/sutra-core/tests/ -v
+```
 
-# Check system stats
-curl http://localhost:8000/api/stats
+### Legacy System Commands
+
+```bash
+# Run original demo (if needed for reference)
+python .archive/old-structure/sutra_ai.py --demo
+
+# Run original hybrid system
+python .archive/old-structure/hybrid_llm_replacement.py
+
+# Run original API server
+python .archive/old-structure/api_service.py
 ```
 
 ### Package Management
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install only core dependencies
+pip install -e packages/sutra-core/
+
+# Install development dependencies
+pip install -r requirements-dev.txt
 
 # Optional: Enhanced semantic understanding (22MB model)
 pip install sentence-transformers
+```
 
-# Minimal installation (TF-IDF fallback)
-pip install fastapi uvicorn pydantic numpy
+### Code Quality and Building
+
+```bash
+# Format code (black, isort)
+make format
+
+# Run linting (flake8, mypy) 
+make lint
+
+# Run full quality checks
+make check
+
+# Clean build artifacts
+make clean
+
+# Build all packages
+make build
+
+# Show all available commands
+make help
 ```
 
 ## Key Architectural Patterns
+
+### Package Dependency Structure
+
+```
+sutra-core     (base package, no dependencies)
+├── sutra-hybrid     <- sutra-core
+├── sutra-api        <- sutra-core, sutra-hybrid  
+└── sutra-cli        <- sutra-core, sutra-hybrid
+```
+
+### Development Workflow
+
+1. **Make changes in appropriate package** (currently only `packages/sutra-core/`)
+2. **Run tests**: `make test-core` 
+3. **Run demos**: `make demo-core`
+4. **Code quality**: `make format && make lint`
+5. **Build**: `make build` (when ready)
 
 ### Concept Strength Dynamics
 - **Initial strength**: 1.0 on creation
@@ -138,12 +199,51 @@ The 0.9 decay factor prevents infinite loops and ensures convergence.
 ### Embedding Dimension Compatibility
 When switching between `sentence-transformers` (384 dims) and TF-IDF (100 dims), the system automatically re-encodes concepts on first load. This has a performance cost but ensures compatibility.
 
+## Important Implementation Details
+
+### Working with the Modular Structure
+
+```python
+# Import from the new modular packages
+from sutra_core import Concept, Association, AssociationType
+from sutra_core.learning import AdaptiveLearner, AssociationExtractor
+from sutra_core.utils import extract_words, clean_text
+
+# Create concepts with proper access patterns
+concept = Concept(id="example", content="example content")
+concept.access()  # Strengthens the concept
+```
+
+### Single Test Running
+
+```bash
+# Run a specific test file
+source venv/bin/activate
+PYTHONPATH=packages/sutra-core python -m pytest packages/sutra-core/tests/test_basic.py::test_concept_creation -v
+
+# Run tests with coverage
+PYTHONPATH=packages/sutra-core python -m pytest packages/sutra-core/tests/ -v --cov=sutra_core --cov-report=html
+```
+
+### Package Development
+
+```bash
+# Install package in development mode
+pip install -e packages/sutra-core/
+
+# After making changes, verify they work
+make demo-core
+make test-core
+```
+
 ## Common Development Pitfalls
 
-1. **Forgetting to call `concept.access()`**: Concepts don't strengthen automatically
-2. **Missing dimension compatibility**: Always check `if embedding is not None`
-3. **Infinite loops in reasoning**: Always maintain `visited` set during graph traversal
-4. **Temperature range**: Keep temperatures between 0.1-2.0 to avoid numeric instability
+1. **Forgetting to activate virtual environment**: Always run `source venv/bin/activate` before testing
+2. **Forgetting to call `concept.access()`**: Concepts don't strengthen automatically - must call during traversal
+3. **Missing PYTHONPATH**: When running tests manually, set `PYTHONPATH=packages/sutra-core`
+4. **Package import confusion**: Use the new imports (`sutra_core.*`) not the old monolithic ones
+5. **Infinite loops in reasoning**: Always maintain `visited` set during graph traversal
+6. **Working with archived code**: Legacy implementations are in `.archive/old-structure/` for reference only
 
 ## Recent Research Integrations (Oct 2025)
 

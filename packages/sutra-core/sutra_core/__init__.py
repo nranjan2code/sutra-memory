@@ -19,6 +19,13 @@ The system offers a genuine alternative to LLM limitations:
 - Scalable to 100K+ concepts
 """
 
+from .config import (
+    ReasoningEngineConfig,
+    ReasoningEngineConfigBuilder,
+    development_config,
+    minimal_config,
+    production_config,
+)
 from .exceptions import (
     AssociationError,
     ConceptError,
@@ -78,6 +85,12 @@ __all__ = [
     "MultiPathAggregator",
     "PathFinder",
     "QueryProcessor",
+    # Configuration
+    "ReasoningEngineConfig",
+    "ReasoningEngineConfigBuilder",
+    "minimal_config",
+    "development_config",
+    "production_config",
     # Utilities
     "extract_words",
     "get_association_patterns",

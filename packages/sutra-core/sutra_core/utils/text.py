@@ -12,6 +12,14 @@ from typing import List, Tuple
 
 from ..graph.concepts import AssociationType
 
+# Module-level constant for stop words (avoid recreation on every call)
+STOP_WORDS = frozenset({
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of",
+    "with", "by", "is", "was", "are", "were", "be", "been", "being", "have",
+    "has", "had", "do", "does", "did", "will", "would", "could", "should",
+    "may", "might", "can", "must", "shall", "this", "that", "these", "those",
+})
+
 
 def extract_words(text: str) -> List[str]:
     """
@@ -29,51 +37,8 @@ def extract_words(text: str) -> List[str]:
     # Simple tokenization - could be enhanced with NLP
     words = re.findall(r"\b\w+\b", text.lower())
 
-    # Filter out very short words and common stop words
-    stop_words = {
-        "the",
-        "a",
-        "an",
-        "and",
-        "or",
-        "but",
-        "in",
-        "on",
-        "at",
-        "to",
-        "for",
-        "of",
-        "with",
-        "by",
-        "is",
-        "was",
-        "are",
-        "were",
-        "be",
-        "been",
-        "being",
-        "have",
-        "has",
-        "had",
-        "do",
-        "does",
-        "did",
-        "will",
-        "would",
-        "could",
-        "should",
-        "may",
-        "might",
-        "can",
-        "must",
-        "shall",
-        "this",
-        "that",
-        "these",
-        "those",
-    }
-
-    return [w for w in words if len(w) > 2 and w not in stop_words]
+    # Filter out very short words and common stop words (using module constant)
+    return [w for w in words if len(w) > 2 and w not in STOP_WORDS]
 
 
 def get_association_patterns() -> List[Tuple[str, AssociationType]]:

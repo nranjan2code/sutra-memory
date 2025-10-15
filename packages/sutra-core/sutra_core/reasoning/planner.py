@@ -84,7 +84,7 @@ class QueryPlanner:
     - Hypotheticals
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize query planner."""
         # Patterns for query decomposition
         self.decomposition_patterns = self._init_patterns()

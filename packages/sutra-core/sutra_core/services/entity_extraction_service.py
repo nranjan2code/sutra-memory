@@ -14,7 +14,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from ollama import Client
 
@@ -76,7 +76,7 @@ class EntityExtractionService:
         logger.info(f"Entity Extraction Service initialized with model: {model}")
         logger.info(f"Storage path: {storage_path}")
     
-    def _init_storage(self):
+    def _init_storage(self) -> None:
         """Initialize storage files if they don't exist."""
         if not self.entity_cache_path.exists():
             self.entity_cache_path.write_text("{}")
@@ -87,15 +87,15 @@ class EntityExtractionService:
         if not self.concepts_path.exists():
             self.concepts_path.write_text("{}")
     
-    def _load_json(self, path: Path) -> dict | list:
+    def _load_json(self, path: Path) -> Union[Dict[str, Any], List[Any]]:
         """Load JSON file safely."""
         try:
             return json.loads(path.read_text())
         except Exception as e:
             logger.error(f"Error loading {path}: {e}")
-            return {} if "cache" in str(path) else []
+            return {} if "cache" in str(path) or "concepts" in str(path) else []
     
-    def _save_json(self, path: Path, data: dict | list):
+    def _save_json(self, path: Path, data: Union[Dict[str, Any], List[Any]]) -> None:
         """Save JSON file safely."""
         try:
             path.write_text(json.dumps(data, indent=2))
@@ -104,20 +104,28 @@ class EntityExtractionService:
     
     def get_processing_queue(self) -> List[str]:
         """Get list of concept IDs needing entity extraction."""
-        return self._load_json(self.processing_queue_path)
+        result = self._load_json(self.processing_queue_path)
+        if not isinstance(result, list):
+            logger.warning(f"Processing queue is not a list, returning empty list")
+            return []
+        return result
     
-    def clear_from_queue(self, concept_ids: List[str]):
+    def clear_from_queue(self, concept_ids: List[str]) -> None:
+        """Remove processed concept IDs from queue."""
         """Remove processed concept IDs from queue."""
         queue = self.get_processing_queue()
         queue = [cid for cid in queue if cid not in concept_ids]
         self._save_json(self.processing_queue_path, queue)
     
-    def get_concept(self, concept_id: str) -> Optional[Dict]:
+    def get_concept(self, concept_id: str) -> Optional[Dict[str, Any]]:
         """Get concept content by ID."""
         concepts = self._load_json(self.concepts_path)
+        if not isinstance(concepts, dict):
+            logger.warning(f"Concepts file is not a dict, returning None")
+            return None
         return concepts.get(concept_id)
     
-    def extract_entities_with_ollama(self, content: str) -> List[Dict]:
+    def extract_entities_with_ollama(self, content: str) -> List[Dict[str, Any]]:
         """
         Extract entities from content using Ollama Cloud.
         
@@ -167,7 +175,11 @@ Return JSON format:
         Returns:
             Number of concepts successfully processed
         """
-        entity_cache = self._load_json(self.entity_cache_path)
+        entity_cache_data = self._load_json(self.entity_cache_path)
+        if not isinstance(entity_cache_data, dict):
+            logger.error("Entity cache is not a dict, initializing empty dict")
+            entity_cache_data = {}
+        
         processed_count = 0
         
         for concept_id in concept_ids:
@@ -187,7 +199,7 @@ Return JSON format:
             entities = self.extract_entities_with_ollama(content)
             
             # Update cache
-            entity_cache[concept_id] = {
+            entity_cache_data[concept_id] = {
                 'entities': entities,
                 'timestamp': time.time(),
                 'model': self.model
@@ -197,7 +209,7 @@ Return JSON format:
             logger.info(f"  → Found {len(entities)} entities")
         
         # Save updated cache
-        self._save_json(self.entity_cache_path, entity_cache)
+        self._save_json(self.entity_cache_path, entity_cache_data)
         
         # Remove from queue
         self.clear_from_queue(concept_ids)
@@ -222,7 +234,7 @@ Return JSON format:
         
         return self.process_batch(batch)
     
-    def run_forever(self):
+    def run_forever(self) -> None:
         """
         Run service continuously, monitoring queue.
         
@@ -248,7 +260,7 @@ Return JSON format:
             raise
 
 
-def main():
+def main() -> None:
     """Run the entity extraction service as a standalone program."""
     import sys
     

@@ -36,7 +36,7 @@ class EntityCache:
         self._cache: Dict[str, List[Dict]] = {}
         self._load_cache()
     
-    def _load_cache(self):
+    def _load_cache(self) -> None:
         """Load entity cache from disk into memory."""
         if not self.entity_cache_path.exists():
             logger.warning(f"Entity cache not found at {self.entity_cache_path}")
@@ -72,7 +72,7 @@ class EntityCache:
         """Check if concept has cached entities."""
         return concept_id in self._cache
     
-    def add_to_processing_queue(self, concept_id: str):
+    def add_to_processing_queue(self, concept_id: str) -> None:
         """
         Add concept to processing queue for background extraction.
         
@@ -94,7 +94,7 @@ class EntityCache:
         except Exception as e:
             logger.error(f"Error adding to processing queue: {e}")
     
-    def reload(self):
+    def reload(self) -> None:
         """Reload cache from disk (for picking up background updates)."""
         self._cache.clear()
         self._load_cache()

@@ -143,9 +143,9 @@ class AssociationExtractor:
         """
         Extract co-occurrence based semantic associations using noun chunks.
 
-        OPTIMIZATION: Uses spaCy noun chunks instead of sliding window to reduce
-        associations from ~900 to <50 per document. Falls back to sliding window
-        if spaCy unavailable.
+        OPTIONAL OPTIMIZATION: Uses spaCy noun chunks (if available) instead of 
+        sliding window to reduce associations from ~900 to <50 per document. 
+        Falls back to sliding window if spaCy unavailable.
 
         Args:
             content: Text content
@@ -156,16 +156,17 @@ class AssociationExtractor:
         """
         associations_created = 0
 
-        # Use shared nlp_processor if available (avoids re-loading model)
+        # Use shared nlp_processor if available (OPTIONAL - graceful fallback)
         if self.nlp_processor:
             processor = self.nlp_processor
         else:
             # Fallback: create new processor (slower, for backward compatibility)
+            # NOTE: This will fail if spaCy not installed - that's OK, we use fallback
             try:
                 from ..utils.nlp import TextProcessor
                 processor = TextProcessor()
             except Exception:
-                # If NLP unavailable, use simple sliding window fallback
+                # spaCy unavailable - use simple sliding window fallback (still works!)
                 return self._extract_cooccurrence_fallback(content, concept_id)
         
         try:
@@ -197,19 +198,27 @@ class AssociationExtractor:
                                         return associations_created
             
             return associations_created
-        except Exception:
-            # Fallback if spaCy processing fails
+        except Exception as e:
+            # Fallback if spaCy processing fails (system still works without it!)
+            logger.debug(f"spaCy NLP processing failed, using fallback: {e}")
             return self._extract_cooccurrence_fallback(content, concept_id)
+
+    def _extract_cooccurrence_fallback(self, content: str, concept_id: str) -> int:
+        """
+        Simple sliding window fallback for co-occurrence extraction.
+        
+        This method works WITHOUT spaCy - uses simple word extraction and sliding window.
+        Performance: Creates more associations (~200) but still bounded by hard limits.
+        
+        Args:
+            content: Text content
+            concept_id: Central concept ID
             
-        except ImportError:
-            # Fallback to simple sliding window if spaCy unavailable
-            pass
-        
-        # Fallback: Simple sliding window approach
+        Returns:
+            Number of associations created
+        """
+        associations_created = 0
         words = extract_words(content)
-        
-        # Limit words to avoid explosion
-        words = words[:30]  # Only first 30 meaningful words
         
         # Sliding window of 3 words to find co-occurrences
         for i, word1 in enumerate(words):

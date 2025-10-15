@@ -106,16 +106,27 @@ class RustStorageAdapter:
             embedding: Vector embedding (numpy array)
         
         Raises:
-            ValueError: If embedding dimension doesn't match
+            ValueError: If embedding dimension doesn't match or embedding is invalid
+            RuntimeError: If storage operation fails
         """
+        # Validate embedding
+        if not isinstance(embedding, np.ndarray):
+            raise ValueError(f"Embedding must be numpy array, got {type(embedding)}")
+        
         if len(embedding) != self.vector_dimension:
             raise ValueError(
                 f"Embedding dimension {len(embedding)} doesn't match "
                 f"expected {self.vector_dimension}"
             )
+        
+        if not np.isfinite(embedding).all():
+            raise ValueError("Embedding contains NaN or Inf values")
 
-        # Store vector in Rust (high performance)
-        self.store.add_vector(concept.id, embedding.astype(np.float32))
+        try:
+            # Store vector in Rust (high performance)
+            self.store.add_vector(concept.id, embedding.astype(np.float32))
+        except Exception as e:
+            raise RuntimeError(f"Failed to store vector in Rust storage: {e}")
 
         # Store metadata in JSON (flexibility)
         self.concept_metadata[concept.id] = {
@@ -381,7 +392,12 @@ class RustStorageAdapter:
         logger.info("Storage saved successfully")
 
     def _load_metadata(self) -> None:
-        """Load metadata from JSON file."""
+        """
+        Load metadata from JSON file with validation and error recovery.
+        
+        Raises:
+            RuntimeError: If metadata is corrupted beyond recovery
+        """
         if not self.metadata_file.exists():
             logger.info("No existing metadata file")
             return
@@ -390,30 +406,73 @@ class RustStorageAdapter:
             with open(self.metadata_file, "r") as f:
                 data = json.load(f)
             
-            self.concept_metadata = data.get("concepts", {})
-            self.association_metadata = data.get("associations", {})
+            # Validate structure
+            if not isinstance(data, dict):
+                raise ValueError(f"Metadata file must contain dict, got {type(data)}")
+            
+            concepts = data.get("concepts", {})
+            associations = data.get("associations", {})
+            
+            # Validate concepts
+            if not isinstance(concepts, dict):
+                logger.error(f"Concepts metadata is invalid, resetting to empty dict")
+                concepts = {}
+            
+            # Validate associations
+            if not isinstance(associations, dict):
+                logger.error(f"Associations metadata is invalid, resetting to empty dict")
+                associations = {}
+            
+            # Validate vector dimension if stored
+            stored_dim = data.get("vector_dimension")
+            if stored_dim is not None and stored_dim != self.vector_dimension:
+                logger.warning(
+                    f"Vector dimension mismatch: stored={stored_dim}, "
+                    f"current={self.vector_dimension}. Metadata may be incompatible."
+                )
+            
+            self.concept_metadata = concepts
+            self.association_metadata = associations
             
             logger.info(
                 f"Loaded metadata: {len(self.concept_metadata)} concepts, "
                 f"{len(self.association_metadata)} associations"
             )
+        except json.JSONDecodeError as e:
+            logger.error(f"Metadata file is corrupted (invalid JSON): {e}")
+            logger.warning("Starting with empty metadata")
+            self.concept_metadata = {}
+            self.association_metadata = {}
         except Exception as e:
             logger.error(f"Failed to load metadata: {e}")
+            raise RuntimeError(f"Cannot recover from metadata corruption: {e}")
 
     def _save_metadata(self) -> None:
-        """Save metadata to JSON file."""
+        """
+        Save metadata to JSON file with atomic write.
+        
+        Raises:
+            RuntimeError: If save fails
+        """
         try:
             data = {
+                "vector_dimension": self.vector_dimension,  # Store for validation
                 "concepts": self.concept_metadata,
                 "associations": self.association_metadata,
             }
             
-            with open(self.metadata_file, "w") as f:
+            # Atomic write: write to temp file first, then rename
+            temp_file = self.metadata_file.with_suffix(".tmp")
+            with open(temp_file, "w") as f:
                 json.dump(data, f, indent=2)
+            
+            # Atomic rename (overwrites existing file)
+            temp_file.replace(self.metadata_file)
             
             logger.debug(f"Metadata saved to {self.metadata_file}")
         except Exception as e:
             logger.error(f"Failed to save metadata: {e}")
+            raise RuntimeError(f"Critical failure saving metadata: {e}")
 
     # ===== Statistics =====
 

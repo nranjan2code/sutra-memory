@@ -69,7 +69,7 @@ class SourceReliability:
     num_contradicted: int = 0
     last_updated: float = field(default_factory=time.time)
     
-    def update_score(self):
+    def update_score(self) -> None:
         """Recalculate reliability based on history."""
         total = self.num_correct + self.num_incorrect + self.num_contradicted
         if total == 0:
@@ -320,6 +320,9 @@ class ContradictionResolver:
             ID of the winning concept
         """
         if contradiction.resolved:
+            # Ensure we return a non-None value
+            if contradiction.resolution is None:
+                raise ValueError(f"Contradiction {contradiction.id} marked as resolved but has no resolution")
             return contradiction.resolution
         
         strategy = strategy or self.default_strategy
@@ -389,7 +392,7 @@ class ContradictionResolver:
         source: str,
         correct: bool,
         contradicted: bool = False,
-    ):
+    ) -> None:
         """
         Update reliability score for a source.
         
@@ -445,7 +448,7 @@ class ContradictionResolver:
         """Get all unresolved contradictions."""
         return [c for c in self.contradictions if not c.resolved]
     
-    def mark_concept_incorrect(self, concept_id: str):
+    def mark_concept_incorrect(self, concept_id: str) -> None:
         """Mark a concept as incorrect (for training source reliability)."""
         if concept_id not in self.concepts:
             return
@@ -454,7 +457,7 @@ class ContradictionResolver:
         if concept.source:
             self.update_source_reliability(concept.source, correct=False)
     
-    def mark_concept_correct(self, concept_id: str):
+    def mark_concept_correct(self, concept_id: str) -> None:
         """Mark a concept as correct (for training source reliability)."""
         if concept_id not in self.concepts:
             return

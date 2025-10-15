@@ -8,7 +8,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import List
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sutra_core import SutraError
@@ -16,7 +16,7 @@ from sutra_core.reasoning import ReasoningEngine
 from sutra_hybrid import HybridAI
 
 from .config import settings
-from .dependencies import get_ai, get_reasoner, get_uptime
+from .dependencies import get_ai, get_reasoner, get_uptime, init_dependencies, shutdown_dependencies
 from .models import (
     BatchLearnRequest,
     BatchLearnResponse,
@@ -47,8 +47,11 @@ async def lifespan(app: FastAPI):
     logger.info(f"Storage path: {settings.storage_path}")
     logger.info(f"Semantic embeddings: {settings.use_semantic_embeddings}")
 
-    # Initialize AI instance
-    ai = get_ai()
+    # Initialize dependencies properly (stores in app.state)
+    init_dependencies(app)
+    
+    # Get AI instance to log stats
+    ai = app.state.ai_instance
     logger.info(
         f"Loaded {len(ai.concepts)} concepts, " f"{len(ai.associations)} associations"
     )
@@ -56,12 +59,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    if settings.auto_save:
-        logger.info("Saving knowledge before shutdown...")
-        ai = get_ai()
-        ai.save()
-        logger.info("Knowledge saved")
-
+    shutdown_dependencies(app)
     logger.info("Shutting down API service")
 
 
@@ -80,6 +78,21 @@ app.add_middleware(
     allow_credentials=settings.allow_credentials,
     allow_methods=settings.allow_methods,
     allow_headers=settings.allow_headers,
+)
+
+# Add rate limiting middleware
+from .middleware import RateLimitMiddleware
+
+app.add_middleware(
+    RateLimitMiddleware,
+    default_limit=60,
+    window_seconds=60,
+    endpoint_limits={
+        "/learn": settings.rate_limit_learn,
+        "/learn/batch": settings.rate_limit_learn // 2,
+        "/reason": settings.rate_limit_reason,
+        "/search": settings.rate_limit_search,
+    },
 )
 
 
@@ -414,16 +427,25 @@ async def load_knowledge(ai: HybridAI = Depends(get_ai)):
 
 
 @app.delete("/reset", status_code=status.HTTP_200_OK, tags=["System"])
-async def reset_system():
+async def reset_system(request: Request):
     """
     Reset the system and clear all knowledge.
 
     WARNING: This deletes all concepts and associations!
     """
-    from .dependencies import reset_ai
-
-    reset_ai()
-    ai = get_ai()  # Create fresh instance
+    # Create fresh HybridAI instance
+    request.app.state.ai_instance = HybridAI(
+        use_semantic=settings.use_semantic_embeddings,
+        storage_path=settings.storage_path,
+    )
+    
+    # Recreate reasoner bound to new AI instance
+    ai = request.app.state.ai_instance
+    request.app.state.reasoner_instance.concepts = ai.concepts
+    request.app.state.reasoner_instance.associations = ai.associations
+    request.app.state.reasoner_instance.concept_neighbors = ai.concept_neighbors
+    request.app.state.reasoner_instance.word_to_concepts = ai.word_to_concepts
+    request.app.state.reasoner_instance._rebuild_indexes()
 
     return {
         "message": "System reset successfully",

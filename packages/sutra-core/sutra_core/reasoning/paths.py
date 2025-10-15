@@ -45,7 +45,7 @@ class PathFinder:
         concept_neighbors: Dict[str, Set[str]],
         max_depth: int = 5,
         min_confidence: float = 0.1,
-        confidence_decay: float = 0.95,
+        confidence_decay: float = 0.85,
         use_harmonic_mean: bool = True,
     ):
         """
@@ -55,10 +55,10 @@ class PathFinder:
             concepts: All concepts in the graph
             associations: All associations
             concept_neighbors: Adjacency list for fast traversal
-            max_depth: Maximum reasoning depth
-            min_confidence: Minimum confidence threshold
-            confidence_decay: Decay factor per hop (ignored if use_harmonic_mean=True)
-            use_harmonic_mean: Use harmonic mean for confidence (better for long paths)
+            max_depth: Maximum reasoning depth (default: 5)
+            min_confidence: Minimum confidence threshold (default: 0.1)
+            confidence_decay: Decay factor per hop (default: 0.85, ignored if use_harmonic_mean=True)
+            use_harmonic_mean: Use harmonic mean for confidence (better for long paths, default: True)
         """
         self.concepts = concepts
         self.associations = associations
@@ -67,22 +67,6 @@ class PathFinder:
         self.min_confidence = min_confidence
         self.confidence_decay = confidence_decay
         self.use_harmonic_mean = use_harmonic_mean
-        """
-        Initialize path finder.
-
-        Args:
-            concepts: All concepts in the system
-            associations: All associations between concepts
-            concept_neighbors: Neighbor mapping for efficient traversal
-        """
-        self.concepts = concepts
-        self.associations = associations
-        self.concept_neighbors = concept_neighbors
-
-        # Performance settings
-        self.max_depth = 6
-        self.min_confidence = 0.1
-        self.confidence_decay = 0.85
         self.max_paths_per_search = 50
 
     def find_reasoning_paths(

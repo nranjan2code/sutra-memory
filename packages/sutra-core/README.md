@@ -10,10 +10,10 @@ The foundational package for the Sutra AI system, providing graph-based reasonin
 - Zero critical mypy errors
 
 ### Phase 2: NLP Upgrade ✅
-- **spaCy integration** (3.8.7 with en_core_web_sm)
-- Production-grade text processing
-- Lemmatization, entity extraction, negation detection
-- Backward compatible with fallback
+- **Optional spaCy integration** (3.8.7 with en_core_web_sm) - NOT REQUIRED
+- Production-grade text processing (with graceful fallbacks)
+- Lemmatization, entity extraction, negation detection (when available)
+- Fully functional without spaCy - simple word extraction fallback
 
 See `PHASE1_2_SUMMARY.md` for complete details.
 
@@ -26,12 +26,16 @@ See `PHASE1_2_SUMMARY.md` for complete details.
 - **Adaptive Learning**: Research-based adaptive focus learning (AdaKD-inspired)
 - **Real-Time Integration**: Instant knowledge updates without retraining
 - **Input Validation**: Comprehensive validation with DOS protection (NEW)
-- **Modern NLP**: spaCy-based text processing with lemmatization and NER (NEW)
+- **Optional NLP**: spaCy-based text processing with lemmatization and NER (OPTIONAL, graceful fallbacks)
 
 ## Installation
 
 ```bash
+# Basic installation (works without spaCy)
 pip install -e .
+
+# Optional: Install with spaCy for enhanced NLP features
+pip install -e ".[nlp]"
 ```
 
 ## Quick Start
@@ -76,13 +80,13 @@ concept_id = learner.learn_adaptive(
 )
 ```
 
-### Text Processing
+### Text Processing (Optional spaCy Enhancement)
 
 ```python
 from sutra_core.utils.nlp import TextProcessor
 
-# NEW: Modern NLP with spaCy
-processor = TextProcessor()
+# NEW: Modern NLP with spaCy (optional - will warn if unavailable)
+processor = TextProcessor()  # Falls back gracefully if spaCy not installed
 
 # Lemmatization
 tokens = processor.extract_meaningful_tokens("The cats are running quickly")
@@ -100,10 +104,10 @@ print(has_negation)  # True
 triples = processor.extract_subject_verb_object("Cats chase mice")
 print(triples)  # [('cats', 'chase', 'mice', False)]
 
-# Backward compatible
+# Works WITHOUT spaCy - simple word extraction fallback
 from sutra_core.utils import extract_words, get_association_patterns
 
-# Extract meaningful words (with fallback if spaCy unavailable)
+# Extract meaningful words (works with or without spaCy)
 words = extract_words("Photosynthesis is a crucial biological process")
 print(words)  # ['photosynthesis', 'crucial', 'biological', 'process']
 

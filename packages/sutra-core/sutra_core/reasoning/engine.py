@@ -9,12 +9,14 @@ Orchestrates all reasoning components to provide AI-level capabilities:
 """
 
 import logging
+import threading
 import time
 from collections import OrderedDict, defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
+from ..exceptions import StorageError
 from ..graph.concepts import Association, AssociationType, Concept
 from ..indexing.vector_search import VectorIndex
 from ..learning.adaptive import AdaptiveLearner
@@ -40,7 +42,56 @@ class ReasoningEngine:
     - Multi-path reasoning with consensus
     - Real-time learning and knowledge integration
     - Explainable AI with confidence scoring
+    
+    Example:
+        >>> # Using configuration builder (recommended)
+        >>> from sutra_core.config import ReasoningEngineConfig
+        >>> config = ReasoningEngineConfig.builder().with_caching(max_size=500).build()
+        >>> engine = ReasoningEngine.from_config(config)
+        >>> 
+        >>> # Using direct initialization (legacy)
+        >>> engine = ReasoningEngine(storage_path="./knowledge")
     """
+    
+    @classmethod
+    def from_config(cls, config: 'ReasoningEngineConfig') -> 'ReasoningEngine':
+        """
+        Create ReasoningEngine from configuration object.
+        
+        Recommended over direct __init__ for complex configurations.
+        
+        Args:
+            config: ReasoningEngineConfig instance
+            
+        Returns:
+            Configured ReasoningEngine
+            
+        Example:
+            >>> from sutra_core.config import production_config
+            >>> engine = ReasoningEngine.from_config(production_config())
+        """
+        from ..config import ReasoningEngineConfig
+        
+        config.validate()  # Ensure config is valid
+        
+        return cls(
+            storage_path=config.storage_path,
+            enable_caching=config.enable_caching,
+            max_cache_size=config.max_cache_size,
+            cache_ttl_seconds=config.cache_ttl_seconds,
+            enable_central_links=config.enable_central_links,
+            central_link_confidence=config.central_link_confidence,
+            central_link_type=config.central_link_type,
+            enable_vector_index=config.enable_vector_index,
+            vector_index_dimension=config.vector_index_dimension,
+            use_rust_storage=config.use_rust_storage,
+            enable_batch_embeddings=config.enable_batch_embeddings,
+            embedding_model=config.embedding_model,
+            mps_batch_threshold=config.mps_batch_threshold,
+            enable_parallel_associations=config.enable_parallel_associations,
+            association_workers=config.association_workers,
+            enable_entity_cache=config.enable_entity_cache,
+        )
 
     def __init__(
         self,
@@ -94,6 +145,11 @@ class ReasoningEngine:
         self.associations: Dict[Tuple[str, str], Association] = {}
         self.concept_neighbors: Dict[str, Set[str]] = defaultdict(set)
         self.word_to_concepts: Dict[str, Set[str]] = defaultdict(set)
+        
+        # Thread safety locks
+        self._concepts_lock = threading.RLock()
+        self._associations_lock = threading.RLock()
+        self._cache_lock = threading.RLock()
 
         # Initialize NLP processor first (needed for dimension detection)
         self.nlp_processor: Optional[TextProcessor] = None
@@ -277,24 +333,25 @@ class ReasoningEngine:
 
         # Check cache first
         if self.enable_caching:
-            cached = self.query_cache.get(question)
-            if cached:
-                cached_result, ts = cached
-                if (
-                    self.cache_ttl_seconds is None
-                    or (time.time() - ts) <= self.cache_ttl_seconds
-                ):
-                    self.cache_hits += 1
-                    logger.debug(f"Cache hit for query: {question[:50]}...")
-                    # LRU: mark as recently used
-                    self.query_cache.move_to_end(question)
-                    return cached_result
-                else:
-                    # TTL expired
-                    try:
-                        del self.query_cache[question]
-                    except KeyError:
-                        pass
+            with self._cache_lock:
+                cached = self.query_cache.get(question)
+                if cached:
+                    cached_result, ts = cached
+                    if (
+                        self.cache_ttl_seconds is None
+                        or (time.time() - ts) <= self.cache_ttl_seconds
+                    ):
+                        self.cache_hits += 1
+                        logger.debug(f"Cache hit for query: {question[:50]}...")
+                        # LRU: mark as recently used
+                        self.query_cache.move_to_end(question)
+                        return cached_result
+                    else:
+                        # TTL expired
+                        try:
+                            del self.query_cache[question]
+                        except KeyError:
+                            pass
 
         # Process query through full reasoning pipeline
         result = self.query_processor.process_query(
@@ -335,9 +392,10 @@ class ReasoningEngine:
         self.learning_events += 1
 
         # Learn through adaptive system (adds to self.concepts dict)
-        concept_id = self.adaptive_learner.learn_adaptive(
-            content, source=source, category=category, **kwargs
-        )
+        with self._concepts_lock:
+            concept_id = self.adaptive_learner.learn_adaptive(
+                content, source=source, category=category, **kwargs
+            )
 
         # Store in Rust storage if enabled
         if self.use_rust_storage and self.storage and self.nlp_processor:
@@ -352,8 +410,12 @@ class ReasoningEngine:
                         # Store in Rust
                         self.storage.add_concept(concept, embedding_array)
                         logger.debug(f"Stored concept {concept_id[:8]} in Rust storage")
+                    else:
+                        logger.warning(f"Failed to generate embedding for concept {concept_id[:8]}")
             except Exception as e:
-                logger.warning(f"Failed to store in Rust storage: {e}")
+                # Critical storage failure - log and re-raise
+                logger.error(f"Critical: Failed to store concept {concept_id[:8]} in Rust storage: {e}")
+                raise StorageError(f"Failed to persist concept: {e}") from e
 
         # Update neighbor mappings
         self._update_concept_neighbors(concept_id)
@@ -412,13 +474,14 @@ class ReasoningEngine:
         # Batch update vector index (much faster)
         if self.enable_vector_index and self.vector_index:
             try:
-                # Collect content texts
+                # Collect content texts with lock
                 content_texts = []
                 valid_concept_ids = []
-                for concept_id in concept_ids:
-                    if concept_id in self.concepts:
-                        content_texts.append(self.concepts[concept_id].content)
-                        valid_concept_ids.append(concept_id)
+                with self._concepts_lock:
+                    for concept_id in concept_ids:
+                        if concept_id in self.concepts:
+                            content_texts.append(self.concepts[concept_id].content)
+                            valid_concept_ids.append(concept_id)
                 
                 # Generate embeddings in batch
                 embeddings = None
@@ -480,11 +543,12 @@ class ReasoningEngine:
         if not self.nlp_processor:
             return
         
-        if concept_id not in self.concepts:
-            return
+        with self._concepts_lock:
+            if concept_id not in self.concepts:
+                return
+            content = self.concepts[concept_id].content
         
         try:
-            content = self.concepts[concept_id].content
             embedding = self.nlp_processor.get_embedding(content)
             
             if embedding is not None:
@@ -540,25 +604,26 @@ class ReasoningEngine:
     def get_concept_info(self, concept_id: str) -> Optional[Dict]:
         """Get information about a specific concept."""
 
-        if concept_id not in self.concepts:
-            return None
+        with self._concepts_lock:
+            if concept_id not in self.concepts:
+                return None
 
-        concept = self.concepts[concept_id]
-        neighbors = self.concept_neighbors.get(concept_id, set())
+            concept = self.concepts[concept_id]
+            neighbors = self.concept_neighbors.get(concept_id, set())
 
-        return {
-            "id": concept.id,
-            "content": concept.content,
-            "strength": concept.strength,
-            "confidence": concept.confidence,
-            "access_count": concept.access_count,
-            "created": concept.created,
-            "last_accessed": concept.last_accessed,
-            "source": concept.source,
-            "category": concept.category,
-            "neighbor_count": len(neighbors),
-            "neighbors": list(neighbors)[:10],  # Limit for display
-        }
+            return {
+                "id": concept.id,
+                "content": concept.content,
+                "strength": concept.strength,
+                "confidence": concept.confidence,
+                "access_count": concept.access_count,
+                "created": concept.created,
+                "last_accessed": concept.last_accessed,
+                "source": concept.source,
+                "category": concept.category,
+                "neighbor_count": len(neighbors),
+                "neighbors": list(neighbors)[:10],  # Limit for display
+            }
 
     def search_concepts(self, query: str, limit: int = 10) -> List[Dict]:
         """
@@ -595,15 +660,16 @@ class ReasoningEngine:
         # Fallback to linear word overlap search (O(N))
         query_words = set(query.lower().split())
 
-        # Score concepts by relevance
+        # Score concepts by relevance (with lock)
         concept_scores = []
-        for concept_id, concept in self.concepts.items():
-            content_words = set(concept.content.lower().split())
-            overlap = len(query_words & content_words)
+        with self._concepts_lock:
+            for concept_id, concept in self.concepts.items():
+                content_words = set(concept.content.lower().split())
+                overlap = len(query_words & content_words)
 
-            if overlap > 0:
-                score = overlap / max(len(query_words), 1) * concept.strength
-                concept_scores.append((concept_id, score))
+                if overlap > 0:
+                    score = overlap / max(len(query_words), 1) * concept.strength
+                    concept_scores.append((concept_id, score))
 
         # Sort and return top matches
         concept_scores.sort(key=lambda x: x[1], reverse=True)
@@ -681,25 +747,27 @@ class ReasoningEngine:
 
         # Remove very weak associations to reduce noise
         weak_associations = []
-        for key, association in self.associations.items():
-            if association.confidence < 0.1:
-                weak_associations.append(key)
+        with self._associations_lock:
+            for key, association in self.associations.items():
+                if association.confidence < 0.1:
+                    weak_associations.append(key)
 
-        for key in weak_associations:
-            del self.associations[key]
-            optimizations["weak_associations_removed"] += 1
+            for key in weak_associations:
+                del self.associations[key]
+                optimizations["weak_associations_removed"] += 1
 
         # Prune cache down to size budget
-        if len(self.query_cache) > self.max_cache_size:
-            to_prune = len(self.query_cache) - self.max_cache_size
-            pruned = 0
-            while pruned < to_prune:
-                try:
-                    self.query_cache.popitem(last=False)
-                    pruned += 1
-                except KeyError:
-                    break
-            optimizations["cache_entries_pruned"] = pruned
+        with self._cache_lock:
+            if len(self.query_cache) > self.max_cache_size:
+                to_prune = len(self.query_cache) - self.max_cache_size
+                pruned = 0
+                while pruned < to_prune:
+                    try:
+                        self.query_cache.popitem(last=False)
+                        pruned += 1
+                    except KeyError:
+                        break
+                optimizations["cache_entries_pruned"] = pruned
 
         logger.debug(f"Performance optimization completed: {optimizations}")
         return optimizations
@@ -710,16 +778,22 @@ class ReasoningEngine:
         import json
 
         try:
-            data = {
-                "concepts": {cid: c.to_dict() for cid, c in self.concepts.items()},
-                "associations": {
+            with self._concepts_lock:
+                concepts_dict = {cid: c.to_dict() for cid, c in self.concepts.items()}
+            
+            with self._associations_lock:
+                associations_dict = {
                     f"{k[0]}:{k[1]}": v.to_dict() for k, v in self.associations.items()
-                },
+                }
+            
+            data = {
+                "concepts": concepts_dict,
+                "associations": associations_dict,
                 "metadata": {
                     "version": "1.0",
                     "created": time.time(),
-                    "total_concepts": len(self.concepts),
-                    "total_associations": len(self.associations),
+                    "total_concepts": len(concepts_dict),
+                    "total_associations": len(associations_dict),
                     "query_count": self.query_count,
                     "learning_events": self.learning_events,
                 },
@@ -745,22 +819,24 @@ class ReasoningEngine:
                 data = json.load(f)
 
             # Load concepts
-            self.concepts.clear()
-            for cid, concept_data in data["concepts"].items():
-                self.concepts[cid] = Concept.from_dict(concept_data)
+            with self._concepts_lock:
+                self.concepts.clear()
+                for cid, concept_data in data["concepts"].items():
+                    self.concepts[cid] = Concept.from_dict(concept_data)
 
             # Load associations
-            self.associations.clear()
-            for key_str, assoc_data in data["associations"].items():
-                if ":" in key_str:
-                    source_id, target_id = key_str.split(":", 1)
-                elif "|" in key_str:
-                    source_id, target_id = key_str.split("|", 1)
-                else:
-                    # Unknown format; skip
-                    continue
-                key = (source_id, target_id)
-                self.associations[key] = Association.from_dict(assoc_data)
+            with self._associations_lock:
+                self.associations.clear()
+                for key_str, assoc_data in data["associations"].items():
+                    if ":" in key_str:
+                        source_id, target_id = key_str.split(":", 1)
+                    elif "|" in key_str:
+                        source_id, target_id = key_str.split("|", 1)
+                    else:
+                        # Unknown format; skip
+                        continue
+                    key = (source_id, target_id)
+                    self.associations[key] = Association.from_dict(assoc_data)
 
             # Rebuild indexes
             self._rebuild_indexes()
@@ -819,13 +895,14 @@ class ReasoningEngine:
     def _update_concept_neighbors(self, concept_id: str) -> None:
         """Update neighbor mappings for a concept."""
 
-        for key, association in self.associations.items():
-            source_id, target_id = key
+        with self._associations_lock:
+            for key, association in self.associations.items():
+                source_id, target_id = key
 
-            if source_id == concept_id:
-                self.concept_neighbors[concept_id].add(target_id)
-            elif target_id == concept_id:
-                self.concept_neighbors[source_id].add(concept_id)
+                if source_id == concept_id:
+                    self.concept_neighbors[concept_id].add(target_id)
+                elif target_id == concept_id:
+                    self.concept_neighbors[source_id].add(concept_id)
 
     def _rebuild_indexes(self) -> None:
         """Rebuild all performance indexes."""
@@ -848,17 +925,18 @@ class ReasoningEngine:
 
     def _update_cache(self, question: str, result: ConsensusResult) -> None:
         """Update query cache with new result (LRU + optional TTL)."""
+        
+        with self._cache_lock:
+            # Evict until within size budget
+            while len(self.query_cache) >= self.max_cache_size:
+                try:
+                    self.query_cache.popitem(last=False)  # pop oldest
+                except KeyError:
+                    break
 
-        # Evict until within size budget
-        while len(self.query_cache) >= self.max_cache_size:
-            try:
-                self.query_cache.popitem(last=False)  # pop oldest
-            except KeyError:
-                break
-
-        # Insert/move to end
-        self.query_cache[question] = (result, time.time())
-        self.query_cache.move_to_end(question)
+            # Insert/move to end
+            self.query_cache[question] = (result, time.time())
+            self.query_cache.move_to_end(question)
 
     def _invalidate_cache(self, new_content: Optional[str] = None) -> None:
         """
@@ -871,34 +949,35 @@ class ReasoningEngine:
         Args:
             new_content: The content being learned (optional, if None clears all)
         """
-        if not new_content:
-            # No content provided, clear all (fallback behavior)
-            self.query_cache.clear()
-            return
-        
-        # Extract meaningful words from new content
-        new_words = set(extract_words(new_content.lower()))
-        
-        if not new_words:
-            # No meaningful words, don't invalidate
-            return
-        
-        # Find queries that overlap with new content
-        queries_to_invalidate = []
-        
-        for cached_query in list(self.query_cache.keys()):
-            query_words = set(extract_words(cached_query.lower()))
+        with self._cache_lock:
+            if not new_content:
+                # No content provided, clear all (fallback behavior)
+                self.query_cache.clear()
+                return
             
-            # If query shares words with new content, invalidate it
-            overlap = query_words & new_words
-            if overlap:
-                queries_to_invalidate.append(cached_query)
-        
-        # Remove invalidated queries
-        for query in queries_to_invalidate:
-            del self.query_cache[query]
-        
-        logger.debug(
+            # Extract meaningful words from new content
+            new_words = set(extract_words(new_content.lower()))
+            
+            if not new_words:
+                # No meaningful words, don't invalidate
+                return
+            
+            # Find queries that overlap with new content
+            queries_to_invalidate = []
+            
+            for cached_query in list(self.query_cache.keys()):
+                query_words = set(extract_words(cached_query.lower()))
+                
+                # If query shares words with new content, invalidate it
+                overlap = query_words & new_words
+                if overlap:
+                    queries_to_invalidate.append(cached_query)
+            
+            # Remove invalidated queries
+            for query in queries_to_invalidate:
+                del self.query_cache[query]
+            
+            logger.debug(
             f"Invalidated {len(queries_to_invalidate)}/{len(self.query_cache) + len(queries_to_invalidate)} "
             f"cache entries based on word overlap with new content"
         )

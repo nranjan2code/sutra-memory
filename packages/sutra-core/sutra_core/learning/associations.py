@@ -15,6 +15,13 @@ from typing import Dict, Tuple
 from ..graph.concepts import Association, AssociationType, Concept
 from ..utils.text import extract_words, get_association_patterns
 
+# Import Optional for type hints
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..utils.nlp import TextProcessor
+    from .entity_cache import EntityCache
+
 
 class AssociationExtractor:
     """Extracts and manages associations between concepts."""
@@ -29,6 +36,8 @@ class AssociationExtractor:
         central_link_confidence: float = 0.6,
         central_link_type: AssociationType = AssociationType.COMPOSITIONAL,
         max_cooccurrence_links: int = 200,
+        nlp_processor: Optional["TextProcessor"] = None,
+        entity_cache: Optional['EntityCache'] = None,
     ):
         """
         Initialize association extractor.
@@ -41,6 +50,8 @@ class AssociationExtractor:
             enable_central_links: Create links from central concept to extracted phrases
             central_link_confidence: Confidence for central links (0.0 - 1.0)
             central_link_type: Association type for central links
+            nlp_processor: Shared TextProcessor instance (avoids re-loading models)
+            entity_cache: Optional EntityCache for LLM-extracted entities
         """
         self.concepts = concepts
         self.word_to_concepts = word_to_concepts
@@ -50,6 +61,8 @@ class AssociationExtractor:
         self.central_link_confidence = central_link_confidence
         self.central_link_type = central_link_type
         self.max_cooccurrence_links = max_cooccurrence_links
+        self.nlp_processor = nlp_processor
+        self.entity_cache = entity_cache
 
     def extract_associations(self, content: str, concept_id: str) -> int:
         """
@@ -143,12 +156,19 @@ class AssociationExtractor:
         """
         associations_created = 0
 
-        # Try using spaCy for intelligent chunk extraction
+        # Use shared nlp_processor if available (avoids re-loading model)
+        if self.nlp_processor:
+            processor = self.nlp_processor
+        else:
+            # Fallback: create new processor (slower, for backward compatibility)
+            try:
+                from ..utils.nlp import TextProcessor
+                processor = TextProcessor()
+            except Exception:
+                # If NLP unavailable, use simple sliding window fallback
+                return self._extract_cooccurrence_fallback(content, concept_id)
+        
         try:
-            from ..utils.nlp import TextProcessor
-
-            processor = TextProcessor()
-            
             # Extract meaningful noun chunks (lemmatized)
             tokens = processor.extract_meaningful_tokens(content)
             
@@ -177,6 +197,9 @@ class AssociationExtractor:
                                         return associations_created
             
             return associations_created
+        except Exception:
+            # Fallback if spaCy processing fails
+            return self._extract_cooccurrence_fallback(content, concept_id)
             
         except ImportError:
             # Fallback to simple sliding window if spaCy unavailable

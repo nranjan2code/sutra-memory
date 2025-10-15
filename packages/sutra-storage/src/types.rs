@@ -1,11 +1,15 @@
 /// Core types for the Sutra storage engine
 use bytemuck::{Pod, Zeroable};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Concept ID: 16-byte MD5 hash
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Pod, Zeroable)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Pod, Zeroable, Serialize, Deserialize)]
 #[repr(C)]
 pub struct ConceptId(pub [u8; 16]);
+
+/// Association ID: 64-bit unique identifier
+pub type AssociationId = u64;
 
 impl ConceptId {
     pub fn from_bytes(bytes: [u8; 16]) -> Self {
@@ -15,7 +19,18 @@ impl ConceptId {
     pub fn from_string(s: &str) -> Self {
         use std::convert::TryInto;
         let bytes = hex::decode(s).expect("Invalid hex string");
-        Self(bytes[..16].try_into().expect("Invalid length"))
+        
+        // Handle both 8-byte (16 hex chars) and 16-byte (32 hex chars) IDs
+        if bytes.len() == 8 {
+            // Pad to 16 bytes with zeros
+            let mut padded = [0u8; 16];
+            padded[..8].copy_from_slice(&bytes);
+            Self(padded)
+        } else if bytes.len() == 16 {
+            Self(bytes.try_into().expect("Invalid length"))
+        } else {
+            panic!("Concept ID must be 8 or 16 bytes, got {}", bytes.len());
+        }
     }
     
     pub fn to_hex(&self) -> String {
@@ -55,21 +70,22 @@ impl AssociationType {
 
 /// Fixed-size concept record (128 bytes)
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-#[repr(C, align(16))]
+#[repr(C, packed)]  // packed to avoid padding
 pub struct ConceptRecord {
-    pub concept_id: ConceptId,
-    pub strength: f32,
-    pub confidence: f32,
-    pub access_count: u32,
-    pub created: u64,
-    pub last_accessed: u64,
-    pub content_offset: u64,
-    pub content_length: u32,
-    pub embedding_offset: u64,
-    pub source_hash: u32,
-    pub flags: u32,
-    pub reserved: [u8; 40],
-}
+    pub concept_id: ConceptId,       // 16 bytes
+    pub strength: f32,                // 4 bytes
+    pub confidence: f32,              // 4 bytes
+    pub access_count: u32,            // 4 bytes
+    pub created: u64,                 // 8 bytes
+    pub last_accessed: u64,           // 8 bytes
+    pub content_offset: u64,          // 8 bytes
+    pub content_length: u32,          // 4 bytes
+    pub embedding_offset: u64,        // 8 bytes
+    pub source_hash: u32,             // 4 bytes
+    pub flags: u32,                   // 4 bytes
+    pub reserved1: [u8; 32],          // 32 bytes
+    pub reserved2: [u8; 24],          // 24 bytes to reach 128
+}  // Total: 128 bytes
 
 impl ConceptRecord {
     pub fn new(
@@ -95,25 +111,26 @@ impl ConceptRecord {
             embedding_offset,
             source_hash: 0,
             flags: 0,
-            reserved: [0; 40],
+            reserved1: [0; 32],
+            reserved2: [0; 24],
         }
     }
 }
 
 /// Fixed-size association record (64 bytes)
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-#[repr(C, align(8))]
+#[repr(C, packed)]  // packed to avoid padding
 pub struct AssociationRecord {
-    pub source_id: ConceptId,
-    pub target_id: ConceptId,
-    pub assoc_type: u8,
-    pub confidence: f32,
-    pub weight: f32,
-    pub created: u64,
-    pub last_used: u64,
-    pub flags: u8,
-    pub reserved: [u8; 7],
-}
+    pub source_id: ConceptId,         // 16 bytes
+    pub target_id: ConceptId,         // 16 bytes
+    pub assoc_type: u8,               // 1 byte
+    pub confidence: f32,              // 4 bytes
+    pub weight: f32,                  // 4 bytes
+    pub created: u64,                 // 8 bytes
+    pub last_used: u64,               // 8 bytes
+    pub flags: u8,                    // 1 byte
+    pub reserved: [u8; 6],            // 6 bytes padding to reach 64
+}  // Total: 64 bytes
 
 impl AssociationRecord {
     pub fn new(
@@ -136,52 +153,15 @@ impl AssociationRecord {
             created: now,
             last_used: now,
             flags: 0,
-            reserved: [0; 7],
+            reserved: [0; 6],
         }
     }
 }
 
 /// Segment header for memory-mapped regions
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct SegmentHeader {
-    pub magic: [u8; 8],           // "SUTRASEG"
-    pub version: u32,
-    pub segment_id: u64,
-    pub created_at: u64,
-    pub concept_count: u64,
-    pub association_count: u64,
-    pub content_size: u64,
-    pub embedding_size: u64,
-    pub checksum: u64,
-    pub reserved: [u8; 216],
-}
-
-impl SegmentHeader {
-    pub fn new(segment_id: u64) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        
-        Self {
-            magic: *b"SUTRASEG",
-            version: 1,
-            segment_id,
-            created_at: now,
-            concept_count: 0,
-            association_count: 0,
-            content_size: 0,
-            embedding_size: 0,
-            checksum: 0,
-            reserved: [0; 216],
-        }
-    }
-    
-    pub fn validate(&self) -> bool {
-        &self.magic == b"SUTRASEG"
-    }
-}
+/// Note: Full implementation is in segment.rs
+/// This is kept for backward compatibility with existing code
+pub use crate::segment::SegmentHeader;
 
 /// Path through the knowledge graph
 #[derive(Debug, Clone)]

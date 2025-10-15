@@ -8,12 +8,15 @@ This is the core package for the Sutra AI system, providing:
 - Adaptive focus learning
 - Real-time knowledge integration
 - Advanced NLP processing with spaCy
+- HNSW vector indexing for O(log N) semantic search
+- Batch operations for efficient bulk learning
 
 The system offers a genuine alternative to LLM limitations:
 - 100% explainable reasoning paths
 - Real-time learning without retraining
 - Unlimited persistent memory
 - Ultra-efficient CPU-only operation
+- Scalable to 100K+ concepts
 """
 
 from .exceptions import (
@@ -41,6 +44,14 @@ from .utils import (
     get_association_patterns,
 )
 from .validation import Validator
+
+# Vector indexing (optional, requires hnswlib)
+try:
+    from .indexing import VectorIndex
+    
+    __all_vector__ = ["VectorIndex"]
+except ImportError:
+    __all_vector__ = []
 
 # NLP processing (optional, requires spacy)
 try:
@@ -82,4 +93,4 @@ __all__ = [
     "ValidationError",
     "StorageError",
     "ConfigurationError",
-] + __all_nlp__
+] + __all_nlp__ + __all_vector__

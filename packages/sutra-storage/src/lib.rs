@@ -21,6 +21,7 @@ mod wal;
 mod quantization;
 mod vectors;
 mod python;
+mod reasoning_store;
 
 pub use types::{
     ConceptId, AssociationId, AssociationType, ConceptRecord, AssociationRecord,
@@ -35,6 +36,7 @@ pub use index::{GraphIndex, IndexStats, ConceptLocation};
 pub use wal::{WriteAheadLog, LogEntry, Operation};
 pub use quantization::ProductQuantizer;
 pub use vectors::{VectorStore, VectorConfig, VectorMetadata, VectorStats};
+pub use reasoning_store::{ReasoningStore, ConceptData, AssociationData, ReasoningContext};
 
 // Re-export Python bindings
 // TODO: Uncomment when ready

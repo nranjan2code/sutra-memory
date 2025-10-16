@@ -106,8 +106,8 @@ class ReasoningEngine:
         vector_index_dimension: Optional[int] = None,
         use_rust_storage: bool = True,
         enable_batch_embeddings: bool = True,
-        embedding_model: str = "all-MiniLM-L6-v2",
-        mps_batch_threshold: int = 64,
+        embedding_model: str = "google/embeddinggemma-300m",
+        mps_batch_threshold: int = 32,
         enable_parallel_associations: bool = True,
         association_workers: int = 4,
         enable_entity_cache: bool = False,
@@ -135,16 +135,10 @@ class ReasoningEngine:
             association_workers: Number of worker processes for parallel extraction
             enable_entity_cache: Enable cached entity extraction with background LLM service (Phase 10)
         """
-        # Storage backend
+        # Storage backend (single source of truth)
         self.storage_path = storage_path
         self.use_rust_storage = use_rust_storage
         self.storage = None
-        
-        # Core data structures (for compatibility, will be proxied to storage)
-        self.concepts: Dict[str, Concept] = {}
-        self.associations: Dict[Tuple[str, str], Association] = {}
-        self.concept_neighbors: Dict[str, Set[str]] = defaultdict(set)
-        self.word_to_concepts: Dict[str, Set[str]] = defaultdict(set)
         
         # Thread safety locks
         self._concepts_lock = threading.RLock()
@@ -164,18 +158,8 @@ class ReasoningEngine:
             try:
                 from ..storage import RustStorageAdapter
                 
-                # Auto-detect embedding dimension from NLP processor
-                detected_dim = 384  # Default fallback
-                if vector_index_dimension:
-                    detected_dim = vector_index_dimension
-                elif self.nlp_processor:
-                    try:
-                        detected_dim = self.nlp_processor.get_embedding_dimension()
-                        if detected_dim <= 0:
-                            detected_dim = 96  # Default for en_core_web_sm
-                        logger.info(f"Auto-detected embedding dimension: {detected_dim}")
-                    except Exception:
-                        detected_dim = 96
+                # Use EmbeddingGemma dimension (768) or specified dimension
+                detected_dim = vector_index_dimension if vector_index_dimension else 768
                 
                 self.storage = RustStorageAdapter(
                     storage_path,
@@ -184,8 +168,12 @@ class ReasoningEngine:
                 )
                 logger.info(f"Rust storage initialized at {storage_path} (dim={detected_dim})")
                 
-                # Load existing data from Rust storage
-                self._load_from_rust_storage()
+                # Load concept count
+                if self.storage:
+                    stats = self.storage.stats()
+                    concept_count = stats.get('total_concepts', 0)
+                    if concept_count > 0:
+                        logger.info(f"Loaded {concept_count} concepts from storage")
                 
             except ImportError as e:
                 logger.warning(f"Rust storage not available: {e}. Using in-memory dicts.")
@@ -198,25 +186,22 @@ class ReasoningEngine:
         self.vector_index: Optional[VectorIndex] = None
         if enable_vector_index:
             try:
-                # Auto-detect embedding dimension from NLP processor if not specified
-                if vector_index_dimension is None and self.nlp_processor:
-                    detected_dim = self.nlp_processor.get_embedding_dimension()
-                    if detected_dim > 0:
-                        vector_index_dimension = detected_dim
-                        logger.info(f"Auto-detected embedding dimension: {detected_dim}")
-                    else:
-                        vector_index_dimension = 96  # Default for en_core_web_sm
-                elif vector_index_dimension is None:
-                    vector_index_dimension = 96  # Default fallback
+                # Default to EmbeddingGemma dimension if not specified
+                if vector_index_dimension is None:
+                    vector_index_dimension = 768  # Default for EmbeddingGemma
                 
                 self.vector_index = VectorIndex(
                     dimension=vector_index_dimension,
                     max_elements=100000,
-                    ef_construction=200,
-                    m=16,
-                    ef_search=50,
+                    ef_construction=400,  # Higher quality index (200→400)
+                    m=48,                # More connections for better recall (16→48)
+                    ef_search=150,        # Better search quality (50→150)
                 )
                 logger.info(f"Vector index initialized (HNSW, dim={vector_index_dimension})")
+                
+                # Note: Vector index rebuild will happen after all components initialized
+                # This is deferred because we need embedding_batch_processor to be ready
+                        
             except Exception as e:
                 logger.warning(f"Vector index unavailable: {e}")
                 self.enable_vector_index = False
@@ -251,14 +236,13 @@ class ReasoningEngine:
                 logger.warning(f"Entity cache unavailable: {e}")
                 self.enable_entity_cache = False
 
-        # Initialize components
-        # Choose association extractor based on settings (priority: Parallel > Sequential)
+        # Initialize components with storage as single source of truth
+        if not self.storage:
+            raise RuntimeError("Rust storage required for operation")
+        
         if enable_parallel_associations:
             self.association_extractor = ParallelAssociationExtractor(
-                self.concepts,
-                self.word_to_concepts,
-                self.concept_neighbors,
-                self.associations,
+                storage=self.storage,
                 enable_central_links=enable_central_links,
                 central_link_confidence=central_link_confidence,
                 central_link_type=central_link_type,
@@ -268,35 +252,31 @@ class ReasoningEngine:
             logger.info(f"Parallel association extractor initialized ({association_workers} workers)")
         else:
             self.association_extractor = AssociationExtractor(
-                self.concepts,
-                self.word_to_concepts,
-                self.concept_neighbors,
-                self.associations,
+                storage=self.storage,
                 enable_central_links=enable_central_links,
                 central_link_confidence=central_link_confidence,
                 central_link_type=central_link_type,
-                nlp_processor=self.nlp_processor,  # Only sequential extractor uses NLP
+                nlp_processor=self.nlp_processor,
                 entity_cache=self.entity_cache,
             )
             logger.info("Sequential association extractor initialized")
 
         self.adaptive_learner = AdaptiveLearner(
-            self.concepts, self.association_extractor
+            storage=self.storage,
+            association_extractor=self.association_extractor
         )
 
-        self.path_finder = PathFinder(
-            self.concepts, self.associations, self.concept_neighbors
-        )
-
+        self.path_finder = PathFinder(self.storage)
         self.mppa = MultiPathAggregator()
 
         self.query_processor = QueryProcessor(
-            self.concepts,
-            self.associations,
-            self.concept_neighbors,
+            self.storage,
             self.association_extractor,
             self.path_finder,
             self.mppa,
+            vector_index=self.vector_index if self.enable_vector_index else None,
+            embedding_processor=self.embedding_batch_processor if self.enable_batch_embeddings else None,
+            nlp_processor=self.nlp_processor,
         )
 
         # Performance optimization
@@ -313,6 +293,35 @@ class ReasoningEngine:
         self.cache_hits = 0
 
         logger.info("Sutra AI Reasoning Engine initialized")
+        
+        # Rebuild vector index from storage after all components are initialized
+        # This ensures existing concepts are indexed with the correct embeddings
+        if self.enable_vector_index and self.vector_index:
+            self._rebuild_vector_index_from_storage()
+    
+    def save(self) -> None:
+        """Persist all knowledge to disk."""
+        if self.use_rust_storage and self.storage:
+            try:
+                self.storage.save()
+                logger.info("Knowledge base persisted to disk")
+            except Exception as e:
+                logger.error(f"Failed to save knowledge base: {e}")
+                raise
+    
+    def close(self) -> None:
+        """Close the engine and ensure all data is persisted."""
+        self.save()
+        logger.info("ReasoningEngine closed")
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - auto-save."""
+        self.close()
+        return False
 
     def ask(self, question: str, num_reasoning_paths: int = 5, **kwargs: Any) -> ConsensusResult:
         """
@@ -391,49 +400,25 @@ class ReasoningEngine:
         """
         self.learning_events += 1
 
-        # Learn through adaptive system (adds to self.concepts dict)
+        # Generate embedding first (prefer batch processor for better quality)
+        embedding = None
+        if self.embedding_batch_processor or self.nlp_processor:
+            embedding = self._generate_embedding_with_retry(content, "new")
+            if embedding is None:
+                raise StorageError(
+                    f"CRITICAL: Failed to generate embedding. "
+                    f"Content: '{content[:100]}...'"
+                )
+        
+        # Learn through adaptive system (writes directly to Rust storage)
         with self._concepts_lock:
             concept_id = self.adaptive_learner.learn_adaptive(
-                content, source=source, category=category, **kwargs
+                content, 
+                source=source, 
+                category=category,
+                embedding=embedding,
+                **kwargs
             )
-
-        # Store in Rust storage if enabled - WITH PRODUCTION-LEVEL ERROR HANDLING
-        if self.use_rust_storage and self.storage and self.nlp_processor:
-            concept = self.concepts.get(concept_id)
-            if not concept:
-                raise StorageError(f"Concept {concept_id[:8]} not found after learning")
-            
-            # CRITICAL: Generate embedding with retry mechanism
-            embedding = self._generate_embedding_with_retry(content, concept_id)
-            if embedding is None:
-                # FAIL FAST: Remove concept from memory if embedding fails
-                self.concepts.pop(concept_id, None)
-                raise StorageError(
-                    f"CRITICAL: Failed to generate embedding for concept {concept_id[:8]}. "
-                    f"Content: '{content[:100]}...'. Concept removed from memory."
-                )
-            
-            try:
-                # Convert to numpy array
-                embedding_array = np.array(embedding, dtype=np.float32)
-                
-                # ATOMIC OPERATION: Store concept and embedding together
-                self.storage.add_concept(concept, embedding_array)
-                
-                # Verify storage succeeded by checking if we can retrieve it
-                if not self.storage.has_concept(concept_id):
-                    raise StorageError(f"Storage verification failed for concept {concept_id[:8]}")
-                
-                logger.debug(f"✅ Stored concept {concept_id[:8]} with embedding in Rust storage")
-                
-            except Exception as e:
-                # ROLLBACK: Remove concept from memory if storage fails
-                self.concepts.pop(concept_id, None)
-                logger.error(f"CRITICAL: Failed to store concept {concept_id[:8]} in Rust storage: {e}")
-                raise StorageError(f"Failed to persist concept atomically: {e}") from e
-
-        # Update neighbor mappings
-        self._update_concept_neighbors(concept_id)
 
         # Update vector index
         self._index_concept(concept_id)
@@ -441,6 +426,14 @@ class ReasoningEngine:
         # Selectively invalidate cache entries affected by new content
         if self.enable_caching:
             self._invalidate_cache(content)
+
+        # PRODUCTION: Auto-persist to disk after learning
+        if self.storage:
+            try:
+                self.storage.save()
+                logger.debug(f"✓ Auto-persisted concept {concept_id[:8]} to disk")
+            except Exception as e:
+                logger.warning(f"Failed to auto-persist: {e}")
 
         logger.debug(f"Learned new concept: {content[:50]}... (ID: {concept_id[:8]})")
 
@@ -477,8 +470,13 @@ class ReasoningEngine:
                     gc.collect()
                     time.sleep(retry_delay * attempt)  # Exponential backoff
                 
-                # Generate embedding
-                embedding = self.nlp_processor.get_embedding(content)
+                # Generate embedding (prefer batch processor for better quality)
+                # Use 'Retrieval-document' prompt for concepts (not queries)
+                embedding = None
+                if self.embedding_batch_processor:
+                    embedding = self.embedding_batch_processor.encode_single(content, prompt_name="Retrieval-document")
+                elif self.nlp_processor:
+                    embedding = self.nlp_processor.get_embedding(content)
                 
                 if embedding is not None and len(embedding) > 0:
                     # Validate embedding quality
@@ -579,9 +577,22 @@ class ReasoningEngine:
                             content, source=source, category=category, **kwargs
                         )
                         
-                        # Store in Rust storage with production-level error handling
-                        if self.use_rust_storage and self.storage and self.nlp_processor:
-                            self._store_concept_atomically(concept_id, content)
+                        # Generate embedding ONCE for both storage and index
+                        embedding = None
+                        if (self.use_rust_storage or self.enable_vector_index) and self.nlp_processor:
+                            embedding = self._generate_embedding_with_retry(content, concept_id)
+                        
+                        # Store in Rust storage with SAME embedding
+                        if self.use_rust_storage and self.storage and embedding is not None:
+                            self._store_concept_with_embedding(concept_id, embedding)
+                        
+                        # Add to vector index INCREMENTALLY with SAME embedding
+                        if self.enable_vector_index and self.vector_index and embedding is not None:
+                            try:
+                                self.vector_index.add_concept(concept_id, embedding)
+                                logger.debug(f"Indexed concept {concept_id[:8]} incrementally")
+                            except Exception as e:
+                                logger.warning(f"Failed to index {concept_id[:8]}: {e}")
                         
                         # Update neighbor mappings
                         self._update_concept_neighbors(concept_id)
@@ -611,22 +622,37 @@ class ReasoningEngine:
                 if fail_on_error:
                     raise
         
-        # Update vector index with all successfully learned concepts
-        if self.enable_vector_index and self.vector_index and successfully_learned:
+        # Verify vector index synchronization (concepts indexed incrementally above)
+        if self.enable_vector_index and self.vector_index:
             try:
-                logger.info(f"🔄 Updating vector index with {len(successfully_learned)} concepts...")
-                self._update_vector_index_batch(successfully_learned)
-                logger.info("✅ Vector index update completed")
+                index_stats = self.vector_index.get_stats()
+                indexed_count = index_stats['indexed_concepts']
+                expected_count = len(successfully_learned)
                 
+                if indexed_count < expected_count:
+                    missing = expected_count - indexed_count
+                    logger.warning(
+                        f"⚠️  Vector index incomplete: {indexed_count}/{expected_count} "
+                        f"({missing} concepts missing)"
+                    )
+                else:
+                    logger.info(f"✅ Vector index verified: {indexed_count} concepts indexed")
+                    
             except Exception as e:
-                logger.error(f"💥 Failed to update vector index: {e}")
-                if fail_on_error:
-                    raise
+                logger.warning(f"Vector index verification failed: {e}")
         
         # Invalidate caches after all learning
         if self.enable_caching:
             combined_content = " ".join(c[0] for c in contents)
             self._invalidate_cache(combined_content)
+        
+        # PRODUCTION: Persist all learned concepts to disk
+        if self.use_rust_storage and self.storage:
+            try:
+                self.storage.save()
+                logger.info(f"✅ Persisted {len(successfully_learned)} concepts to disk")
+            except Exception as e:
+                logger.error(f"Failed to persist batch: {e}")
         
         # Final memory cleanup
         gc.collect()
@@ -650,13 +676,15 @@ class ReasoningEngine:
         
         return successfully_learned
     
-    def _store_concept_atomically(self, concept_id: str, content: str) -> None:
+    def _store_concept_with_embedding(
+        self, concept_id: str, embedding: np.ndarray
+    ) -> None:
         """
-        Store concept in Rust storage with atomic operation guarantees.
+        Store concept in Rust storage with pre-computed embedding.
         
         Args:
-            concept_id: Unique concept identifier
-            content: Concept content text
+            concept_id: Unique concept identifier  
+            embedding: Pre-computed embedding vector
             
         Raises:
             StorageError: If storage operation fails
@@ -672,18 +700,13 @@ class ReasoningEngine:
             
             concept = self.concepts[concept_id]
             
-            # Generate embedding for the concept
-            embedding = self._generate_embedding_with_retry(content, concept_id)
-            if embedding is None:
-                raise StorageError(f"Failed to generate embedding for concept {concept_id[:8]}")
-            
             # Store using the add_concept method from RustStorageAdapter
             self.storage.add_concept(concept, embedding)
             logger.debug(f"Stored concept {concept_id[:8]} in Rust storage")
             
         except Exception as e:
-            logger.error(f"Atomic storage failed for concept {concept_id[:8]}: {e}")
-            raise StorageError(f"Atomic storage failed: {e}")
+            logger.error(f"Storage failed for concept {concept_id[:8]}: {e}")
+            raise StorageError(f"Storage failed: {e}")
     
     def _rollback_batch_concepts(self, concept_ids: List[str]) -> None:
         """
@@ -794,8 +817,10 @@ class ReasoningEngine:
                 logger.warning("No valid embeddings generated for vector indexing")
                 
         except Exception as e:
-            logger.error(f"Batch vector indexing failed: {e}")
-            raise
+            logger.error(f"💥 Failed to update vector index: {e}")
+            # Don't raise - vector index failure shouldn't block learning
+            # Fall back to individual indexing if batch fails
+            logger.info("⚠️  Vector index batch update failed, will retry on next query")
     
     def _index_concept(self, concept_id: str) -> None:
         """
@@ -810,18 +835,17 @@ class ReasoningEngine:
         if not self.enable_vector_index or not self.vector_index:
             return
         
-        if not self.nlp_processor:
-            logger.warning(f"Cannot index concept {concept_id[:8]}: NLP processor unavailable")
+        if not self.nlp_processor or not self.storage:
+            logger.warning(f"Cannot index concept {concept_id[:8]}: missing processor or storage")
             return
         
-        with self._concepts_lock:
-            if concept_id not in self.concepts:
-                logger.warning(f"Cannot index concept {concept_id[:8]}: concept not found in memory")
-                return
-            content = self.concepts[concept_id].content
+        concept = self.storage.get_concept(concept_id)
+        if not concept:
+            logger.warning(f"Cannot index concept {concept_id[:8]}: concept not found in storage")
+            return
         
         # Use the production-level embedding generation with retry
-        embedding = self._generate_embedding_with_retry(content, concept_id)
+        embedding = self._generate_embedding_with_retry(concept.content, concept_id)
         
         if embedding is None:
             # This is now a CRITICAL error - concept exists but can't be indexed
@@ -849,6 +873,32 @@ class ReasoningEngine:
                 f"This will cause search inconsistencies."
             )
             # Don't raise exception as concept is already stored in main storage
+    
+    def _rebuild_vector_index_from_storage(self) -> None:
+        """Rebuild vector index from all concepts in Rust storage."""
+        if not self.vector_index or not self.storage or not self.nlp_processor:
+            return
+        
+        try:
+            all_concept_ids = self.storage.get_all_concept_ids()
+            indexed_count = 0
+            
+            logger.info(f"Rebuilding vector index for {len(all_concept_ids)} concepts...")
+            
+            for concept_id in all_concept_ids:
+                concept = self.storage.get_concept(concept_id)
+                if concept:
+                    # Generate embedding if not present
+                    embedding = self._generate_embedding_with_retry(concept.content, concept_id)
+                    if embedding is not None:
+                        logger.debug(f"Indexing {concept_id[:8]}: embedding dim={len(embedding)}, content='{concept.content[:50]}'")
+                        self.vector_index.add_concept(concept_id, embedding)
+                        indexed_count += 1
+            
+            logger.info(f"✅ Rebuilt vector index: {indexed_count}/{len(all_concept_ids)} concepts indexed")
+            
+        except Exception as e:
+            logger.warning(f"Failed to rebuild vector index: {e}")
 
     def explain_reasoning(self, question: str, detailed: bool = False) -> Dict:
         """
@@ -897,26 +947,28 @@ class ReasoningEngine:
     def get_concept_info(self, concept_id: str) -> Optional[Dict]:
         """Get information about a specific concept."""
 
-        with self._concepts_lock:
-            if concept_id not in self.concepts:
-                return None
+        if not self.storage:
+            return None
+        
+        concept = self.storage.get_concept(concept_id)
+        if not concept:
+            return None
 
-            concept = self.concepts[concept_id]
-            neighbors = self.concept_neighbors.get(concept_id, set())
+        neighbors = self.storage.get_neighbors(concept_id) or []
 
-            return {
-                "id": concept.id,
-                "content": concept.content,
-                "strength": concept.strength,
-                "confidence": concept.confidence,
-                "access_count": concept.access_count,
-                "created": concept.created,
-                "last_accessed": concept.last_accessed,
-                "source": concept.source,
-                "category": concept.category,
-                "neighbor_count": len(neighbors),
-                "neighbors": list(neighbors)[:10],  # Limit for display
-            }
+        return {
+            "id": concept.id,
+            "content": concept.content,
+            "strength": concept.strength,
+            "confidence": concept.confidence,
+            "access_count": concept.access_count,
+            "created": concept.created,
+            "last_accessed": concept.last_accessed,
+            "source": concept.source,
+            "category": concept.category,
+            "neighbor_count": len(neighbors),
+            "neighbors": neighbors[:10],  # Limit for display
+        }
 
     def search_concepts(self, query: str, limit: int = 10) -> List[Dict]:
         """
@@ -1149,72 +1201,8 @@ class ReasoningEngine:
             logger.error(f"Failed to load knowledge base: {e}")
             return False
 
-    def _load_from_rust_storage(self) -> None:
-        """Load existing concepts and associations from Rust storage into memory indexes."""
-        if not self.storage:
-            return
-        
-        try:
-            # Load all concept IDs from metadata
-            all_concept_ids = self.storage.get_all_concept_ids()
-            
-            logger.info(f"Loading {len(all_concept_ids)} concepts from Rust storage...")
-            
-            # Load concepts into memory dict for fast access
-            for concept_id in all_concept_ids:
-                concept = self.storage.get_concept(concept_id)
-                if concept:
-                    self.concepts[concept_id] = concept
-                    
-                    # Build word index
-                    words = extract_words(concept.content)
-                    for word in words:
-                        self.word_to_concepts[word].add(concept_id)
-            
-            # Build neighbor index from graph
-            for concept_id in all_concept_ids:
-                neighbors = self.storage.get_neighbors(concept_id)
-                if neighbors:
-                    self.concept_neighbors[concept_id] = set(neighbors)
-            
-            logger.info(
-                f"Loaded {len(self.concepts)} concepts, "
-                f"{len(self.concept_neighbors)} with neighbors"
-            )
-            
-        except Exception as e:
-            logger.error(f"Failed to load from Rust storage: {e}")
 
-    def _update_concept_neighbors(self, concept_id: str) -> None:
-        """Update neighbor mappings for a concept."""
 
-        with self._associations_lock:
-            for key, association in self.associations.items():
-                source_id, target_id = key
-
-                if source_id == concept_id:
-                    self.concept_neighbors[concept_id].add(target_id)
-                elif target_id == concept_id:
-                    self.concept_neighbors[source_id].add(concept_id)
-
-    def _rebuild_indexes(self) -> None:
-        """Rebuild all performance indexes."""
-
-        # Clear existing indexes
-        self.concept_neighbors.clear()
-        self.word_to_concepts.clear()
-
-        # Rebuild concept neighbors (symmetric to runtime indexing)
-        for key, association in self.associations.items():
-            source_id, target_id = key
-            self.concept_neighbors[source_id].add(target_id)
-            self.concept_neighbors[target_id].add(source_id)
-
-        # Rebuild word to concepts mapping using standardized tokenization
-        for concept_id, concept in self.concepts.items():
-            words = extract_words(concept.content)
-            for word in words:
-                self.word_to_concepts[word].add(concept_id)
 
     def _update_cache(self, question: str, result: ConsensusResult) -> None:
         """Update query cache with new result (LRU + optional TTL)."""

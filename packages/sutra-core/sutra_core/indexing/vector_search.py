@@ -37,9 +37,9 @@ class VectorIndex:
         self,
         dimension: int = 384,
         max_elements: int = 100000,
-        ef_construction: int = 200,
-        m: int = 16,
-        ef_search: int = 50,
+        ef_construction: int = 400,  # Production scale for 10K+ vectors
+        m: int = 48,                # More connections for better recall
+        ef_search: int = 150,        # Better search quality
         enable_auto_rebuild: bool = True,
         rebuild_threshold: int = 1000,
     ):

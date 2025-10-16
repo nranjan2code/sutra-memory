@@ -45,7 +45,7 @@ impl fmt::Display for ConceptId {
 }
 
 /// Association type enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum AssociationType {
     Semantic = 0,

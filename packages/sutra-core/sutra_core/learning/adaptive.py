@@ -38,17 +38,17 @@ class AdaptiveLearner:
 
     def __init__(
         self,
-        concepts: Dict[str, Concept],
+        storage,
         association_extractor: AssociationExtractor,
     ):
         """
         Initialize adaptive learner.
 
         Args:
-            concepts: Dictionary of all concepts
+            storage: RustStorageAdapter (single source of truth)
             association_extractor: Association extraction handler
         """
-        self.concepts = concepts
+        self.storage = storage
         self.association_extractor = association_extractor
 
     def learn_adaptive(
@@ -56,6 +56,7 @@ class AdaptiveLearner:
         content: str,
         source: Optional[str] = None,
         category: Optional[str] = None,
+        embedding: Optional[any] = None,
     ) -> str:
         """
         Learn new knowledge with adaptive focus.
@@ -69,28 +70,38 @@ class AdaptiveLearner:
             content: Knowledge to learn
             source: Source of knowledge
             category: Category/domain
+            embedding: Pre-computed embedding vector
 
         Returns:
             Concept ID
         """
+        import numpy as np
+        
         # Create concept ID
         concept_id = hashlib.md5(content.encode()).hexdigest()[:16]
 
-        if concept_id in self.concepts:
+        existing_concept = self.storage.get_concept(concept_id) if self.storage else None
+        
+        if existing_concept:
             # Handle existing concept with adaptive reinforcement
-            concept = self.concepts[concept_id]
-            old_strength = concept.strength
+            old_strength = existing_concept.strength
 
             # Standard access strengthening
-            concept.access()
+            existing_concept.access()
 
             # Apply adaptive reinforcement
-            self._apply_adaptive_reinforcement(concept)
-
+            self._apply_adaptive_reinforcement(existing_concept)
+            
+            # Update in storage
+            if embedding is not None:
+                embedding_array = np.array(embedding, dtype=np.float32)
+                self.storage.add_concept(existing_concept, embedding_array)
+            
             logger.debug(
                 f"Strengthened concept: {content[:30]}... "
-                f"({old_strength:.2f} → {concept.strength:.2f})"
+                f"({old_strength:.2f} → {existing_concept.strength:.2f})"
             )
+            concept = existing_concept
         else:
             # Create new concept
             concept = Concept(
@@ -99,13 +110,15 @@ class AdaptiveLearner:
                 source=source,
                 category=category,
             )
-            self.concepts[concept_id] = concept
-            self.association_extractor._index_concept(concept)
+            
+            # Store in Rust storage immediately
+            if embedding is not None:
+                embedding_array = np.array(embedding, dtype=np.float32)
+                self.storage.add_concept(concept, embedding_array)
 
             logger.debug(f"Created new concept: {content[:30]}...")
 
         # Extract associations with adaptive depth
-        concept = self.concepts[concept_id]
         extraction_depth = self._get_extraction_depth(concept)
 
         associations_created = self.association_extractor.extract_associations_adaptive(
@@ -160,7 +173,7 @@ class AdaptiveLearner:
         Returns:
             Dictionary with learning stats
         """
-        if not self.concepts:
+        if not self.storage:
             return {
                 "total_concepts": 0,
                 "difficult_concepts": 0,
@@ -168,14 +181,38 @@ class AdaptiveLearner:
                 "easy_concepts": 0,
                 "average_strength": 0.0,
             }
-
-        strengths = [c.strength for c in self.concepts.values()]
+        
+        all_concept_ids = self.storage.get_all_concept_ids()
+        if not all_concept_ids:
+            return {
+                "total_concepts": 0,
+                "difficult_concepts": 0,
+                "moderate_concepts": 0,
+                "easy_concepts": 0,
+                "average_strength": 0.0,
+            }
+        
+        strengths = []
+        for concept_id in all_concept_ids:
+            concept = self.storage.get_concept(concept_id)
+            if concept:
+                strengths.append(concept.strength)
+        
+        if not strengths:
+            return {
+                "total_concepts": len(all_concept_ids),
+                "difficult_concepts": 0,
+                "moderate_concepts": 0,
+                "easy_concepts": 0,
+                "average_strength": 0.0,
+            }
+        
         difficult = sum(1 for s in strengths if s < self.DIFFICULT_THRESHOLD)
         easy = sum(1 for s in strengths if s > self.EASY_THRESHOLD)
         moderate = len(strengths) - difficult - easy
 
         return {
-            "total_concepts": len(self.concepts),
+            "total_concepts": len(strengths),
             "difficult_concepts": difficult,
             "moderate_concepts": moderate,
             "easy_concepts": easy,

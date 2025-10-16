@@ -140,10 +140,7 @@ class ParallelAssociationExtractor:
     
     def __init__(
         self,
-        concepts: Dict,
-        word_to_concepts: defaultdict,
-        concept_neighbors: defaultdict,
-        associations: Dict,
+        storage,
         enable_central_links: bool = True,
         central_link_confidence: float = 0.6,
         central_link_type: AssociationType = AssociationType.COMPOSITIONAL,
@@ -155,10 +152,7 @@ class ParallelAssociationExtractor:
         Initialize parallel association extractor.
         
         Args:
-            concepts: Shared concepts dictionary
-            word_to_concepts: Word to concept ID mapping
-            concept_neighbors: Concept neighbors mapping
-            associations: Shared associations dictionary
+            storage: RustStorageAdapter (single source of truth)
             enable_central_links: Whether to create central concept links
             central_link_confidence: Confidence for central links
             central_link_type: Type of central links
@@ -166,10 +160,13 @@ class ParallelAssociationExtractor:
             parallel_threshold: Minimum batch size for parallel processing
             entity_cache: Optional EntityCache for LLM-extracted entities
         """
-        self.concepts = concepts
-        self.word_to_concepts = word_to_concepts
-        self.concept_neighbors = concept_neighbors
-        self.associations = associations
+        self.storage = storage
+        # Temporary working structures (TODO: remove once fully refactored)
+        self.concepts: Dict[str, any] = {}
+        self.word_to_concepts = defaultdict(set)
+        self.concept_neighbors = defaultdict(set)
+        self.associations: Dict[Tuple[str, str], any] = {}
+        
         self.enable_central_links = enable_central_links
         self.central_link_confidence = central_link_confidence
         self.central_link_type = central_link_type
@@ -260,6 +257,33 @@ class ParallelAssociationExtractor:
         
         # Apply results to shared data structures
         self._apply_result(result)
+
+        # Persist associations to Rust storage if available
+        # Only persist if both concepts exist in Rust (have been stored with embeddings)
+        try:
+            if (self.storage is not None and result.associations and
+                hasattr(self.storage, "add_association") and
+                hasattr(self.storage, "has_concept")):
+                type_map = {
+                    "SEMANTIC": AssociationType.SEMANTIC,
+                    "CAUSAL": AssociationType.CAUSAL,
+                    "TEMPORAL": AssociationType.TEMPORAL,
+                    "HIERARCHICAL": AssociationType.HIERARCHICAL,
+                    "COMPOSITIONAL": AssociationType.COMPOSITIONAL,
+                }
+                from ..graph.concepts import Association
+                for src, tgt, assoc_type_name, conf in result.associations:
+                    # Only persist if both concepts exist in Rust
+                    if self.storage.has_concept(src) and self.storage.has_concept(tgt):
+                        assoc = Association(
+                            source_id=src,
+                            target_id=tgt,
+                            assoc_type=type_map.get(assoc_type_name.upper(), AssociationType.SEMANTIC),
+                            confidence=conf,
+                        )
+                        self.storage.add_association(assoc)
+        except Exception:
+            pass
         
         return result.associations_count
     
@@ -370,6 +394,7 @@ class ParallelAssociationExtractor:
                 self.enable_central_links,
                 self.central_link_confidence,
                 self.central_link_type,
+                storage=self.storage,
             )
             count = extractor.extract_associations_adaptive(content, concept_id, depth)
             total_associations += count
@@ -403,6 +428,15 @@ class ParallelAssociationExtractor:
                 words = extract_words(content)
                 for word in words:
                     self.word_to_concepts[word].add(concept_id)
+                
+                # PRODUCTION: Persist sub-concepts to Rust storage
+                if self.storage is not None and hasattr(self.storage, 'add_concept'):
+                    try:
+                        import numpy as np
+                        # Store with placeholder embedding (no NLP in parallel path)
+                        self.storage.add_concept(concept, np.zeros(384, dtype=np.float32))
+                    except Exception:
+                        pass  # Non-fatal
         
         # Create associations
         for source_id, target_id, assoc_type_name, confidence in result.associations:
@@ -418,7 +452,9 @@ class ParallelAssociationExtractor:
                     confidence=confidence
                 )
                 self.associations[key] = assoc
+                # Maintain symmetric neighbor indices
                 self.concept_neighbors[source_id].add(target_id)
+                self.concept_neighbors[target_id].add(source_id)
     
     def _extract_parallel(
         self,

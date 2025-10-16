@@ -116,10 +116,26 @@ class Association:
     @classmethod
     def from_dict(cls, data: dict) -> "Association":
         """Deserialize association from dictionary."""
+        # Handle both integer (from Rust) and string (from JSON) enum values
+        assoc_type_raw = data["assoc_type"]
+        if isinstance(assoc_type_raw, int):
+            # Map Rust integer to Python enum
+            assoc_type_map = {
+                0: AssociationType.SEMANTIC,
+                1: AssociationType.CAUSAL,
+                2: AssociationType.TEMPORAL,
+                3: AssociationType.HIERARCHICAL,
+                4: AssociationType.COMPOSITIONAL,
+            }
+            assoc_type = assoc_type_map.get(assoc_type_raw, AssociationType.SEMANTIC)
+        else:
+            # String value from JSON
+            assoc_type = AssociationType(assoc_type_raw)
+        
         return cls(
             source_id=data["source_id"],
             target_id=data["target_id"],
-            assoc_type=AssociationType(data["assoc_type"]),
+            assoc_type=assoc_type,
             weight=data.get("weight", 1.0),
             confidence=data.get("confidence", 1.0),
             created=data.get("created", time.time()),

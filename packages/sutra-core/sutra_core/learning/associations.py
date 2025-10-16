@@ -24,14 +24,11 @@ if TYPE_CHECKING:
 
 
 class AssociationExtractor:
-    """Extracts and manages associations between concepts."""
+    """Extracts and manages associations between concepts (Rust-backed)."""
 
     def __init__(
         self,
-        concepts: Dict[str, Concept],
-        word_to_concepts: defaultdict,
-        concept_neighbors: defaultdict,
-        associations: Dict[Tuple[str, str], Association],
+        storage,
         enable_central_links: bool = True,
         central_link_confidence: float = 0.6,
         central_link_type: AssociationType = AssociationType.COMPOSITIONAL,
@@ -43,20 +40,15 @@ class AssociationExtractor:
         Initialize association extractor.
 
         Args:
-            concepts: Dictionary of all concepts
-            word_to_concepts: Word -> concept ID mapping
-            concept_neighbors: Concept -> neighbor IDs mapping
-            associations: All associations in the system
+            storage: RustStorageAdapter (single source of truth)
             enable_central_links: Create links from central concept to extracted phrases
             central_link_confidence: Confidence for central links (0.0 - 1.0)
             central_link_type: Association type for central links
             nlp_processor: Shared TextProcessor instance (avoids re-loading models)
             entity_cache: Optional EntityCache for LLM-extracted entities
         """
-        self.concepts = concepts
-        self.word_to_concepts = word_to_concepts
-        self.concept_neighbors = concept_neighbors
-        self.associations = associations
+        self.storage = storage
+        
         self.enable_central_links = enable_central_links
         self.central_link_confidence = central_link_confidence
         self.central_link_type = central_link_type
@@ -224,8 +216,9 @@ class AssociationExtractor:
         for i, word1 in enumerate(words):
             for word2 in words[i + 1 : i + 4]:  # Window of 3 words
                 # Find concepts containing these words
-                concepts1 = self.word_to_concepts.get(word1, set())
-                concepts2 = self.word_to_concepts.get(word2, set())
+                # Use Rust inverted index to find concepts containing words
+                concepts1 = set(self.storage.search_by_text(word1)) if self.storage else set()
+                concepts2 = set(self.storage.search_by_text(word2)) if self.storage else set()
 
                 # Strict limit to avoid exponential explosion
                 for c1 in list(concepts1)[:2]:  # Max 2 concepts per word
@@ -253,19 +246,37 @@ class AssociationExtractor:
         """
         concept_id = hashlib.md5(text.encode()).hexdigest()[:16]
 
-        if concept_id not in self.concepts:
-            # Create new concept with lower confidence
-            concept = Concept(id=concept_id, content=text, confidence=0.7)
-            self.concepts[concept_id] = concept
-            self._index_concept(concept)
-
+        # If concept exists in storage, return id
+        try:
+            if self.storage and self.storage.has_concept(concept_id):
+                return concept_id
+        except Exception:
+            pass
+        
+        # Create new concept directly in storage
+        concept = Concept(id=concept_id, content=text, confidence=0.7)
+        try:
+            import numpy as np
+            embedding = None
+            if self.nlp_processor:
+                try:
+                    emb = self.nlp_processor.get_embedding(text)
+                    if emb is not None:
+                        embedding = np.array(emb, dtype=np.float32)
+                except Exception:
+                    embedding = None
+            if embedding is None:
+                dim = getattr(self.storage, 'vector_dimension', 384)
+                embedding = np.zeros(dim, dtype=np.float32)
+            self.storage.add_concept(concept, embedding)
+        except Exception:
+            # Best-effort: still return id even if embedding/storage fails
+            pass
         return concept_id
 
     def _index_concept(self, concept: Concept) -> None:
-        """Index concept for fast retrieval by words."""
-        words = extract_words(concept.content)
-        for word in words:
-            self.word_to_concepts[word.lower()].add(concept.id)
+        """No-op: Rust indexes text content on put_concept."""
+        return
 
     def _create_association(
         self,
@@ -288,22 +299,17 @@ class AssociationExtractor:
         """
         key = (source_id, target_id)
 
-        if key in self.associations:
-            # Strengthen existing association
-            self.associations[key].strengthen()
-            return False
-        else:
-            # Create new association
-            association = Association(
-                source_id=source_id,
-                target_id=target_id,
-                assoc_type=assoc_type,
-                confidence=confidence,
-            )
-            self.associations[key] = association
-
-            # Update neighbor indices for fast graph traversal
-            self.concept_neighbors[source_id].add(target_id)
-            self.concept_neighbors[target_id].add(source_id)
-
-            return True
+        # Always persist association directly to Rust (single source of truth)
+        association = Association(
+            source_id=source_id,
+            target_id=target_id,
+            assoc_type=assoc_type,
+            confidence=confidence,
+        )
+        try:
+            if self.storage and self.storage.has_concept(source_id) and self.storage.has_concept(target_id):
+                self.storage.add_association(association)
+                return True
+        except Exception:
+            pass
+        return False

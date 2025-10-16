@@ -149,6 +149,7 @@ class EmbeddingBatchProcessor:
         texts: List[str],
         show_progress: bool = False,
         normalize: bool = True,
+        prompt_name: Optional[str] = None,
     ) -> np.ndarray:
         """
         Encode batch of texts to embeddings with caching.
@@ -157,6 +158,7 @@ class EmbeddingBatchProcessor:
             texts: List of text strings to encode
             show_progress: Show progress bar
             normalize: Normalize embeddings to unit length
+            prompt_name: Optional prompt name for task-specific models (e.g., 'Retrieval-query', 'Retrieval-document')
 
         Returns:
             Array of embeddings (batch_size, embedding_dim)
@@ -167,14 +169,16 @@ class EmbeddingBatchProcessor:
         start_time = time.time()
         batch_size = len(texts)
 
-        # Check cache
+        # Check cache (include prompt in cache key for task-specific models)
         uncached_texts = []
         uncached_indices = []
         embeddings = [None] * batch_size
 
         for i, text in enumerate(texts):
-            if text in self.cache:
-                embeddings[i] = self.cache[text]
+            # Cache key includes prompt to avoid mixing query/document embeddings
+            cache_key = f"{prompt_name}:{text}" if prompt_name else text
+            if cache_key in self.cache:
+                embeddings[i] = self.cache[cache_key]
                 self.cache_hits += 1
             else:
                 uncached_texts.append(text)
@@ -193,22 +197,28 @@ class EmbeddingBatchProcessor:
                 self.model.to("cpu")
 
             # Generate embeddings
-            new_embeddings = self.model.encode(
-                uncached_texts,
-                device=target_device,
-                show_progress_bar=show_progress,
-                normalize_embeddings=normalize,
-                convert_to_numpy=True,
-            )
+            encode_kwargs = {
+                "device": target_device,
+                "show_progress_bar": show_progress,
+                "normalize_embeddings": normalize,
+                "convert_to_numpy": True,
+            }
+            
+            # Add prompt for task-specific models (e.g., EmbeddingGemma)
+            if prompt_name:
+                encode_kwargs["prompt_name"] = prompt_name
+            
+            new_embeddings = self.model.encode(uncached_texts, **encode_kwargs)
 
             # Update cache and results
             for i, idx in enumerate(uncached_indices):
                 emb = new_embeddings[i]
                 embeddings[idx] = emb
                 
-                # Add to cache if not full
+                # Add to cache if not full (use prompt-aware key)
                 if len(self.cache) < self.cache_size:
-                    self.cache[uncached_texts[i]] = emb
+                    cache_key = f"{prompt_name}:{uncached_texts[i]}" if prompt_name else uncached_texts[i]
+                    self.cache[cache_key] = emb
 
         # Stack embeddings
         result = np.vstack(embeddings)
@@ -229,18 +239,19 @@ class EmbeddingBatchProcessor:
 
         return result
 
-    def encode_single(self, text: str, normalize: bool = True) -> np.ndarray:
+    def encode_single(self, text: str, normalize: bool = True, prompt_name: Optional[str] = None) -> np.ndarray:
         """
         Encode single text (convenience wrapper).
 
         Args:
             text: Text to encode
             normalize: Normalize embedding
+            prompt_name: Optional prompt name for task-specific models
 
         Returns:
             Embedding vector
         """
-        result = self.encode_batch([text], show_progress=False, normalize=normalize)
+        result = self.encode_batch([text], show_progress=False, normalize=normalize, prompt_name=prompt_name)
         return result[0]
 
     def clear_cache(self):

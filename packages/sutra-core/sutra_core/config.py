@@ -25,7 +25,7 @@ class ReasoningEngineConfig:
         >>> config = (ReasoningEngineConfig.builder()
         ...     .with_storage_path("./my_knowledge")
         ...     .with_caching(enabled=True, max_size=500, ttl_seconds=300)
-        ...     .with_vector_index(enabled=True, dimension=384)
+        ...     .with_vector_index(enabled=True, dimension=768)
         ...     .build())
         >>> engine = ReasoningEngine.from_config(config)
     """
@@ -50,8 +50,8 @@ class ReasoningEngineConfig:
     
     # Batch processing configuration
     enable_batch_embeddings: bool = True
-    embedding_model: str = "all-MiniLM-L6-v2"
-    mps_batch_threshold: int = 64
+    embedding_model: str = "google/embeddinggemma-300m"  # 768-dim, state-of-the-art
+    mps_batch_threshold: int = 32
     
     # Parallel processing configuration
     enable_parallel_associations: bool = True
@@ -228,7 +228,7 @@ class ReasoningEngineConfigBuilder:
     def with_batch_embeddings(
         self,
         enabled: bool = True,
-        model: str = "all-MiniLM-L6-v2",
+        model: str = "google/embeddinggemma-300m",  # 768-dim, state-of-the-art
         mps_threshold: int = 64
     ) -> 'ReasoningEngineConfigBuilder':
         """
@@ -326,8 +326,8 @@ def production_config(storage_path: str = "./knowledge") -> ReasoningEngineConfi
     return (ReasoningEngineConfig.builder()
         .with_storage_path(storage_path, use_rust=True)
         .with_caching(enabled=True, max_size=5000, ttl_seconds=3600)
-        .with_vector_index(enabled=True, dimension=384)
-        .with_batch_embeddings(enabled=True)
+        .with_vector_index(enabled=True, dimension=768)  # EmbeddingGemma dimension
+        .with_batch_embeddings(enabled=True)  # Uses google/embeddinggemma-300m by default
         .with_parallel_associations(enabled=True, workers=8)
         .build())
 

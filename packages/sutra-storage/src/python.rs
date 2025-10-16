@@ -10,9 +10,10 @@ use numpy::{PyArray1, PyReadonlyArray1};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use crate::types::ConceptId;
+use crate::types::{ConceptId, AssociationType};
 use crate::vectors::{VectorStore, VectorConfig};
 use crate::index::GraphIndex;
+use crate::reasoning_store::{ReasoningStore, ConceptData, AssociationData};
 
 // =============================================================================
 // Error Handling
@@ -291,6 +292,304 @@ impl PyGraphStore {
 #[pymodule]
 fn sutra_storage(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyGraphStore>()?;
+    m.add_class::<PyReasoningStore>()?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
+}
+
+// =============================================================================
+// Python ReasoningStore (New API)
+// =============================================================================
+
+#[pyclass(name = "ReasoningStore")]
+pub struct PyReasoningStore {
+    store: Arc<Mutex<ReasoningStore>>,    
+}
+
+#[pymethods]
+impl PyReasoningStore {
+    #[new]
+    #[pyo3(signature = (path, vector_dimension=None))]
+    fn new(path: &str, vector_dimension: Option<usize>) -> PyResult<Self> {
+        let store = ReasoningStore::new(path, vector_dimension)
+            .map_err(|e| PyException::new_err(format!("{}", e)))?;
+        Ok(Self { store: Arc::new(Mutex::new(store)) })
+    }
+
+    // Concepts
+    fn put_concept(&self, concept: &PyDict, embedding: Option<PyReadonlyArray1<f32>>) -> PyResult<()> {
+        let id_str: String = concept.get_item("id")?
+            .ok_or_else(|| PyException::new_err("Missing 'id'"))?
+            .extract()?;
+        let concept_id = ConceptId::from_string(&id_str);
+
+        let content: String = concept.get_item("content")?
+            .ok_or_else(|| PyException::new_err("Missing 'content'"))?
+            .extract()?;
+        let created: u64 = concept.get_item("created")?
+            .ok_or_else(|| PyException::new_err("Missing 'created'"))?
+            .extract()?;
+        let last_accessed: u64 = concept.get_item("last_accessed")?
+            .ok_or_else(|| PyException::new_err("Missing 'last_accessed'"))?
+            .extract()?;
+        let access_count: u32 = concept.get_item("access_count")?
+            .ok_or_else(|| PyException::new_err("Missing 'access_count'"))?
+            .extract()?;
+        let strength: f32 = concept.get_item("strength")?
+            .ok_or_else(|| PyException::new_err("Missing 'strength'"))?
+            .extract()?;
+        let confidence: f32 = concept.get_item("confidence")?
+            .ok_or_else(|| PyException::new_err("Missing 'confidence'"))?
+            .extract()?;
+        let source: Option<String> = concept.get_item("source")?
+            .map(|o| o.extract()).transpose()?.flatten();
+        let category: Option<String> = concept.get_item("category")?
+            .map(|o| o.extract()).transpose()?.flatten();
+
+        let data = ConceptData {
+            id: concept_id,
+            content,
+            created,
+            last_accessed,
+            access_count,
+            strength,
+            confidence,
+            source,
+            category,
+        };
+
+        let emb = embedding.map(|e| e.as_slice().unwrap().to_vec());
+        self.store.lock().unwrap().put_concept(data, emb)
+            .map_err(|e| PyException::new_err(format!("{}", e)))
+    }
+
+    fn get_concept(&self, concept_id: &str, py: Python<'_>) -> PyResult<Option<PyObject>> {
+        let id = ConceptId::from_string(concept_id);
+        if let Some(c) = self.store.lock().unwrap().get_concept(id) {
+            let dict = PyDict::new(py);
+            dict.set_item("id", c.id.to_hex())?;
+            dict.set_item("content", c.content)?;
+            dict.set_item("created", c.created)?;
+            dict.set_item("last_accessed", c.last_accessed)?;
+            dict.set_item("access_count", c.access_count)?;
+            dict.set_item("strength", c.strength)?;
+            dict.set_item("confidence", c.confidence)?;
+            dict.set_item("source", c.source)?;
+            dict.set_item("category", c.category)?;
+            Ok(Some(dict.into()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn get_all_concept_ids(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let ids = self.store.lock().unwrap().get_all_concept_ids();
+        let ids_str: Vec<String> = ids.iter().map(|id| id.to_hex()).collect();
+        Ok(PyList::new(py, ids_str).into())
+    }
+
+    // Associations
+    fn put_association(&self, assoc: &PyDict) -> PyResult<()> {
+        let source: String = assoc.get_item("source_id")?
+            .ok_or_else(|| PyException::new_err("Missing 'source_id'"))?
+            .extract()?;
+        let target: String = assoc.get_item("target_id")?
+            .ok_or_else(|| PyException::new_err("Missing 'target_id'"))?
+            .extract()?;
+        let assoc_type_val: u8 = assoc.get_item("assoc_type")?
+            .ok_or_else(|| PyException::new_err("Missing 'assoc_type'"))?
+            .extract()?;
+        let weight: f32 = assoc.get_item("weight")?
+            .ok_or_else(|| PyException::new_err("Missing 'weight'"))?
+            .extract()?;
+        let confidence: f32 = assoc.get_item("confidence")?
+            .ok_or_else(|| PyException::new_err("Missing 'confidence'"))?
+            .extract()?;
+        let created: u64 = assoc.get_item("created")?
+            .ok_or_else(|| PyException::new_err("Missing 'created'"))?
+            .extract()?;
+        let last_used: u64 = assoc.get_item("last_used")?
+            .ok_or_else(|| PyException::new_err("Missing 'last_used'"))?
+            .extract()?;
+
+        let data = AssociationData {
+            source_id: ConceptId::from_string(&source),
+            target_id: ConceptId::from_string(&target),
+            assoc_type: AssociationType::from_u8(assoc_type_val).unwrap_or(AssociationType::Semantic),
+            weight,
+            confidence,
+            created,
+            last_used,
+        };
+
+        self.store.lock().unwrap().put_association(data)
+            .map_err(|e| PyException::new_err(format!("{}", e)))
+    }
+
+    /// Atomically learn a concept (with optional embedding) and a list of associations
+    #[pyo3(signature = (concept, associations, embedding=None))]
+    fn learn_atomic(&self, concept: &PyDict, associations: &PyList, embedding: Option<PyReadonlyArray1<f32>>) -> PyResult<()> {
+        // Parse concept
+        let id_str: String = concept.get_item("id")?
+            .ok_or_else(|| PyException::new_err("Missing 'id'"))?
+            .extract()?;
+        let concept_id = ConceptId::from_string(&id_str);
+        let content: String = concept.get_item("content")?
+            .ok_or_else(|| PyException::new_err("Missing 'content'"))?
+            .extract()?;
+        let created: u64 = concept.get_item("created")?
+            .ok_or_else(|| PyException::new_err("Missing 'created'"))?
+            .extract()?;
+        let last_accessed: u64 = concept.get_item("last_accessed")?
+            .ok_or_else(|| PyException::new_err("Missing 'last_accessed'"))?
+            .extract()?;
+        let access_count: u32 = concept.get_item("access_count")?
+            .ok_or_else(|| PyException::new_err("Missing 'access_count'"))?
+            .extract()?;
+        let strength: f32 = concept.get_item("strength")?
+            .ok_or_else(|| PyException::new_err("Missing 'strength'"))?
+            .extract()?;
+        let confidence: f32 = concept.get_item("confidence")?
+            .ok_or_else(|| PyException::new_err("Missing 'confidence'"))?
+            .extract()?;
+        let source: Option<String> = concept.get_item("source")?
+            .map(|o| o.extract()).transpose()?.flatten();
+        let category: Option<String> = concept.get_item("category")?
+            .map(|o| o.extract()).transpose()?.flatten();
+
+        let concept_data = ConceptData {
+            id: concept_id,
+            content,
+            created,
+            last_accessed,
+            access_count,
+            strength,
+            confidence,
+            source,
+            category,
+        };
+
+        // Parse associations
+        let mut assoc_vec: Vec<AssociationData> = Vec::new();
+        for item in associations.iter() {
+            let a: &PyDict = item.downcast()?;
+            let source: String = a.get_item("source_id")?
+                .ok_or_else(|| PyException::new_err("Missing 'source_id'"))?
+                .extract()?;
+            let target: String = a.get_item("target_id")?
+                .ok_or_else(|| PyException::new_err("Missing 'target_id'"))?
+                .extract()?;
+            let assoc_type_val: u8 = a.get_item("assoc_type")?
+                .ok_or_else(|| PyException::new_err("Missing 'assoc_type'"))?
+                .extract()?;
+            let weight: f32 = a.get_item("weight")?
+                .ok_or_else(|| PyException::new_err("Missing 'weight'"))?
+                .extract()?;
+            let conf: f32 = a.get_item("confidence")?
+                .ok_or_else(|| PyException::new_err("Missing 'confidence'"))?
+                .extract()?;
+            let created: u64 = a.get_item("created")?
+                .ok_or_else(|| PyException::new_err("Missing 'created'"))?
+                .extract()?;
+            let last_used: u64 = a.get_item("last_used")?
+                .ok_or_else(|| PyException::new_err("Missing 'last_used'"))?
+                .extract()?;
+
+            assoc_vec.push(AssociationData {
+                source_id: ConceptId::from_string(&source),
+                target_id: ConceptId::from_string(&target),
+                assoc_type: AssociationType::from_u8(assoc_type_val).unwrap_or(AssociationType::Semantic),
+                weight,
+                confidence: conf,
+                created,
+                last_used,
+            });
+        }
+
+        let emb = embedding.map(|e| e.as_slice().unwrap().to_vec());
+        self.store.lock().unwrap().learn_atomic(concept_data, emb, assoc_vec)
+            .map_err(|e| PyException::new_err(format!("{}", e)))
+    }
+
+    /// Native pathfinding returning list of paths
+    fn find_paths(&self, source_id: &str, target_id: &str, max_depth: usize, max_paths: usize, py: Python<'_>) -> PyResult<PyObject> {
+        let source = ConceptId::from_string(source_id);
+        let target = ConceptId::from_string(target_id);
+        let paths = self.store.lock().unwrap().find_paths(source, target, max_depth, max_paths);
+        let out: Vec<PyObject> = paths.into_iter().map(|p| {
+            let dict = PyDict::new(py);
+            let concepts: Vec<String> = p.concepts.into_iter().map(|id| id.to_hex()).collect();
+            let edges: Vec<PyObject> = p.edges.into_iter().map(|(s,t,ty)| {
+                let tuple = (s.to_hex(), t.to_hex(), ty as u8);
+                tuple.into_py(py)
+            }).collect();
+            dict.set_item("concepts", PyList::new(py, concepts)).unwrap();
+            dict.set_item("edges", PyList::new(py, edges)).unwrap();
+            dict.set_item("confidence", p.confidence).unwrap();
+            dict.into()
+        }).collect();
+        Ok(PyList::new(py, out).into())
+    }
+
+    fn get_all_associations(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let list = self.store.lock().unwrap().get_all_associations();
+        let out: Vec<PyObject> = list.into_iter().map(|a| {
+            let dict = PyDict::new(py);
+            dict.set_item("source_id", a.source_id.to_hex()).unwrap();
+            dict.set_item("target_id", a.target_id.to_hex()).unwrap();
+            dict.set_item("assoc_type", a.assoc_type as u8).unwrap();
+            dict.set_item("weight", a.weight).unwrap();
+            dict.set_item("confidence", a.confidence).unwrap();
+            dict.set_item("created", a.created).unwrap();
+            dict.set_item("last_used", a.last_used).unwrap();
+            dict.into()
+        }).collect();
+        Ok(PyList::new(py, out).into())
+    }
+
+    fn get_associations_from(&self, concept_id: &str, py: Python<'_>) -> PyResult<PyObject> {
+        let id = ConceptId::from_string(concept_id);
+        let list = self.store.lock().unwrap().get_associations_from(id);
+        let out: Vec<PyObject> = list.into_iter().map(|a| {
+            let dict = PyDict::new(py);
+            dict.set_item("source_id", a.source_id.to_hex()).unwrap();
+            dict.set_item("target_id", a.target_id.to_hex()).unwrap();
+            dict.set_item("assoc_type", a.assoc_type as u8).unwrap();
+            dict.set_item("weight", a.weight).unwrap();
+            dict.set_item("confidence", a.confidence).unwrap();
+            dict.set_item("created", a.created).unwrap();
+            dict.set_item("last_used", a.last_used).unwrap();
+            dict.into()
+        }).collect();
+        Ok(PyList::new(py, out).into())
+    }
+
+    // Graph queries
+    fn get_neighbors(&self, concept_id: &str, py: Python<'_>) -> PyResult<PyObject> {
+        let id = ConceptId::from_string(concept_id);
+        let neighbors = self.store.lock().unwrap().get_neighbors(id);
+        let neighbors_hex: Vec<String> = neighbors.into_iter().map(|id| id.to_hex()).collect();
+        Ok(PyList::new(py, neighbors_hex).into())
+    }
+
+    fn search_by_text(&self, query: &str, py: Python<'_>) -> PyResult<PyObject> {
+        let ids = self.store.lock().unwrap().search_by_text(query);
+        let ids_hex: Vec<String> = ids.into_iter().map(|id| id.to_hex()).collect();
+        Ok(PyList::new(py, ids_hex).into())
+    }
+
+    // Lifecycle
+    fn flush(&self) -> PyResult<()> {
+        self.store.lock().unwrap().flush()
+            .map_err(|e| PyException::new_err(format!("{}", e)))
+    }
+
+    fn stats(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let stats = self.store.lock().unwrap().stats();
+        let dict = PyDict::new(py);
+        for (k, v) in stats.into_iter() {
+            dict.set_item(k, v)?;
+        }
+        Ok(dict.into())
+    }
 }

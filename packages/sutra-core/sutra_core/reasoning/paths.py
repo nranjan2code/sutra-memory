@@ -40,9 +40,7 @@ class PathFinder:
 
     def __init__(
         self,
-        concepts: Dict[str, Concept],
-        associations: Dict[Tuple[str, str], Association],
-        concept_neighbors: Dict[str, Set[str]],
+        storage,
         max_depth: int = 5,
         min_confidence: float = 0.1,
         confidence_decay: float = 0.85,
@@ -52,17 +50,13 @@ class PathFinder:
         Initialize path finder.
 
         Args:
-            concepts: All concepts in the graph
-            associations: All associations
-            concept_neighbors: Adjacency list for fast traversal
+            storage: RustStorageAdapter (single source of truth)
             max_depth: Maximum reasoning depth (default: 5)
             min_confidence: Minimum confidence threshold (default: 0.1)
             confidence_decay: Decay factor per hop (default: 0.85, ignored if use_harmonic_mean=True)
             use_harmonic_mean: Use harmonic mean for confidence (better for long paths, default: True)
         """
-        self.concepts = concepts
-        self.associations = associations
-        self.concept_neighbors = concept_neighbors
+        self.storage = storage
         self.max_depth = max_depth
         self.min_confidence = min_confidence
         self.confidence_decay = confidence_decay
@@ -151,21 +145,20 @@ class PathFinder:
 
             # Expand if within depth limit
             if current.depth < self.max_depth:
-                neighbors = self.concept_neighbors.get(current.concept_id, set())
+                neighbors = self.storage.get_neighbors(current.concept_id)
+                if not neighbors:
+                    continue
 
                 for neighbor_id in neighbors:
                     if neighbor_id in current.path_history:
                         continue  # Avoid cycles
 
                     # Calculate transition confidence
-                    association = self.associations.get(
-                        (current.concept_id, neighbor_id)
+                    association = self.storage.get_association(
+                        current.concept_id, neighbor_id
                     )
                     if not association:
                         continue
-
-                    # Mark edge as used
-                    association.last_used = time.time()
 
                     # Calculate confidence with harmonic mean or multiplicative decay
                     new_confidence = self._propagate_confidence(
@@ -214,20 +207,19 @@ class PathFinder:
                 continue
 
             if current.depth < self.max_depth:
-                neighbors = self.concept_neighbors.get(current.concept_id, set())
+                neighbors = self.storage.get_neighbors(current.concept_id)
+                if not neighbors:
+                    continue
 
                 for neighbor_id in neighbors:
                     if neighbor_id in current.path_history:
                         continue
 
-                    association = self.associations.get(
-                        (current.concept_id, neighbor_id)
+                    association = self.storage.get_association(
+                        current.concept_id, neighbor_id
                     )
                     if not association:
                         continue
-
-                    # Mark edge as used
-                    association.last_used = time.time()
 
                     new_confidence = (
                         current.confidence
@@ -323,7 +315,9 @@ class PathFinder:
                 next_queue.append(current)
                 continue
 
-            neighbors = self.concept_neighbors.get(current.concept_id, set())
+            neighbors = self.storage.get_neighbors(current.concept_id)
+            if not neighbors:
+                continue
 
             for neighbor_id in neighbors:
                 if neighbor_id in current.path_history:
@@ -331,19 +325,16 @@ class PathFinder:
 
                 # Get association (consider direction)
                 if direction == "forward":
-                    association = self.associations.get(
-                        (current.concept_id, neighbor_id)
+                    association = self.storage.get_association(
+                        current.concept_id, neighbor_id
                     )
                 else:
-                    association = self.associations.get(
-                        (neighbor_id, current.concept_id)
+                    association = self.storage.get_association(
+                        neighbor_id, current.concept_id
                     )
 
                 if not association:
                     continue
-
-                # Mark edge as used
-                association.last_used = time.time()
 
                 # Use harmonic mean confidence propagation (OPTIMIZATION)
                 new_confidence = self._propagate_confidence(
@@ -382,13 +373,13 @@ class PathFinder:
             return 1.0
 
         # Simple heuristic based on direct connections
-        if target_id in self.concept_neighbors.get(concept_id, set()):
+        concept_neighbors = self.storage.get_neighbors(concept_id) or []
+        if target_id in concept_neighbors:
             return 0.5
 
         # Check for common neighbors
-        concept_neighbors = self.concept_neighbors.get(concept_id, set())
-        target_neighbors = self.concept_neighbors.get(target_id, set())
-        common = len(concept_neighbors & target_neighbors)
+        target_neighbors = self.storage.get_neighbors(target_id) or []
+        common = len(set(concept_neighbors) & set(target_neighbors))
 
         if common > 0:
             return 0.2 * min(1.0, common / 3.0)
@@ -403,12 +394,14 @@ class PathFinder:
             source_id = path_node.path_history[i]
             target_id = path_node.path_history[i + 1]
 
-            association = self.associations.get((source_id, target_id))
+            association = self.storage.get_association(source_id, target_id)
+            source_concept = self.storage.get_concept(source_id)
+            target_concept = self.storage.get_concept(target_id)
 
             step = ReasoningStep(
-                source_concept=self.concepts[source_id].content[:50] + "...",
+                source_concept=(source_concept.content[:50] + "...") if source_concept else "?",
                 relation=association.assoc_type.value if association else "related",
-                target_concept=self.concepts[target_id].content[:50] + "...",
+                target_concept=(target_concept.content[:50] + "...") if target_concept else "?",
                 confidence=association.confidence if association else 0.5,
                 step_number=i + 1,
                 source_id=source_id,
@@ -416,9 +409,10 @@ class PathFinder:
             )
             steps.append(step)
 
+        end_concept = self.storage.get_concept(path_node.concept_id)
         return ReasoningPath(
             query="Path reasoning",
-            answer=self.concepts[path_node.concept_id].content,
+            answer=end_concept.content if end_concept else "?",
             steps=steps,
             confidence=path_node.confidence,
             total_time=0.0,  # Will be set by caller

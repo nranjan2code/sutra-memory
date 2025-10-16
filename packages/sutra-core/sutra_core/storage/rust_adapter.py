@@ -44,7 +44,7 @@ class RustStorageAdapter:
     def __init__(
         self,
         storage_path: str,
-        vector_dimension: int = 384,
+        vector_dimension: int = 768,
         use_compression: bool = True,  # kept for API compatibility; ReasoningStore manages compression
     ):
         if not RUST_STORAGE_AVAILABLE:

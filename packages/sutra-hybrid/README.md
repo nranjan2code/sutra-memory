@@ -7,7 +7,7 @@ Hybrid reasoning system combining graph-based reasoning with semantic embeddings
 - **Semantic Similarity Search**: Find conceptually similar knowledge using embeddings
 - **Graph + Semantic Reasoning**: Best of both worlds - explainable and semantic
 - **Automatic Fallback**: Uses TF-IDF when sentence-transformers unavailable
-- **Lightweight**: Optional 22MB model or pure Python TF-IDF
+- **State-of-the-art**: 300M parameter EmbeddingGemma model or pure Python TF-IDF
 - **CPU-Friendly**: No GPU required
 
 ## Installation
@@ -66,10 +66,10 @@ ai = HybridAI(use_semantic=False)
 ### Embedding Providers
 
 1. **SemanticEmbedding** (Recommended)
-   - Uses `sentence-transformers`
-   - 384-dimensional embeddings
-   - 22MB model size
-   - High-quality semantic understanding
+   - Uses `sentence-transformers` with Google's EmbeddingGemma
+   - 768-dimensional embeddings
+   - 300M parameters, state-of-the-art for size
+   - Excellent semantic understanding with 100+ language support
 
 2. **TfidfEmbedding** (Fallback)
    - Scikit-learn based

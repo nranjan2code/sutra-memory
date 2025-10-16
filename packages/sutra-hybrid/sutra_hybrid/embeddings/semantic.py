@@ -19,14 +19,14 @@ class SemanticEmbedding(EmbeddingProvider):
     """
     Semantic embedding provider using sentence-transformers.
 
-    Uses the 'all-MiniLM-L6-v2' model which provides:
-    - 384-dimensional embeddings
-    - ~22MB model size
-    - Good balance of quality and speed
-    - CPU-friendly operation
+    Uses Google's EmbeddingGemma model which provides:
+    - 768-dimensional embeddings
+    - 300M parameters, state-of-the-art for size
+    - Excellent semantic understanding
+    - CPU-friendly operation with on-device focus
     """
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = "google/embeddinggemma-300m"):
         """
         Initialize semantic embedding provider.
 
@@ -56,7 +56,7 @@ class SemanticEmbedding(EmbeddingProvider):
             texts: List of text strings to encode
 
         Returns:
-            numpy array of shape (len(texts), 384)
+            numpy array of shape (len(texts), 768)
         """
         if not texts:
             return np.array([]).reshape(0, self.get_dimension())
@@ -76,9 +76,9 @@ class SemanticEmbedding(EmbeddingProvider):
         Get embedding dimension.
 
         Returns:
-            384 (dimension of all-MiniLM-L6-v2)
+            768 (dimension of EmbeddingGemma)
         """
-        return 384
+        return 768
 
     def get_name(self) -> str:
         """

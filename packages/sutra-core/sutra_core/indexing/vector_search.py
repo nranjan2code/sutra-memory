@@ -35,7 +35,7 @@ class VectorIndex:
 
     def __init__(
         self,
-        dimension: int = 384,
+        dimension: int = 768,
         max_elements: int = 100000,
         ef_construction: int = 400,  # Production scale for 10K+ vectors
         m: int = 48,                # More connections for better recall
@@ -47,7 +47,7 @@ class VectorIndex:
         Initialize HNSW vector index.
 
         Args:
-            dimension: Embedding dimension (384 for spaCy en_core_web_sm)
+            dimension: Embedding dimension (768 for EmbeddingGemma)
             max_elements: Maximum number of vectors to index
             ef_construction: Controls index build quality (higher = better, slower)
             m: Number of bi-directional links per element (higher = better recall)

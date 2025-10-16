@@ -67,7 +67,10 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
-dataset
+# Dataset files (large files)
+dataset/
+dataset/*
+*.txt
 
 # Translations
 *.mo

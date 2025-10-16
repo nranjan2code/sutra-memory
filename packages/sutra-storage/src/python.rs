@@ -66,20 +66,25 @@ impl PyGraphStore {
         std::fs::create_dir_all(&path_buf)
             .map_err(|e| StorageError(format!("Failed to create directory: {}", e)))?;
         
-        // Initialize vector store
-        let vector_config = VectorConfig {
-            dimension: vector_dimension,
-            use_compression,
-            num_subvectors: vector_dimension / 8,
-            num_centroids: 256,
-        };
-        
+        // Initialize vector store - load if exists, create if new
+        let vectors_path = path_buf.join("vectors");
         let vectors = Arc::new(Mutex::new(
-            VectorStore::new(path_buf.join("vectors"), vector_config)
-                .map_err(|e| StorageError(format!("Failed to create vector store: {}", e)))?
-        ));
-        
-        // Initialize index
+            if vectors_path.join("config.json").exists() {
+                // Load existing vector store
+                VectorStore::load(&vectors_path)
+                    .map_err(|e| StorageError(format!("Failed to load vector store: {}", e)))?
+            } else {
+                // Create new vector store
+                let vector_config = VectorConfig {
+                    dimension: vector_dimension,
+                    use_compression,
+                    num_subvectors: vector_dimension / 8,
+                    num_centroids: 256,
+                };
+                VectorStore::new(&vectors_path, vector_config)
+                    .map_err(|e| StorageError(format!("Failed to create vector store: {}", e)))?
+            }
+        ));        // Initialize index
         let index = Arc::new(Mutex::new(GraphIndex::new()));
         
         Ok(Self {

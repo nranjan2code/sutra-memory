@@ -77,7 +77,15 @@ class TextProcessor:
         try:
             from sentence_transformers import SentenceTransformer
             
-            self.embedding_model = SentenceTransformer(embedding_model)
+            # Try to load from cache first (no network calls)
+            try:
+                self.embedding_model = SentenceTransformer(embedding_model, local_files_only=True)
+                logger.debug(f"Loaded {embedding_model} from local cache")
+            except Exception:
+                # If not in cache, download once then use cache
+                logger.info(f"Downloading {embedding_model} to cache...")
+                self.embedding_model = SentenceTransformer(embedding_model, local_files_only=False)
+                
             self.embedding_model_name = embedding_model
             self.embedding_dimension = self.embedding_model.get_sentence_embedding_dimension()
             

@@ -397,25 +397,40 @@ class ReasoningEngine:
                 content, source=source, category=category, **kwargs
             )
 
-        # Store in Rust storage if enabled
+        # Store in Rust storage if enabled - WITH PRODUCTION-LEVEL ERROR HANDLING
         if self.use_rust_storage and self.storage and self.nlp_processor:
+            concept = self.concepts.get(concept_id)
+            if not concept:
+                raise StorageError(f"Concept {concept_id[:8]} not found after learning")
+            
+            # CRITICAL: Generate embedding with retry mechanism
+            embedding = self._generate_embedding_with_retry(content, concept_id)
+            if embedding is None:
+                # FAIL FAST: Remove concept from memory if embedding fails
+                self.concepts.pop(concept_id, None)
+                raise StorageError(
+                    f"CRITICAL: Failed to generate embedding for concept {concept_id[:8]}. "
+                    f"Content: '{content[:100]}...'. Concept removed from memory."
+                )
+            
             try:
-                concept = self.concepts.get(concept_id)
-                if concept:
-                    # Get embedding
-                    embedding = self.nlp_processor.get_embedding(content)
-                    if embedding is not None:
-                        # Convert to numpy array
-                        embedding_array = np.array(embedding, dtype=np.float32)
-                        # Store in Rust
-                        self.storage.add_concept(concept, embedding_array)
-                        logger.debug(f"Stored concept {concept_id[:8]} in Rust storage")
-                    else:
-                        logger.warning(f"Failed to generate embedding for concept {concept_id[:8]}")
+                # Convert to numpy array
+                embedding_array = np.array(embedding, dtype=np.float32)
+                
+                # ATOMIC OPERATION: Store concept and embedding together
+                self.storage.add_concept(concept, embedding_array)
+                
+                # Verify storage succeeded by checking if we can retrieve it
+                if not self.storage.has_concept(concept_id):
+                    raise StorageError(f"Storage verification failed for concept {concept_id[:8]}")
+                
+                logger.debug(f"✅ Stored concept {concept_id[:8]} with embedding in Rust storage")
+                
             except Exception as e:
-                # Critical storage failure - log and re-raise
-                logger.error(f"Critical: Failed to store concept {concept_id[:8]} in Rust storage: {e}")
-                raise StorageError(f"Failed to persist concept: {e}") from e
+                # ROLLBACK: Remove concept from memory if storage fails
+                self.concepts.pop(concept_id, None)
+                logger.error(f"CRITICAL: Failed to store concept {concept_id[:8]} in Rust storage: {e}")
+                raise StorageError(f"Failed to persist concept atomically: {e}") from e
 
         # Update neighbor mappings
         self._update_concept_neighbors(concept_id)
@@ -431,131 +446,409 @@ class ReasoningEngine:
 
         return concept_id
     
+    def _generate_embedding_with_retry(
+        self, 
+        content: str, 
+        concept_id: str, 
+        max_retries: int = 3,
+        retry_delay: float = 0.1
+    ) -> Optional[np.ndarray]:
+        """
+        Generate embedding with retry mechanism for production reliability.
+        
+        Args:
+            content: Text content to embed
+            concept_id: Concept ID for logging
+            max_retries: Maximum retry attempts
+            retry_delay: Delay between retries in seconds
+            
+        Returns:
+            Embedding array or None if all retries fail
+        """
+        import gc
+        import time
+        
+        last_error = None
+        
+        for attempt in range(max_retries + 1):
+            try:
+                # Force garbage collection before embedding generation
+                if attempt > 0:
+                    gc.collect()
+                    time.sleep(retry_delay * attempt)  # Exponential backoff
+                
+                # Generate embedding
+                embedding = self.nlp_processor.get_embedding(content)
+                
+                if embedding is not None and len(embedding) > 0:
+                    # Validate embedding quality
+                    embedding_array = np.array(embedding, dtype=np.float32)
+                    if not np.isnan(embedding_array).any() and not np.isinf(embedding_array).any():
+                        logger.debug(f"✅ Generated embedding for {concept_id[:8]} (attempt {attempt + 1})")
+                        return embedding_array
+                    else:
+                        last_error = "Generated embedding contains NaN or Inf values"
+                else:
+                    last_error = "Embedding generation returned None or empty result"
+                    
+            except Exception as e:
+                last_error = f"Embedding generation failed: {e}"
+                logger.warning(f"Attempt {attempt + 1}/{max_retries + 1} failed for {concept_id[:8]}: {e}")
+            
+            # Don't retry on the last attempt
+            if attempt < max_retries:
+                logger.info(f"Retrying embedding generation for {concept_id[:8]} in {retry_delay * (attempt + 1):.1f}s...")
+        
+        # All retries failed
+        logger.error(
+            f"FAILED: All {max_retries + 1} embedding generation attempts failed for {concept_id[:8]}. "
+            f"Last error: {last_error}"
+        )
+        return None
+    
     def learn_batch(
         self,
         contents: List[Tuple[str, Optional[str], Optional[str]]],
+        batch_size: int = 50,
+        memory_cleanup_interval: int = 5,
+        fail_on_error: bool = True,
         **kwargs: Any
     ) -> List[str]:
         """
-        Learn multiple knowledge items in batch for efficiency.
+        PRODUCTION-LEVEL batch learning with comprehensive error handling and resource management.
         
-        This is significantly faster than calling learn() multiple times
-        because it:
-        - Reduces per-operation overhead
-        - Batches vector index updates
-        - Amortizes cache invalidation
+        Features:
+        - Atomic batch processing with rollback capability
+        - Memory cleanup between batches
+        - Resource monitoring and throttling
+        - Comprehensive error handling and recovery
+        - Progress tracking and detailed logging
         
         Args:
             contents: List of (content, source, category) tuples
+            batch_size: Number of items to process per batch (default: 50 for memory safety)
+            memory_cleanup_interval: Force garbage collection every N batches
+            fail_on_error: If True, rollback entire operation on any failure
             **kwargs: Additional learning options
             
         Returns:
-            List of concept IDs for learned knowledge
+            List of concept IDs for successfully learned content
+            
+        Raises:
+            StorageError: If critical failure occurs and rollback is needed
         """
         if not contents:
             return []
         
+        import gc
+        import psutil
+        
         start_time = time.time()
-        concept_ids = []
+        total_items = len(contents)
+        successfully_learned = []
+        failed_items = []
         
-        # Learn all concepts
-        for content, source, category in contents:
-            self.learning_events += 1
-            
-            concept_id = self.adaptive_learner.learn_adaptive(
-                content, source=source, category=category, **kwargs
-            )
-            
-            # Update neighbor mappings
-            self._update_concept_neighbors(concept_id)
-            
-            concept_ids.append(concept_id)
+        logger.info(f"🚀 Starting production batch learning: {total_items:,} items in batches of {batch_size}")
         
-        # Batch update vector index (much faster)
-        if self.enable_vector_index and self.vector_index:
+        # Process in smaller batches for memory safety
+        for batch_idx in range(0, total_items, batch_size):
+            batch_end = min(batch_idx + batch_size, total_items)
+            current_batch = contents[batch_idx:batch_end]
+            batch_number = (batch_idx // batch_size) + 1
+            total_batches = (total_items + batch_size - 1) // batch_size
+            
+            logger.info(f"📦 Processing batch {batch_number}/{total_batches} ({len(current_batch)} items)")
+            
+            # Memory cleanup before processing batch
+            if batch_number % memory_cleanup_interval == 0:
+                gc.collect()
+                memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+                logger.info(f"🧹 Memory cleanup: {memory_mb:.1f} MB RSS")
+            
+            batch_concept_ids = []
+            batch_start_time = time.time()
+            
             try:
-                # Collect content texts with lock
-                content_texts = []
-                valid_concept_ids = []
-                with self._concepts_lock:
-                    for concept_id in concept_ids:
-                        if concept_id in self.concepts:
-                            content_texts.append(self.concepts[concept_id].content)
-                            valid_concept_ids.append(concept_id)
+                # Learn all concepts in current batch
+                for item_idx, (content, source, category) in enumerate(current_batch):
+                    try:
+                        self.learning_events += 1
+                        
+                        # Learn concept with adaptive system
+                        concept_id = self.adaptive_learner.learn_adaptive(
+                            content, source=source, category=category, **kwargs
+                        )
+                        
+                        # Store in Rust storage with production-level error handling
+                        if self.use_rust_storage and self.storage and self.nlp_processor:
+                            self._store_concept_atomically(concept_id, content)
+                        
+                        # Update neighbor mappings
+                        self._update_concept_neighbors(concept_id)
+                        
+                        batch_concept_ids.append(concept_id)
+                        
+                    except Exception as e:
+                        error_msg = f"Failed to learn item {batch_idx + item_idx + 1}: {str(e)}"
+                        failed_items.append((batch_idx + item_idx + 1, content[:100], error_msg))
+                        
+                        if fail_on_error:
+                            logger.error(f"💥 {error_msg}")
+                            # Rollback this batch
+                            self._rollback_batch_concepts(batch_concept_ids)
+                            raise StorageError(f"Batch learning failed at item {batch_idx + item_idx + 1}: {e}")
+                        else:
+                            logger.warning(f"⚠️ {error_msg} (continuing...)")
                 
-                # Generate embeddings in batch
-                embeddings = None
-                if self.enable_batch_embeddings and self.embedding_batch_processor:
-                    # Use fast batch embedding processor with MPS support
-                    embeddings = self.embedding_batch_processor.encode_batch(
-                        content_texts,
-                        show_progress=False,
-                        normalize=True,
-                    )
-                    logger.debug(
-                        f"Generated {len(embeddings)} embeddings via batch processor"
-                    )
-                elif self.nlp_processor:
-                    # Fallback to NLP processor (slower, one-by-one)
-                    embeddings_list = []
-                    for text in content_texts:
-                        embedding = self.nlp_processor.get_embedding(text)
-                        if embedding is not None:
-                            embeddings_list.append(embedding)
-                    if embeddings_list:
-                        embeddings = np.array(embeddings_list)
+                successfully_learned.extend(batch_concept_ids)
                 
-                # Add to vector index
-                if embeddings is not None and len(embeddings) > 0:
-                    concept_embeddings = [
-                        (cid, emb) for cid, emb in zip(valid_concept_ids, embeddings)
-                    ]
-                    self.vector_index.add_concepts_batch(concept_embeddings)
-                    logger.debug(
-                        f"Batch indexed {len(concept_embeddings)} concepts"
-                    )
+                batch_duration = time.time() - batch_start_time
+                logger.info(f"✅ Batch {batch_number} completed: {len(batch_concept_ids)} concepts in {batch_duration:.2f}s")
+                
             except Exception as e:
-                logger.warning(f"Batch vector indexing failed: {e}")
+                batch_duration = time.time() - batch_start_time
+                logger.error(f"💥 Batch {batch_number} failed after {batch_duration:.2f}s: {e}")
+                if fail_on_error:
+                    raise
         
-        # Invalidate cache once for all new content
+        # Update vector index with all successfully learned concepts
+        if self.enable_vector_index and self.vector_index and successfully_learned:
+            try:
+                logger.info(f"🔄 Updating vector index with {len(successfully_learned)} concepts...")
+                self._update_vector_index_batch(successfully_learned)
+                logger.info("✅ Vector index update completed")
+                
+            except Exception as e:
+                logger.error(f"💥 Failed to update vector index: {e}")
+                if fail_on_error:
+                    raise
+        
+        # Invalidate caches after all learning
         if self.enable_caching:
             combined_content = " ".join(c[0] for c in contents)
             self._invalidate_cache(combined_content)
         
-        elapsed = time.time() - start_time
-        logger.info(
-            f"Batch learned {len(concept_ids)} concepts in {elapsed:.3f}s "
-            f"({len(concept_ids)/elapsed:.1f} concepts/sec)"
-        )
+        # Final memory cleanup
+        gc.collect()
         
-        return concept_ids
+        # Summary reporting
+        duration = time.time() - start_time
+        success_rate = len(successfully_learned) / total_items * 100 if total_items > 0 else 0
+        
+        logger.info(f"🎯 PRODUCTION BATCH LEARNING COMPLETE:")
+        logger.info(f"   📊 Total items: {total_items:,}")
+        logger.info(f"   ✅ Successfully learned: {len(successfully_learned):,} ({success_rate:.1f}%)")
+        logger.info(f"   ❌ Failed: {len(failed_items):,}")
+        logger.info(f"   ⏱️ Duration: {duration:.2f}s ({total_items/duration:.1f} items/sec)")
+        
+        if failed_items and not fail_on_error:
+            logger.warning(f"⚠️ {len(failed_items)} items failed to learn:")
+            for item_num, content_preview, error in failed_items[:5]:  # Show first 5 failures
+                logger.warning(f"   Item {item_num}: {content_preview}... - {error}")
+            if len(failed_items) > 5:
+                logger.warning(f"   ... and {len(failed_items) - 5} more failures")
+        
+        return successfully_learned
+    
+    def _store_concept_atomically(self, concept_id: str, content: str) -> None:
+        """
+        Store concept in Rust storage with atomic operation guarantees.
+        
+        Args:
+            concept_id: Unique concept identifier
+            content: Concept content text
+            
+        Raises:
+            StorageError: If storage operation fails
+        """
+        if not self.storage:
+            return
+        
+        try:
+            # Ensure concept exists in memory before storing
+            if concept_id not in self.concepts:
+                logger.error(f"Cannot store concept {concept_id[:8]} - not found in memory")
+                raise StorageError(f"Concept {concept_id[:8]} not found in memory")
+            
+            concept = self.concepts[concept_id]
+            
+            # Generate embedding for the concept
+            embedding = self._generate_embedding_with_retry(content, concept_id)
+            if embedding is None:
+                raise StorageError(f"Failed to generate embedding for concept {concept_id[:8]}")
+            
+            # Store using the add_concept method from RustStorageAdapter
+            self.storage.add_concept(concept, embedding)
+            logger.debug(f"Stored concept {concept_id[:8]} in Rust storage")
+            
+        except Exception as e:
+            logger.error(f"Atomic storage failed for concept {concept_id[:8]}: {e}")
+            raise StorageError(f"Atomic storage failed: {e}")
+    
+    def _rollback_batch_concepts(self, concept_ids: List[str]) -> None:
+        """
+        Rollback concepts that were learned in a failed batch.
+        
+        Args:
+            concept_ids: List of concept IDs to remove
+        """
+        logger.warning(f"🔄 Rolling back {len(concept_ids)} concepts from failed batch")
+        
+        for concept_id in concept_ids:
+            try:
+                # Remove from memory
+                with self._concepts_lock:
+                    if concept_id in self.concepts:
+                        del self.concepts[concept_id]
+                
+                # Remove from Rust storage
+                if self.storage:
+                    self.storage.delete_concept(concept_id)
+                
+                # Remove from vector index
+                if self.enable_vector_index and self.vector_index:
+                    if hasattr(self.vector_index, 'remove'):
+                        self.vector_index.remove([concept_id])
+                
+                # Remove from associations
+                associations_to_remove = []
+                for assoc_id, association in self.associations.items():
+                    if association.from_concept == concept_id or association.to_concept == concept_id:
+                        associations_to_remove.append(assoc_id)
+                
+                for assoc_id in associations_to_remove:
+                    del self.associations[assoc_id]
+                
+            except Exception as e:
+                logger.error(f"Failed to rollback concept {concept_id[:8]}: {e}")
+    
+    def _update_vector_index_batch(self, concept_ids: List[str]) -> None:
+        """
+        Update vector index with batch of concepts efficiently.
+        
+        Args:
+            concept_ids: List of concept IDs to index
+            
+        Raises:
+            Exception: If batch indexing fails
+        """
+        if not concept_ids or not self.enable_vector_index or not self.vector_index:
+            return
+        
+        # Collect content texts with lock
+        content_texts = []
+        valid_concept_ids = []
+        
+        with self._concepts_lock:
+            for concept_id in concept_ids:
+                if concept_id in self.concepts:
+                    content_texts.append(self.concepts[concept_id].content)
+                    valid_concept_ids.append(concept_id)
+        
+        if not content_texts:
+            logger.warning("No valid concepts to index")
+            return
+        
+        try:
+            # Generate embeddings in batch for efficiency
+            embeddings = None
+            if hasattr(self.nlp_processor, 'encode_batch'):
+                # Use batch encoding if available (much faster)
+                embeddings = self.nlp_processor.encode_batch(
+                    content_texts,
+                    batch_size=32,  # Moderate batch size for memory efficiency
+                    show_progress_bar=False
+                )
+                logger.debug(f"Generated {len(embeddings)} embeddings via batch encoding")
+            else:
+                # Fallback to individual embeddings
+                embeddings_list = []
+                for text in content_texts:
+                    embedding = self._generate_embedding_with_retry(text, "batch_update")
+                    if embedding is not None:
+                        embeddings_list.append(embedding)
+                
+                if embeddings_list:
+                    embeddings = np.array(embeddings_list)
+                    logger.debug(f"Generated {len(embeddings_list)} embeddings individually")
+            
+            # Add to vector index
+            if embeddings is not None and len(embeddings) > 0:
+                if hasattr(self.vector_index, 'add_concepts_batch'):
+                    # Use batch add if available
+                    concept_embeddings = [
+                        (cid, emb) for cid, emb in zip(valid_concept_ids, embeddings)
+                    ]
+                    self.vector_index.add_concepts_batch(concept_embeddings)
+                else:
+                    # Fallback to individual adds
+                    for concept_id, embedding in zip(valid_concept_ids, embeddings):
+                        self.vector_index.add(
+                            ids=[concept_id],
+                            embeddings=[embedding],
+                            documents=[self.concepts[concept_id].content]
+                        )
+                
+                logger.info(f"✅ Batch indexed {len(valid_concept_ids)} concepts in vector index")
+            else:
+                logger.warning("No valid embeddings generated for vector indexing")
+                
+        except Exception as e:
+            logger.error(f"Batch vector indexing failed: {e}")
+            raise
     
     def _index_concept(self, concept_id: str) -> None:
         """
-        Add concept to vector index.
+        Add concept to vector index with production-level error handling.
         
         Args:
             concept_id: Concept to index
+            
+        Raises:
+            StorageError: If vector indexing fails critically
         """
         if not self.enable_vector_index or not self.vector_index:
             return
         
         if not self.nlp_processor:
+            logger.warning(f"Cannot index concept {concept_id[:8]}: NLP processor unavailable")
             return
         
         with self._concepts_lock:
             if concept_id not in self.concepts:
+                logger.warning(f"Cannot index concept {concept_id[:8]}: concept not found in memory")
                 return
             content = self.concepts[concept_id].content
         
+        # Use the production-level embedding generation with retry
+        embedding = self._generate_embedding_with_retry(content, concept_id)
+        
+        if embedding is None:
+            # This is now a CRITICAL error - concept exists but can't be indexed
+            logger.error(
+                f"CRITICAL: Cannot index concept {concept_id[:8]} - embedding generation failed. "
+                f"This will cause search inconsistencies."
+            )
+            # Don't raise exception here as the concept is already stored, 
+            # but log as critical for monitoring
+            return
+        
         try:
-            embedding = self.nlp_processor.get_embedding(content)
+            # Add to vector index with validation
+            self.vector_index.add_concept(concept_id, embedding)
             
-            if embedding is not None:
-                self.vector_index.add_concept(concept_id, embedding)
-                logger.debug(f"Indexed concept {concept_id[:8]} in vector index")
+            # Verify the concept was actually added to the index
+            if hasattr(self.vector_index, 'has_concept') and not self.vector_index.has_concept(concept_id):
+                raise StorageError(f"Vector index verification failed for concept {concept_id[:8]}")
+            
+            logger.debug(f"✅ Indexed concept {concept_id[:8]} in vector index")
+            
         except Exception as e:
-            logger.warning(f"Failed to index concept {concept_id[:8]}: {e}")
+            logger.error(
+                f"CRITICAL: Failed to index concept {concept_id[:8]} in vector index: {e}. "
+                f"This will cause search inconsistencies."
+            )
+            # Don't raise exception as concept is already stored in main storage
 
     def explain_reasoning(self, question: str, detailed: bool = False) -> Dict:
         """

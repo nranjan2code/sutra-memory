@@ -68,7 +68,16 @@ class EmbeddingBatchProcessor:
         # Load model
         logger.info(f"Loading embedding model: {model_name}")
         start_time = time.time()
-        self.model = SentenceTransformer(model_name)
+        
+        # Try to load from cache first (no network calls)
+        try:
+            self.model = SentenceTransformer(model_name, local_files_only=True)
+            logger.debug(f"Loaded {model_name} from local cache")
+        except Exception:
+            # If not in cache, download once then use cache
+            logger.info(f"Downloading {model_name} to cache...")
+            self.model = SentenceTransformer(model_name, local_files_only=False)
+            
         load_time = time.time() - start_time
         logger.info(f"Model loaded in {load_time:.2f}s")
 

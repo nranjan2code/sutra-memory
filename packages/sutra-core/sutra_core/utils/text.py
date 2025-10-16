@@ -58,11 +58,31 @@ def get_association_patterns() -> List[Tuple[str, AssociationType]]:
     from ..graph.concepts import AssociationType
 
     return [
+        # Causal relationships
         (r"(.+?) causes (.+)", AssociationType.CAUSAL),
+        (r"(.+?) leads to (.+)", AssociationType.CAUSAL),
+        (r"(.+?) results in (.+)", AssociationType.CAUSAL),
+        
+        # Hierarchical relationships  
         (r"(.+?) is (?:a|an) (.+)", AssociationType.HIERARCHICAL),
+        (r"(.+?) are (?:a|an|types? of) (.+)", AssociationType.HIERARCHICAL),
+        
+        # Compositional relationships
         (r"(.+?) contains (.+)", AssociationType.COMPOSITIONAL),
+        (r"(.+?) includes (.+)", AssociationType.COMPOSITIONAL),
+        (r"(.+?) consists of (.+)", AssociationType.COMPOSITIONAL),
+        
+        # Semantic relationships (definitions, descriptions)
+        (r"(.+?) refers to (.+)", AssociationType.SEMANTIC),
+        (r"(.+?) means (.+)", AssociationType.SEMANTIC),
+        (r"(.+?) involves (.+)", AssociationType.SEMANTIC),
         (r"(.+?) similar to (.+)", AssociationType.SEMANTIC),
+        (r"(.+?) related to (.+)", AssociationType.SEMANTIC),
+        
+        # Temporal relationships
         (r"(.+?) before (.+)", AssociationType.TEMPORAL),
+        (r"(.+?) after (.+)", AssociationType.TEMPORAL),
+        (r"(.+?) follows (.+)", AssociationType.TEMPORAL),
     ]
 
 

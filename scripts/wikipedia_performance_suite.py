@@ -151,47 +151,83 @@ class WikipediaPerformanceTester:
         return total / (1024 * 1024)
     
     def load_wikipedia_articles(self, num_articles: int = 100) -> List[Dict[str, str]]:
-        """Load Wikipedia articles from Hugging Face datasets."""
-        print(f"\n📥 Downloading {num_articles} Wikipedia articles...")
+        """
+        Load Wikipedia articles from Hugging Face datasets.
+        
+        For comprehensive knowledge building, we load as many high-quality articles as possible
+        up to the specified limit, with improved filtering for better content quality.
+        """
+        print(f"\n📥 Downloading up to {num_articles:,} Wikipedia articles...")
         
         try:
             # Use the latest wikimedia/wikipedia dataset (November 2023)
-            print("Loading wikimedia/wikipedia dataset (20231101.en)...")
+            print("Loading wikimedia/wikipedia dataset (20231101.en) in streaming mode...")
             dataset = load_dataset(
                 "wikimedia/wikipedia",
                 "20231101.en",
                 split="train",
-                streaming=True,  # Use streaming to avoid downloading entire dataset
+                streaming=True,  # Essential for large datasets to avoid memory issues
                 token=self.hf_token if self.hf_token else None
             )
             
-            # Take first N articles with substantial content
+            # Process articles with improved quality filtering
             articles = []
-            print("Processing articles...")
+            print("Processing articles with quality filtering...")
             count = 0
+            batch_size = 1000
+            
             for item in dataset:
                 if len(articles) >= num_articles:
                     break
                 
                 count += 1
-                # Show progress every 10 articles checked
-                if count % 10 == 0:
-                    print(f"  Checked {count} articles, collected {len(articles)}...")
                 
-                # Filter for articles with good content
+                # Show progress every batch
+                if count % batch_size == 0:
+                    print(f"  Processed {count:,} articles, collected {len(articles):,} high-quality articles...")
+                    # Force garbage collection for memory management
+                    import gc
+                    gc.collect()
+                
+                # Improved quality filters
                 text = item.get("text", "")
-                if len(text) > 500:  # At least 500 characters
+                title = item.get("title", "Unknown")
+                
+                # Quality criteria for better articles
+                if (len(text) > 1000 and  # At least 1000 characters for substantial content
+                    len(text) < 50000 and  # Not too long (likely list articles or dumps)
+                    not title.startswith("List of") and  # Skip list articles
+                    not title.startswith("Category:") and  # Skip category pages
+                    "disambiguation" not in title.lower() and  # Skip disambiguation pages
+                    len(title.split()) > 1 and  # Multi-word titles tend to be better
+                    not title.endswith("(disambiguation)") and  # Another disambiguation check
+                    ":" not in title[:50]):  # Skip most namespace pages
+                    
                     articles.append({
-                        "title": item.get("title", "Unknown"),
-                        "text": text[:5000]  # Limit to first 5000 chars
+                        "title": title,
+                        "text": text[:10000],  # First 10k chars for comprehensive learning
+                        "original_length": len(text)
                     })
             
-            print(f"✓ Loaded {len(articles)} articles")
+            print(f"✓ Collected {len(articles):,} high-quality articles from {count:,} total articles processed")
+            
+            # Sort by original length to prioritize substantial articles
+            articles.sort(key=lambda x: x.get('original_length', 0), reverse=True)
+            
+            # Calculate some stats
+            if articles:
+                avg_length = sum(len(a['text']) for a in articles) / len(articles)
+                total_content = sum(len(a['text']) for a in articles)
+                print(f"  Average article length: {avg_length:,.0f} characters")
+                print(f"  Total content: {total_content:,} characters ({total_content/1024/1024:.1f} MB)")
+            
             return articles
             
         except Exception as e:
             print(f"❌ Failed to load Wikipedia: {e}")
             print(f"📌 Error type: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
             raise
     
     def benchmark_wikipedia_learning(
@@ -292,38 +328,88 @@ class WikipediaPerformanceTester:
         
         return result, engine, articles
     
-    def generate_questions_from_articles(self, articles: List[Dict[str, str]]) -> List[str]:
-        """Generate relevant questions based on the Wikipedia articles we learned from."""
+    def generate_questions_from_articles(self, articles: List[Dict[str, str]], num_questions: int = 100) -> List[str]:
+        """
+        Generate diverse, high-quality questions based on the Wikipedia articles we learned from.
+        
+        Uses random sampling to create exactly the requested number of questions
+        with good variety and coverage of different topics.
+        """
+        import random
+        random.seed(42)  # For reproducible results
+        
         questions = []
         
-        # Add questions based on article titles
-        for article in articles[:5]:  # Use first 5 articles
+        # Sample articles to generate questions from (use more articles for diversity)
+        sample_size = min(num_questions * 2, len(articles))  # Sample more articles than questions needed
+        sampled_articles = random.sample(articles, sample_size)
+        
+        # Question templates for variety
+        question_templates = [
+            "What is {title}?",
+            "Tell me about {title}",
+            "What do you know about {title}?",
+            "Explain {title}",
+            "Describe {title}",
+            "What are the key facts about {title}?",
+            "What is the main topic of {title}?",
+            "Can you summarize {title}?",
+            "What information do you have about {title}?",
+            "How would you describe {title}?",
+        ]
+        
+        print(f"Generating {num_questions} questions from {len(sampled_articles)} sampled articles...")
+        
+        for article in sampled_articles:
+            if len(questions) >= num_questions:
+                break
+                
             title = article['title']
             text = article['text']
             
-            # Generate different types of questions
-            if 'is' in text.lower() and len(title.split()) <= 3:
-                questions.append(f"What is {title}?")
+            # Generate primary question using random template
+            template = random.choice(question_templates)
+            questions.append(template.format(title=title))
             
-            if 'was' in text.lower() and any(word in title.lower() for word in ['person', 'man', 'woman']) or title.count(' ') == 1:
-                questions.append(f"Who was {title}?")
+            if len(questions) >= num_questions:
+                break
             
-            if 'capital' in text.lower():
-                questions.append(f"What is the capital mentioned in the article about {title}?")
+            # Generate content-based questions for variety
+            if 'is a' in text.lower() or 'was a' in text.lower():
+                questions.append(f"What type of thing is {title}?")
+            elif 'located' in text.lower() or 'situated' in text.lower():
+                questions.append(f"Where is {title} located?")
+            elif any(word in text.lower() for word in ['founded', 'established', 'created', 'invented']):
+                questions.append(f"When was {title} founded or established?")
+            elif any(word in text.lower() for word in ['born', 'died', 'lived']):
+                questions.append(f"What do you know about the life of {title}?")
+            else:
+                # Fallback to another template
+                if len(questions) < num_questions:
+                    questions.append(f"What are the main characteristics of {title}?")
             
-            # Extract key concepts from the first sentence
-            first_sentence = text.split('.')[0] if '.' in text else text[:100]
-            if len(first_sentence) < 200:
-                questions.append(f"Tell me about {title}")
+            if len(questions) >= num_questions:
+                break
         
-        # Add some generic questions that might match
-        questions.extend([
-            "What information is available?",
-            "Describe the main topic",
-            "What is the key concept?",
-        ])
+        # If we don't have enough questions, add some generic ones
+        if len(questions) < num_questions:
+            generic_questions = [
+                "What information is available?",
+                "Describe the main topics you know about",
+                "What are some interesting facts?",
+                "Tell me about something educational",
+                "What knowledge do you have?",
+                "Share some information",
+                "What can you tell me?",
+            ]
+            questions.extend(generic_questions[:num_questions - len(questions)])
         
-        return questions[:10]  # Return up to 10 questions
+        # Randomize and trim to exact number requested
+        random.shuffle(questions)
+        questions = questions[:num_questions]
+        
+        print(f"✓ Generated {len(questions)} diverse questions")
+        return questions
         
     def benchmark_question_answering(
         self, 
@@ -346,10 +432,13 @@ class WikipediaPerformanceTester:
         
         # Generate relevant test questions if none provided
         if test_questions is None:
-            test_questions = self.generate_questions_from_articles(articles)
-            print(f"\n{Colors.CYAN}🤔 Generated questions based on learned content:{Colors.END}")
-            for i, question in enumerate(test_questions, 1):
+            num_qa_samples = 100  # Default to 100 Q&A samples for efficient testing
+            test_questions = self.generate_questions_from_articles(articles, num_qa_samples)
+            print(f"\n{Colors.CYAN}🤔 Generated {len(test_questions)} questions from learned content:{Colors.END}")
+            for i, question in enumerate(test_questions[:5], 1):  # Show first 5 as examples
                 print(f"  {i}. {question}")
+            if len(test_questions) > 5:
+                print(f"  ... and {len(test_questions) - 5} more questions")
         else:
             print(f"\n{Colors.CYAN}🤔 Using provided test questions{Colors.END}")
         
@@ -480,11 +569,12 @@ def main():
     else:
         print(f"{Colors.CYAN}Usage: python wikipedia_performance_suite.py <num_articles>{Colors.END}")
         print(f"{Colors.CYAN}Examples:{Colors.END}")
-        print(f"  python wikipedia_performance_suite.py 100    # Quick test")
-        print(f"  python wikipedia_performance_suite.py 1000   # Standard test")
-        print(f"  python wikipedia_performance_suite.py 5000   # Large test")
-        print(f"\n{Colors.YELLOW}Running with default: 100 articles{Colors.END}\n")
-        num_articles = 100
+        print(f"  python wikipedia_performance_suite.py 1000     # Quick test (1k articles)")
+        print(f"  python wikipedia_performance_suite.py 10000    # Standard test (10k articles)")
+        print(f"  python wikipedia_performance_suite.py 50000    # Large test (50k articles)")
+        print(f"  python wikipedia_performance_suite.py 100000   # Comprehensive test (100k articles)")
+        print(f"\n{Colors.YELLOW}Running with default: 10,000 articles for comprehensive knowledge{Colors.END}\n")
+        num_articles = 10000  # Better default for comprehensive knowledge
     
     # Print header
     tester.print_header("🌍 WIKIPEDIA REAL-WORLD PERFORMANCE TEST 🌍")

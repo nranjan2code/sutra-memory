@@ -15,20 +15,36 @@ Sutra AI is an explainable graph-based AI system that learns in real-time withou
 
 ## Architecture
 
-gRPC-first monorepo — all app services connect to the storage server.
+gRPC-first microservices architecture with containerized deployment. All services communicate via gRPC with a secure React-based control center for monitoring.
 
 ```
-┌───────────────┐         gRPC          ┌─────────────────────┐
-│  sutra-api    │ ───────────────────▶  │  storage-server     │
-│  (FastAPI)    │ ◀───────────────────  │  (Rust, gRPC)       │
-└───────────────┘                       └─────────────────────┘
-        ▲                                        ▲
-        │                                        │
-        └──────────── gRPC ──────────────────────┘
-
-┌───────────────┐
-│ sutra-hybrid  │  (embeddings + orchestration)
-└───────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            Docker Network (sutra-network)                       │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────────────────┐  │
+│  │  sutra-control  │    │   sutra-client  │    │      sutra-markdown-web     │  │
+│  │  (React + Fast  │    │   (Streamlit)   │    │       (Markdown API)       │  │
+│  │   API Gateway)  │    │    UI Client    │    │        UI Client           │  │
+│  │   Port: 9000    │    │   Port: 8080    │    │       Port: 8002           │  │
+│  └─────────┬───────┘    └─────────┬───────┘    └─────────────┬───────────────┘  │
+│            │                      │                          │                   │
+│            └──────────────────────┼──────────────────────────┘                   │
+│                                   │                                              │
+│  ┌─────────────────┐              │gRPC       ┌─────────────────────────────┐  │
+│  │   sutra-api     │◀─────────────┼──────────▶│      storage-server         │  │
+│  │   (FastAPI)     │              │           │       (Rust gRPC)           │  │
+│  │   Port: 8000    │              │           │      Port: 50051            │  │
+│  └─────────┬───────┘              │           └──────────────┬──────────────┘  │
+│            │                      │                          │                   │
+│            └──────────────────────┼──────────────────────────┘                   │
+│                                   │                                              │
+│  ┌─────────────────┐              │           ┌─────────────────────────────┐  │
+│  │  sutra-hybrid   │◀─────────────┼──────────▶│        sutra-ollama         │  │
+│  │ (Embeddings +   │              │           │     (Local LLM Server)      │  │
+│  │ Orchestration)  │              │           │      Port: 11434            │  │
+│  │   Port: 8001    │              │           └─────────────────────────────┘  │
+│  └─────────────────┘              │                                              │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Key Architectural Principles:**
@@ -43,6 +59,9 @@ gRPC-first monorepo — all app services connect to the storage server.
 - **sutra-storage**: Production-ready Rust storage with ConcurrentStorage (57K writes/sec, <0.01ms reads), single-file architecture, and lock-free concurrency  
 - **sutra-hybrid**: Semantic embeddings integration (SutraAI class) that combines graph reasoning with optional similarity matching
 - **sutra-api**: Production REST API with FastAPI, rate limiting, and comprehensive endpoints
+- **sutra-control**: Modern React-based control center with secure FastAPI gateway for system monitoring and management
+- **sutra-client**: Streamlit-based web interface for interactive AI queries and knowledge exploration
+- **sutra-markdown-web**: Markdown API service for document processing and content management
 - **sutra-cli**: Command-line interface (placeholder)
 
 ## Development Commands
@@ -89,14 +108,24 @@ make lint
 make check  # Runs format, lint, and test
 ```
 
-### Demos and Development
+### Deployment
 ```bash
-# Local stack (recommended)
+# Full containerized stack (recommended)
+docker compose up -d
+
+# Development with local optimizations
 DEPLOY=local VERSION=v2 bash deploy-optimized.sh
 
-# Or run API locally (requires storage server)
+# Individual service development (requires storage server)
 export SUTRA_STORAGE_SERVER=localhost:50051
 uvicorn sutra_api.main:app --host 0.0.0.0 --port 8000
+
+# Control center development
+cd packages/sutra-control
+npm install
+npm run dev  # Frontend dev server
+# In separate terminal:
+python backend/main.py  # Backend gateway
 ```
 
 ### Build and Distribution
@@ -149,6 +178,16 @@ Production-ready storage architecture:
 - Immutable read snapshots for burst-tolerant performance
 - Path finding and graph traversal (BFS)
 - 100% test pass rate with verified accuracy
+
+### Sutra Control Center (sutra-control)
+Modern React-based monitoring and management interface:
+- **Frontend**: React 18 with Material Design 3, TypeScript, and Vite
+- **Backend**: Secure FastAPI gateway that abstracts internal gRPC communication
+- **Real-time Updates**: WebSocket connection for live system metrics
+- **Security**: Production-hardened with non-root containers, restricted CORS, no internal API exposure
+- **Features**: System health monitoring, performance metrics, knowledge graph visualization
+- **Architecture**: Multi-stage Docker build combining React SPA with Python gateway
+- **Access**: http://localhost:9000 (containerized deployment)
 ### Configuration
 
 ### Environment Variables
@@ -156,13 +195,22 @@ Production-ready storage architecture:
 # Storage server address (all services)
 export SUTRA_STORAGE_SERVER="storage-server:50051"
 
-# API settings
+# Service ports
 export SUTRA_API_PORT="8000"
+export SUTRA_HYBRID_PORT="8001"
+export SUTRA_CLIENT_PORT="8080"
+export SUTRA_CONTROL_PORT="9000"
+export SUTRA_MARKDOWN_PORT="8002"
+export SUTRA_OLLAMA_PORT="11434"
+export SUTRA_STORAGE_PORT="50051"
 
 # Rate limits
 export SUTRA_RATE_LIMIT_LEARN="30"
 export SUTRA_RATE_LIMIT_REASON="60"
-```
+
+# Production settings
+export ENVIRONMENT="production"
+export PYTHONPATH=/app:$PYTHONPATH
 ```
 
 ### Reasoning Configuration
@@ -218,6 +266,13 @@ The system has comprehensive testing at multiple levels:
 2. Implement endpoint in `sutra_api/main.py`
 3. Add rate limiting configuration
 4. Update OpenAPI documentation
+
+### Extending Control Center
+1. **Frontend Changes**: Edit React components in `packages/sutra-control/src/`
+2. **Backend Changes**: Update FastAPI gateway in `packages/sutra-control/backend/main.py`
+3. **Build Process**: Run `npm run build` to create production build
+4. **Docker**: Rebuild container with `docker build -t sutra-control:latest .`
+5. **Testing**: Access at http://localhost:9000 after `docker compose up -d`
 
 ## Troubleshooting
 

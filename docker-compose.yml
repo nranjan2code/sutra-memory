@@ -1,7 +1,7 @@
 services:
   # Rust gRPC Storage Server (core backend)
   storage-server:
-    image: sutra-storage-server:latest
+    image: sutra-storage-server:v2
     container_name: sutra-storage
     ports:
       - "50051:50051"
@@ -18,7 +18,7 @@ services:
 
   # Sutra API (primary REST API)
   sutra-api:
-    image: sutra-api:latest
+    image: sutra-api:v2
     container_name: sutra-api
     ports:
       - "8000:8000"
@@ -42,7 +42,7 @@ services:
 
   # Sutra Hybrid (semantic embeddings API)
   sutra-hybrid:
-    image: sutra-hybrid:latest
+    image: sutra-hybrid:v2
     container_name: sutra-hybrid
     ports:
       - "8001:8000"
@@ -63,21 +63,24 @@ services:
       - sutra-network
     restart: unless-stopped
 
-  # Sutra Control Panel (lifecycle management)
+  # Sutra Control Center (production-grade secure gateway)
   sutra-control:
-    image: sutra-control:latest
+    image: sutra-control:complete
     container_name: sutra-control
     ports:
-      - "5001:5000"
+      - "9000:9000"
     environment:
       - PYTHONUNBUFFERED=1
-      - SUTRA_STORAGE_MODE=server
+      - PYTHONDONTWRITEBYTECODE=1
+      - ENVIRONMENT=production
       - SUTRA_STORAGE_SERVER=storage-server:50051
+      - PORT=9000
     depends_on:
+      - storage-server
       - sutra-api
       - sutra-hybrid
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -88,7 +91,7 @@ services:
 
   # React Web Client
   sutra-client:
-    image: sutra-client:latest
+    image: sutra-client:v2
     container_name: sutra-client
     ports:
       - "8080:8080"

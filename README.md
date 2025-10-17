@@ -40,38 +40,65 @@ Tested with 5 concepts, ~100ms query latency, full persistence verified.
 
 ## Architecture
 
-gRPC-first, service-oriented design. All application services talk to the Storage Server over gRPC.
+gRPC-first microservices architecture with containerized deployment. All services communicate via gRPC with a secure React-based control center for monitoring.
 
 ```
-┌───────────────┐       gRPC        ┌─────────────────────┐
-│  sutra-api    │ ───────────────▶  │  storage-server     │
-│ (FastAPI)     │ ◀───────────────  │  (Rust, gRPC)       │
-└───────────────┘                   └─────────────────────┘
-       ▲   ▲                                  ▲
-       │   │                                  │
-       │   └─────────────── gRPC ─────────────┘
-       │
-┌───────────────┐
-│ sutra-hybrid  │  (embeddings + orchestration, gRPC client)
-└───────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          Docker Network (sutra-network)                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌───────────────┐         ┌───────────────┐         ┌───────────────┐    │
+│  │ sutra-control │         │ sutra-client  │         │ sutra-markdown│    │
+│  │ (React + API  │         │ (Streamlit    │         │      web       │    │
+│  │   Gateway)    │         │  UI Client)   │         │ (Markdown API)│    │
+│  │  Port: 9000   │         │  Port: 8080   │         │  Port: 8002   │    │
+│  └───────┬───────┘         └───────┬───────┘         └───────┬───────┘    │
+│          │                       │                       │            │
+│          └───────────────────────┼───────────────────────┘            │
+│                                  │                                        │
+│  ┌───────────────┐         │gRPC       ┌─────────────────────┐       │
+│  │   sutra-api   │◀────────┼─────────▶│  storage-server  │       │
+│  │   (FastAPI)   │         │           │   (Rust gRPC)    │       │
+│  │  Port: 8000   │         │           │   Port: 50051    │       │
+│  └───────┬───────┘         │           └──────────┬──────────┘       │
+│          │                       │                       │               │
+│          └───────────────────────┼───────────────────────┘               │
+│                                  │                                       │
+│  ┌───────────────┐         │           ┌─────────────────────┐       │
+│  │ sutra-hybrid  │◀────────┼─────────▶│   sutra-ollama    │       │
+│  │ (Embeddings + │         │           │  (Local LLM)     │       │
+│  │ Orchestration)│         │           │   Port: 11434    │       │
+│  │  Port: 8001   │         │           └─────────────────────┘       │
+│  └───────────────┘         │                                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- sutra-api: Thin REST-to-gRPC proxy (no local reasoning)
-- sutra-hybrid: Embeddings + orchestration, forwards graph ops via gRPC
-- storage-server: Single source of truth for graph + vectors
+### Service Overview
+- **sutra-control**: React-based monitoring center with secure FastAPI gateway
+- **sutra-client**: Streamlit web interface for interactive queries  
+- **sutra-api**: Primary REST API for AI operations
+- **sutra-hybrid**: Semantic embeddings and orchestration
+- **storage-server**: Rust gRPC core storage engine (57K writes/sec)
+- **sutra-markdown-web**: Document processing API
+- **sutra-ollama**: Local LLM inference server
 
-Only `sutra-api` and `sutra-hybrid` are user-facing HTTP services. No component accesses storage directly in-process.
+All services communicate via gRPC internally, with REST APIs for external access. The control center provides secure monitoring without exposing internal implementation details.
 
 ## Quick Start
 
-### 1. Run locally (Docker Compose)
+### 1. Deploy with Docker Compose (Recommended)
 
 ```bash
-# From repo root
-DEPLOY=local VERSION=v2 bash deploy-optimized.sh
+# Start the entire stack
+docker compose up -d
+
+# Access services
+open http://localhost:9000    # Control Center (monitoring)
+open http://localhost:8080    # Interactive Client (queries)
+open http://localhost:8000    # Primary API
 
 # Health checks
-curl -s http://localhost:8000/health     # sutra-api
+curl -s http://localhost:9000/health     # sutra-control
+curl -s http://localhost:8000/health     # sutra-api  
 curl -s http://localhost:8001/ping       # sutra-hybrid
 ```
 

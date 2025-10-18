@@ -8,9 +8,9 @@ RUN apk add --no-cache musl-dev protobuf-dev
 WORKDIR /build
 
 # Copy manifests
-COPY Cargo.toml Cargo.lock build.rs ./
-COPY proto ./proto
-COPY src ./src
+COPY packages/sutra-storage/Cargo.toml packages/sutra-storage/Cargo.lock packages/sutra-storage/build.rs ./
+COPY packages/sutra-storage/proto ./proto
+COPY packages/sutra-storage/src ./src
 
 # Build for release with static linking
 RUN cargo build --release --bin storage_server_simple

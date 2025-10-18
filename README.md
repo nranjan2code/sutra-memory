@@ -85,64 +85,57 @@ All services communicate via gRPC internally, with REST APIs for external access
 
 ### Sutra Grid - Distributed Storage Orchestration
 
-**NEW**: Production-ready distributed infrastructure with event-driven observability.
+**NEW**: Production-ready distributed infrastructure with complete Docker deployment and web UI integration.
 
 Sutra Grid manages storage nodes across multiple agents with:
-- **Bidirectional gRPC**: Master ↔ Agent communication (7000, 8001+)
+- **Bidirectional gRPC**: Master ↔ Agent communication (ports 7001 HTTP, 7002 gRPC)
 - **Event-Driven Monitoring**: 17 structured events → knowledge graph (port 50052)
 - **Auto-Recovery**: Crashed nodes restart automatically (up to 3 times)
 - **Production Features**: Retry logic, timeouts, health monitoring, graceful degradation
+- **Web UI**: Complete Grid management via Sutra Control Center (port 9000)
 
 **Key Innovation**: Grid monitors itself using Sutra's own platform - proving event-driven observability works without external LMT (Logs/Metrics/Telemetry) stack.
 
-#### Quick Start
-
-```bash
-# Terminal 1: Reserved Storage for Grid events
-cd packages/sutra-storage
-./bootstrap-grid-events.sh
-
-# Terminal 2: Grid Master
-cd packages/sutra-grid-master
-EVENT_STORAGE=http://localhost:50052 cargo run --release
-
-# Terminal 3: Grid Agent
-cd packages/sutra-grid-agent
-EVENT_STORAGE=http://localhost:50052 cargo run --release
-
-# Terminal 4: Test operations
-cd packages/sutra-grid-master
-./test-integration.sh  # Runs 5 automated tests
-```
-
-**Architecture Details**: See [docs/grid/architecture/GRID_ARCHITECTURE.md](docs/grid/architecture/GRID_ARCHITECTURE.md) for complete documentation.
-
 **Status**: Production-Ready ✅  
 - Master: 11 events emitted
-- Agent: 2 node lifecycle events
+- Agent: 2 node lifecycle events  
 - Storage: Events as queryable concepts
+- Docker: Complete containerized deployment
+- Control Center: Grid management UI integrated
 - Testing: End-to-end verified
 
-**Next Phase**: Sutra Control integration (React dashboard with natural language queries)
+**Architecture Details**: See [docs/grid/architecture/GRID_ARCHITECTURE.md](docs/grid/architecture/GRID_ARCHITECTURE.md) and [DEPLOYMENT.md](DEPLOYMENT.md) for complete documentation.
 
 ## Quick Start
 
-### 1. Deploy with Docker Compose (Recommended)
+### 1. Deploy with Docker (Recommended)
+
+**⚡ Single command deployment:**
 
 ```bash
-# Start the entire stack
-docker compose up -d
+# First-time installation
+./sutra-deploy.sh install
 
-# Access services
-open http://localhost:9000    # Control Center (monitoring)
+# Or start existing services
+./sutra-deploy.sh up
+```
+
+**Access services:**
+```bash
+open http://localhost:9000    # Control Center (monitoring + Grid management)
 open http://localhost:8080    # Interactive Client (queries)
 open http://localhost:8000    # Primary API
-
-# Health checks
-curl -s http://localhost:9000/health     # sutra-control
-curl -s http://localhost:8000/health     # sutra-api  
-curl -s http://localhost:8001/ping       # sutra-hybrid
 ```
+
+**Manage deployment:**
+```bash
+./sutra-deploy.sh status      # Check system status
+./sutra-deploy.sh logs        # View all logs
+./sutra-deploy.sh maintenance # Interactive menu
+./sutra-deploy.sh down        # Stop all services
+```
+
+**See [DEPLOYMENT.md](DEPLOYMENT.md) for complete documentation.**
 
 ### 2. Test End-to-End
 

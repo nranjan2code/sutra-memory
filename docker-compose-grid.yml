@@ -1,0 +1,291 @@
+services:
+  # ============================================================================
+  # STORAGE LAYER
+  # ============================================================================
+  
+  # Main Storage Server (Core Sutra AI Knowledge Graph)
+  storage-server:
+    build:
+      context: .
+      dockerfile: ./packages/sutra-storage/Dockerfile
+    image: sutra-storage-server:latest
+    container_name: sutra-storage
+    ports:
+      - "50051:50051"
+    volumes:
+      - storage-data:/data
+    environment:
+      - RUST_LOG=info
+      - STORAGE_PATH=/data
+      - STORAGE_HOST=0.0.0.0
+      - STORAGE_PORT=50051
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:50051"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Grid Event Storage (Reserved for Grid Observability)
+  grid-event-storage:
+    build:
+      context: .
+      dockerfile: ./packages/sutra-storage/Dockerfile
+    image: sutra-storage-server:latest
+    container_name: sutra-grid-events
+    ports:
+      - "50052:50051"
+    volumes:
+      - grid-event-data:/data
+    environment:
+      - RUST_LOG=info
+      - STORAGE_PATH=/data
+      - STORAGE_HOST=0.0.0.0
+      - STORAGE_PORT=50051
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:50051"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================================
+  # GRID INFRASTRUCTURE
+  # ============================================================================
+  
+  # Grid Master (Orchestration & Coordination)
+  grid-master:
+    build:
+      context: .
+      dockerfile: ./packages/sutra-grid-master/Dockerfile
+    image: sutra-grid-master:latest
+    container_name: sutra-grid-master
+    ports:
+      - "7001:7001"  # HTTP binary distribution
+      - "7002:7002"  # gRPC agent connections
+    environment:
+      - RUST_LOG=info
+      - GRID_MASTER_HOST=0.0.0.0
+      - GRID_MASTER_PORT=7000
+      - EVENT_STORAGE=http://grid-event-storage:50051
+    depends_on:
+      - grid-event-storage
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:7000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Grid Agent 1 (Node Management)
+  grid-agent-1:
+    build:
+      context: .
+      dockerfile: ./packages/sutra-grid-agent/Dockerfile
+    image: sutra-grid-agent:latest
+    container_name: sutra-grid-agent-1
+    ports:
+      - "8003:8001"
+    volumes:
+      - agent1-data:/storage-nodes
+    environment:
+      - RUST_LOG=info
+      - GRID_AGENT_HOST=0.0.0.0
+      - GRID_AGENT_PORT=8001
+      - GRID_MASTER_ADDRESS=grid-master:7000
+      - EVENT_STORAGE=http://grid-event-storage:50051
+      - AGENT_ID=agent-001
+      - MAX_STORAGE_NODES=5
+    depends_on:
+      - grid-master
+      - grid-event-storage
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:8001"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Grid Agent 2 (Additional Node Management)
+  grid-agent-2:
+    build:
+      context: .
+      dockerfile: ./packages/sutra-grid-agent/Dockerfile
+    image: sutra-grid-agent:latest
+    container_name: sutra-grid-agent-2
+    ports:
+      - "8004:8001"
+    volumes:
+      - agent2-data:/storage-nodes
+    environment:
+      - RUST_LOG=info
+      - GRID_AGENT_HOST=0.0.0.0
+      - GRID_AGENT_PORT=8001
+      - GRID_MASTER_ADDRESS=grid-master:7000
+      - EVENT_STORAGE=http://grid-event-storage:50051
+      - AGENT_ID=agent-002
+      - MAX_STORAGE_NODES=5
+    depends_on:
+      - grid-master
+      - grid-event-storage
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:8001"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ============================================================================
+  # API LAYER
+  # ============================================================================
+  
+  # Sutra API (Primary REST API)
+  sutra-api:
+    build:
+      context: .
+      dockerfile: ./packages/sutra-api/Dockerfile
+    image: sutra-api:latest
+    container_name: sutra-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SUTRA_STORAGE_MODE=server
+      - SUTRA_STORAGE_SERVER=storage-server:50051
+      - SUTRA_RATE_LIMIT_LEARN=100
+      - SUTRA_RATE_LIMIT_REASON=200
+    depends_on:
+      - storage-server
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Sutra Hybrid (Semantic Embeddings API)
+  sutra-hybrid:
+    build:
+      context: .
+      dockerfile: ./packages/sutra-hybrid/Dockerfile
+    image: sutra-hybrid:latest
+    container_name: sutra-hybrid
+    ports:
+      - "8001:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SUTRA_STORAGE_MODE=server
+      - SUTRA_STORAGE_SERVER=storage-server:50051
+      - SUTRA_USE_SEMANTIC_EMBEDDINGS=true
+    depends_on:
+      - storage-server
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================================
+  # WEB INTERFACES
+  # ============================================================================
+  
+  # Sutra Control Center (Grid Management + System Monitoring)
+  sutra-control:
+    build:
+      context: .
+      dockerfile: ./packages/sutra-control/Dockerfile
+    image: sutra-control:grid-integrated
+    container_name: sutra-control
+    ports:
+      - "9000:9000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - ENVIRONMENT=production
+      - SUTRA_STORAGE_SERVER=storage-server:50051
+      - SUTRA_GRID_MASTER=grid-master:7000
+      - PORT=9000
+    depends_on:
+      - storage-server
+      - grid-master
+      - sutra-api
+      - sutra-hybrid
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+
+  # Sutra Client (Interactive AI Interface)
+  sutra-client:
+    build:
+      context: ./packages/sutra-client
+      dockerfile: Dockerfile
+    image: sutra-client:latest
+    container_name: sutra-client
+    ports:
+      - "8080:8080"
+    environment:
+      - SUTRA_API_URL=http://sutra-api:8000
+      - SUTRA_HYBRID_URL=http://sutra-hybrid:8000
+    depends_on:
+      - sutra-api
+      - sutra-hybrid
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+# ============================================================================
+# NETWORKING & STORAGE
+# ============================================================================
+
+volumes:
+  # Docker managed volumes (easier for deployment)
+  storage-data:
+    driver: local
+  grid-event-data:
+    driver: local
+  agent1-data:
+    driver: local
+  agent2-data:
+    driver: local
+
+networks:
+  sutra-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16

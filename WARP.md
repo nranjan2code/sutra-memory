@@ -65,8 +65,8 @@ gRPC-first microservices architecture with containerized deployment. All service
 - **sutra-cli**: Command-line interface (placeholder)
 
 #### Sutra Grid (Distributed Infrastructure)
-- **sutra-grid-master**: Rust-based orchestration service managing agents and storage nodes (port 7000)
-- **sutra-grid-agent**: Rust-based agent with gRPC server for storage node lifecycle management (port 8001+)
+- **sutra-grid-master**: Rust-based orchestration service managing agents and storage nodes (ports 7001 HTTP, 7002 gRPC)
+- **sutra-grid-agent**: Rust-based agent with gRPC server for storage node lifecycle management (ports 8003, 8004)
 - **sutra-grid-events**: Event emission library with 17 structured event types, async background worker
 - **sutra-grid-cli**: Command-line tool for cluster management (`list-agents`, `status`, `spawn`, `stop`)
 
@@ -151,26 +151,53 @@ make check  # Runs format, lint, and test
 ```
 
 ### Deployment
+
+**⚡ Single Source of Truth: `./sutra-deploy.sh`**
+
+All deployment operations are managed through one script:
+
 ```bash
-# Full containerized stack (recommended)
-docker compose up -d
+# First-time installation
+./sutra-deploy.sh install
 
-# Development with local optimizations
-DEPLOY=local VERSION=v2 bash deploy-optimized.sh
+# Start all services
+./sutra-deploy.sh up
 
-# Individual service development (requires storage server)
+# Stop all services
+./sutra-deploy.sh down
+
+# Restart services
+./sutra-deploy.sh restart
+
+# Check system status
+./sutra-deploy.sh status
+
+# View logs (all services or specific)
+./sutra-deploy.sh logs
+./sutra-deploy.sh logs sutra-api
+
+# Interactive maintenance menu
+./sutra-deploy.sh maintenance
+
+# Complete cleanup
+./sutra-deploy.sh clean
+```
+
+**Service URLs (after deployment):**
+- Sutra Control Center: http://localhost:9000
+- Sutra Client (UI): http://localhost:8080  
+- Sutra API: http://localhost:8000
+- Sutra Hybrid API: http://localhost:8001
+- Grid Master (HTTP): http://localhost:7001
+- Grid Master (gRPC): localhost:7002
+
+**Individual service development** (requires storage server):
+```bash
 export SUTRA_STORAGE_SERVER=localhost:50051
 uvicorn sutra_api.main:app --host 0.0.0.0 --port 8000
-
-# Control center development (with Grid integration)
-cd packages/sutra-control
-npm install
-python3 -m venv venv && source venv/bin/activate
-pip install fastapi uvicorn pydantic grpcio
-npm run build  # Build React app
-# Start with Grid support:
-SUTRA_GRID_MASTER=localhost:7000 python3 backend/main.py
 ```
+
+**See `DEPLOYMENT.md` for comprehensive documentation.**
 
 ### Build and Distribution
 ```bash

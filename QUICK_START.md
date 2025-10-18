@@ -21,23 +21,37 @@ Hybrid:  653 MB → 400 MB 🎯 39% smaller
 
 ## 🚀 One-Command Deployment
 
-### Local Development
+**⚡ New: Unified Deployment Script**
+
+All deployment operations now use a single script:
+
 ```bash
-./deploy-optimized.sh
-# Builds optimized images and starts local stack
+# First-time installation
+./sutra-deploy.sh install
+
+# Start all services
+./sutra-deploy.sh up
+
+# Stop all services  
+./sutra-deploy.sh down
+
+# Check system status
+./sutra-deploy.sh status
+
+# View logs
+./sutra-deploy.sh logs
+
+# Interactive maintenance
+./sutra-deploy.sh maintenance
 ```
 
-### Kubernetes Production
-```bash
-DEPLOY=k8s ./deploy-optimized.sh
-# Builds and deploys to your K8s cluster
-```
+**See [DEPLOYMENT.md](DEPLOYMENT.md) for complete documentation.**
 
-### Push to Registry
-```bash
-PUSH=true REGISTRY=your-registry.io/sutra-ai ./deploy-optimized.sh
-# Builds, tags, and pushes to your registry
-```
+### Old Deployment Scripts (Archived)
+
+The following scripts have been archived to `archive/`:
+- `deploy-optimized.sh` → Use `./sutra-deploy.sh`
+- `build-images.sh` → Use `./sutra-deploy.sh build`
 
 ## 📋 File Structure
 

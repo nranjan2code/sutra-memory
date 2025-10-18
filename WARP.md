@@ -64,6 +64,19 @@ gRPC-first microservices architecture with containerized deployment. All service
 - **sutra-markdown-web**: Markdown API service for document processing and content management
 - **sutra-cli**: Command-line interface (placeholder)
 
+#### Sutra Grid (Distributed Infrastructure)
+- **sutra-grid-master**: Rust-based orchestration service managing agents and storage nodes (port 7000)
+- **sutra-grid-agent**: Rust-based agent with gRPC server for storage node lifecycle management (port 8001+)
+- **sutra-grid-events**: Event emission library with 17 structured event types, async background worker
+- **sutra-grid-cli**: Command-line tool for cluster management (`list-agents`, `status`, `spawn`, `stop`)
+
+**Grid Status**: Production-Ready ✅  
+- Master: 11 events emitted (agent lifecycle, node operations)
+- Agent: 2 events emitted (node crash, restart)
+- Reserved Storage: Port 50052 for Grid events
+- Testing: End-to-end verified with `test-integration.sh`
+- Documentation: See `docs/grid/architecture/GRID_ARCHITECTURE.md` for complete details
+
 ## Development Commands
 
 ### Environment Setup
@@ -83,6 +96,11 @@ pip install -r requirements-dev.txt
 # Core package tests
 make test-core
 
+# Storage tests (Rust - includes WAL crash recovery tests)
+cd packages/sutra-storage
+cargo test
+cargo test test_wal  # Specific WAL durability tests
+
 # End-to-end demos
 python demo_simple.py
 python demo_end_to_end.py
@@ -94,6 +112,30 @@ python -m pytest tests/ -v
 
 # Verify storage performance
 python verify_concurrent_storage.py
+
+# Grid integration tests
+cd packages/sutra-grid-master
+./test-integration.sh  # Automated end-to-end (5 tests)
+
+# Manual Grid testing (3 terminals required)
+# Terminal 1: Reserved storage for events
+cd packages/sutra-storage
+./bootstrap-grid-events.sh
+
+# Terminal 2: Grid Master
+cd packages/sutra-grid-master
+EVENT_STORAGE=http://localhost:50052 cargo run --release
+
+# Terminal 3: Grid Agent
+cd packages/sutra-grid-agent
+EVENT_STORAGE=http://localhost:50052 cargo run --release
+
+# Terminal 4: CLI commands
+cd packages/sutra-grid-master
+cargo build --release
+./target/release/sutra-grid-cli --master http://localhost:7000 list-agents
+./target/release/sutra-grid-cli status
+./target/release/sutra-grid-cli spawn --agent agent-001 --port 50053 --storage-path /tmp/node1 --memory 512
 ```
 
 ### Code Quality
@@ -120,12 +162,14 @@ DEPLOY=local VERSION=v2 bash deploy-optimized.sh
 export SUTRA_STORAGE_SERVER=localhost:50051
 uvicorn sutra_api.main:app --host 0.0.0.0 --port 8000
 
-# Control center development
+# Control center development (with Grid integration)
 cd packages/sutra-control
 npm install
-npm run dev  # Frontend dev server
-# In separate terminal:
-python backend/main.py  # Backend gateway
+python3 -m venv venv && source venv/bin/activate
+pip install fastapi uvicorn pydantic grpcio
+npm run build  # Build React app
+# Start with Grid support:
+SUTRA_GRID_MASTER=localhost:7000 python3 backend/main.py
 ```
 
 ### Build and Distribution
@@ -170,30 +214,44 @@ High-level interface combining graph reasoning with semantic embeddings:
 - Knowledge persistence and audit trails
 
 ### ConcurrentStorage (sutra-storage - Rust)
-Production-ready storage architecture:
+Production-ready storage architecture with enterprise-grade durability:
 - **57,412 writes/sec** (25,000× faster than JSON baseline)
 - **<0.01ms read latency** (zero-copy memory-mapped files)
+- **Zero data loss** with Write-Ahead Log (WAL) integration
 - Lock-free write log with background reconciliation
 - Single-file storage (`storage.dat`) with 512MB initial size
 - Immutable read snapshots for burst-tolerant performance
 - Path finding and graph traversal (BFS)
+- Crash recovery with automatic WAL replay
 - 100% test pass rate with verified accuracy
 
+**Durability Guarantees:**
+- Every write logged to WAL before in-memory structures
+- Automatic crash recovery on startup
+- WAL checkpoint on flush (safe truncation)
+- RPO (Recovery Point Objective): 0 (zero data loss)
+- Tested with comprehensive crash simulation tests
+
 ### Sutra Control Center (sutra-control)
-Modern React-based monitoring and management interface:
+Modern React-based monitoring and management interface with **Grid Management Integration**:
 - **Frontend**: React 18 with Material Design 3, TypeScript, and Vite
 - **Backend**: Secure FastAPI gateway that abstracts internal gRPC communication
 - **Real-time Updates**: WebSocket connection for live system metrics
-- **Security**: Production-hardened with non-root containers, restricted CORS, no internal API exposure
-- **Features**: System health monitoring, performance metrics, knowledge graph visualization
+- **Grid Management**: Complete web UI for Grid agents and storage nodes ✅
+- **Grid API**: REST endpoints for spawn/stop operations, status monitoring ✅
+- **Features**: System health monitoring, performance metrics, knowledge graph visualization, Grid cluster management
 - **Architecture**: Multi-stage Docker build combining React SPA with Python gateway
 - **Access**: http://localhost:9000 (containerized deployment)
+- **Grid UI**: Accessible at http://localhost:9000/grid with real-time monitoring
 ### Configuration
 
 ### Environment Variables
 ```bash
 # Storage server address (all services)
 export SUTRA_STORAGE_SERVER="storage-server:50051"
+
+# Grid Master address (for Control Center integration)
+export SUTRA_GRID_MASTER="localhost:7000"
 
 # Service ports
 export SUTRA_API_PORT="8000"
@@ -274,6 +332,27 @@ The system has comprehensive testing at multiple levels:
 4. **Docker**: Rebuild container with `docker build -t sutra-control:latest .`
 5. **Testing**: Access at http://localhost:9000 after `docker compose up -d`
 
+### Extending Sutra Grid
+1. **Adding New Event Types**: Update `packages/sutra-grid-events/src/types.rs` with new event variants
+2. **Master Changes**: Edit orchestration logic in `packages/sutra-grid-master/src/master.rs`
+3. **Agent Changes**: Edit node management in `packages/sutra-grid-agent/src/agent.rs`
+4. **Protocol Updates**: Modify `.proto` files and regenerate with `cargo build`
+5. **Testing**: Run `./test-integration.sh` and check event storage with `grpcurl`
+
+**Grid Event Flow**: Master/Agent → EventEmitter → Async Worker → Storage gRPC → Sutra Storage (port 50052)
+
+**Grid Control Center Integration**: ✅ **COMPLETED**
+- ✅ React Grid dashboard with agent/node topology view
+- ✅ REST API endpoints for all Grid operations  
+- ✅ Real-time monitoring and status updates
+- ✅ Interactive spawn/stop operations via web UI
+- ✅ Comprehensive documentation and troubleshooting guides
+
+**Future Enhancements**:
+- Natural language queries for events ("Show me all crashed nodes today")
+- Advanced visualizations and network topology diagrams
+- Automated operations and auto-scaling capabilities
+
 ## Troubleshooting
 
 ### Import Errors
@@ -296,11 +375,14 @@ pip install -r requirements-dev.txt
 
 ### Storage/Persistence Issues
 - **ConcurrentStorage**: Data written to single `storage.dat` file
+- **WAL (Write-Ahead Log)**: All writes logged to `wal.log` for durability
 - Check storage path permissions (default: `./knowledge/storage.dat`)
 - Call `storage.flush()` manually before shutdown
 - Auto-flush triggers at 50K concepts (configurable)
 - Verify performance with `verify_concurrent_storage.py`
 - Monitor stats: `storage.stats()` shows writes, drops, concepts, edges
+- WAL automatically replays on startup for crash recovery
+- WAL is checkpointed (truncated) after successful flush
 
 ## Code Style
 

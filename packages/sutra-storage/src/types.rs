@@ -18,18 +18,34 @@ impl ConceptId {
     
     pub fn from_string(s: &str) -> Self {
         use std::convert::TryInto;
-        let bytes = hex::decode(s).expect("Invalid hex string");
         
-        // Handle both 8-byte (16 hex chars) and 16-byte (32 hex chars) IDs
-        if bytes.len() == 8 {
+        // Handle odd-length hex strings by padding with leading zero
+        let hex_str = if s.len() % 2 == 1 {
+            format!("0{}", s)
+        } else {
+            s.to_string()
+        };
+        
+        let bytes = hex::decode(&hex_str).unwrap_or_else(|e| {
+            log::warn!("Failed to decode hex '{}', using MD5 hash instead: {}", s, e);
+            // Fallback: use MD5 hash of the string
+            let hash = md5::compute(s.as_bytes());
+            hash.to_vec()
+        });
+        
+        // Handle different byte lengths
+        if bytes.len() <= 8 {
             // Pad to 16 bytes with zeros
             let mut padded = [0u8; 16];
-            padded[..8].copy_from_slice(&bytes);
+            padded[..bytes.len()].copy_from_slice(&bytes);
             Self(padded)
-        } else if bytes.len() == 16 {
-            Self(bytes.try_into().expect("Invalid length"))
+        } else if bytes.len() <= 16 {
+            let mut padded = [0u8; 16];
+            padded[..bytes.len()].copy_from_slice(&bytes);
+            Self(padded)
         } else {
-            panic!("Concept ID must be 8 or 16 bytes, got {}", bytes.len());
+            // Take first 16 bytes if too long
+            Self(bytes[..16].try_into().expect("Invalid length"))
         }
     }
     

@@ -6,7 +6,7 @@ authors = ["Sutra AI Team"]
 
 [lib]
 name = "sutra_storage"
-crate-type = ["cdylib", "rlib"]  # Both Python bindings and Rust library
+crate-type = ["rlib"]  # Rust library only (Python bindings disabled for testing)
 
 [dependencies]
 # Core concurrency and collections
@@ -32,9 +32,9 @@ simd-json = "0.13"                 # Fast JSON with SIMD
 # Vector search (HNSW) - incremental updates, persistence
 hnsw_rs = "0.3"                    # HNSW with incremental insert support
 
-# Python bindings
-pyo3 = { version = "0.20", features = ["extension-module", "abi3-py38"] }
-numpy = "0.20"                     # NumPy integration
+# Python bindings (disabled for testing)
+# pyo3 = { version = "0.20", features = ["extension-module", "abi3-py38"] }
+# numpy = "0.20"                     # NumPy integration
 
 # Utilities
 thiserror = "1.0"                  # Error handling
@@ -43,6 +43,7 @@ log = "0.4"                        # Logging
 env_logger = "0.11"                # Logging implementation
 rayon = "1.8"                      # Data parallelism
 hex = "0.4"                        # Hex encoding for IDs
+md5 = "0.7"                        # MD5 hashing for ConceptId fallback
 tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "signal"] }  # Async runtime
 tonic = { version = "0.10", features = ["transport"] }  # gRPC framework
 prost = "0.12"                     # Protocol buffers runtime

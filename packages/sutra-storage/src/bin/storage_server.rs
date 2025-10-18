@@ -11,15 +11,12 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
 use parking_lot::RwLock;
 use tokio::signal;
 use tonic::{transport::Server, Request, Response, Status};
-use tower::ServiceBuilder;
 
-use sutra_storage::concurrent_memory::{ConcurrentMemory, ConcurrentConfig};
-use sutra_storage::types::{ConceptId, AssociationType};
+use sutra_storage::{ConcurrentMemory, ConcurrentConfig, ConceptId, AssociationType};
 
 // Generated protobuf code
 pub mod storage {
@@ -214,7 +211,7 @@ impl StorageService for StorageServer {
             edges: stats.snapshot.edge_count as u64,
             written: stats.write_log.written,
             dropped: stats.write_log.dropped,
-            pending: stats.write_log.pending,
+            pending: stats.write_log.pending as u64,
             reconciliations: stats.reconciler.reconciliations,
             uptime_seconds: self.start_time.elapsed().as_secs(),
         }))
@@ -225,6 +222,7 @@ impl StorageService for StorageServer {
         _request: Request<HealthCheckRequest>,
     ) -> Result<Response<HealthCheckResponse>, Status> {
         Ok(Response::new(HealthCheckResponse {
+            healthy: true,
             status: "healthy".to_string(),
             uptime_seconds: self.start_time.elapsed().as_secs(),
         }))
@@ -239,7 +237,7 @@ impl StorageService for StorageServer {
         match storage.flush() {
             Ok(_) => {
                 log::info!("Storage flushed to disk");
-                Ok(Response::new(FlushResponse { success: true, message: "Flushed successfully".to_string() }))
+                Ok(Response::new(FlushResponse { success: true }))
             }
             Err(e) => {
                 log::error!("Flush failed: {:?}", e);
@@ -257,7 +255,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
     
     // Parse command line arguments
-    let args: Vec<String> = std::env::args().collect();
+    let _args: Vec<String> = std::env::args().collect();
     let host = std::env::var("STORAGE_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let port = std::env::var("STORAGE_PORT").unwrap_or_else(|_| "50051".to_string());
     let storage_path = std::env::var("STORAGE_PATH").unwrap_or_else(|_| "./knowledge".to_string());
@@ -290,15 +288,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("   Health check: /health");
     log::info!("   Ready for connections!");
     
-    // Build gRPC server with middleware
-    let svc = ServiceBuilder::new()
-        // Add middleware layers here
-        .timeout(Duration::from_secs(30))
-        .service(StorageServiceServer::new(server));
-    
     // Start server with graceful shutdown
     Server::builder()
-        .add_service(svc)
+        .add_service(StorageServiceServer::new(server))
         .serve_with_shutdown(addr, shutdown_signal())
         .await?;
     

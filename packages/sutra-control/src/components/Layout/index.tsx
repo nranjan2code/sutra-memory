@@ -30,6 +30,7 @@ import { Analytics } from '../Analytics';
 import { KnowledgeGraph } from '../KnowledgeGraph';
 import { Reasoning } from '../Reasoning';
 import { Settings } from '../Settings';
+import Grid from '../Grid';
 import { ConnectionStatus } from '../ConnectionStatus';
 
 const DRAWER_WIDTH = 280;
@@ -52,6 +53,7 @@ export const Layout: React.FC = () => {
       '/analytics': 'Analytics',
       '/knowledge': 'Knowledge Graph',
       '/reasoning': 'Reasoning Engine',
+      '/grid': 'Grid Management',
       '/settings': 'Settings',
     };
     return routes[location.pathname] || 'Sutra AI Control Center';
@@ -186,6 +188,7 @@ export const Layout: React.FC = () => {
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/knowledge" element={<KnowledgeGraph />} />
                 <Route path="/reasoning" element={<Reasoning />} />
+                <Route path="/grid" element={<Grid />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

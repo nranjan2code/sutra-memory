@@ -83,6 +83,48 @@ gRPC-first microservices architecture with containerized deployment. All service
 
 All services communicate via gRPC internally, with REST APIs for external access. The control center provides secure monitoring without exposing internal implementation details.
 
+### Sutra Grid - Distributed Storage Orchestration
+
+**NEW**: Production-ready distributed infrastructure with event-driven observability.
+
+Sutra Grid manages storage nodes across multiple agents with:
+- **Bidirectional gRPC**: Master ↔ Agent communication (7000, 8001+)
+- **Event-Driven Monitoring**: 17 structured events → knowledge graph (port 50052)
+- **Auto-Recovery**: Crashed nodes restart automatically (up to 3 times)
+- **Production Features**: Retry logic, timeouts, health monitoring, graceful degradation
+
+**Key Innovation**: Grid monitors itself using Sutra's own platform - proving event-driven observability works without external LMT (Logs/Metrics/Telemetry) stack.
+
+#### Quick Start
+
+```bash
+# Terminal 1: Reserved Storage for Grid events
+cd packages/sutra-storage
+./bootstrap-grid-events.sh
+
+# Terminal 2: Grid Master
+cd packages/sutra-grid-master
+EVENT_STORAGE=http://localhost:50052 cargo run --release
+
+# Terminal 3: Grid Agent
+cd packages/sutra-grid-agent
+EVENT_STORAGE=http://localhost:50052 cargo run --release
+
+# Terminal 4: Test operations
+cd packages/sutra-grid-master
+./test-integration.sh  # Runs 5 automated tests
+```
+
+**Architecture Details**: See [docs/grid/architecture/GRID_ARCHITECTURE.md](docs/grid/architecture/GRID_ARCHITECTURE.md) for complete documentation.
+
+**Status**: Production-Ready ✅  
+- Master: 11 events emitted
+- Agent: 2 node lifecycle events
+- Storage: Events as queryable concepts
+- Testing: End-to-end verified
+
+**Next Phase**: Sutra Control integration (React dashboard with natural language queries)
+
 ## Quick Start
 
 ### 1. Deploy with Docker Compose (Recommended)

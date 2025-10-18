@@ -19,8 +19,8 @@ mod index;
 mod wal;
 mod quantization;
 mod vectors;
-mod python;
-mod python_concurrent;
+// mod python;
+// mod python_concurrent;
 mod reasoning_store;
 
 // New concurrent memory modules

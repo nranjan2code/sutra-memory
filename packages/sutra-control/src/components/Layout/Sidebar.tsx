@@ -24,6 +24,7 @@ import {
   Speed as SpeedIcon,
   Storage as StorageIcon,
   Cloud as CloudIcon,
+  GridView as GridIcon,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 
@@ -73,6 +74,13 @@ const navigationItems: NavigationItem[] = [
     icon: <ReasoningIcon />,
     path: '/reasoning',
     description: 'AI reasoning paths and queries',
+  },
+  {
+    id: 'grid',
+    label: 'Grid Management',
+    icon: <GridIcon />,
+    path: '/grid',
+    description: 'Distributed storage cluster',
   },
   {
     id: 'settings',

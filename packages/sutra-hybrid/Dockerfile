@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy storage-client for gRPC
 COPY packages/sutra-storage-client ./packages/sutra-storage-client
+# Copy NLG package (no-LLM grounded NLG)
+COPY packages/sutra-nlg ./packages/sutra-nlg
 
 # (Skipping grpcio-tools and proto generation; using checked-in generated files)
 
@@ -32,6 +34,7 @@ EOF
 # Install
 RUN pip install --no-cache-dir typing_extensions>=4.12.0 && \
     pip install --no-cache-dir --user ./packages/sutra-storage-client && \
+    pip install --no-cache-dir --user ./packages/sutra-nlg && \
     pip install --no-cache-dir --user --no-compile -r hybrid-requirements.txt && \
     find /root/.local -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
     find /root/.local -type f -name "*.pyc" -delete || true

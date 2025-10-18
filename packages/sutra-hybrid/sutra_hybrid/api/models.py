@@ -97,6 +97,9 @@ class QueryRequest(BaseModel):
     max_paths: int = Field(
         default=5, ge=1, le=50, description="Maximum reasoning paths"
     )
+    # NLG (optional) controls
+    tone: Optional[str] = Field(default=None, description="Response tone: friendly|formal|concise|regulatory")
+    moves: Optional[List[str]] = Field(default=None, description="Rhetorical moves, e.g., [define, evidence]")
 
 
 class ConfidenceBreakdown(BaseModel):

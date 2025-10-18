@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+import logging
 
 from ..engine import SutraAI
 from .models import (
@@ -29,6 +30,7 @@ from .models import (
 
 # Router for Sutra-specific endpoints
 router = APIRouter(prefix="/sutra", tags=["Sutra"])
+logger = logging.getLogger(__name__)
 
 # Global AI instance (will be injected)
 _ai_instance: Optional[SutraAI] = None
@@ -109,38 +111,76 @@ async def query(
             max_paths=request.max_paths,
         )
 
-        # Convert reasoning paths
-        reasoning_paths = [
-            ReasoningPath(
-                path=[concept for concept, _ in path.path],
-                confidence=path.confidence,
-            )
-            for path in result.reasoning_paths
-        ]
+        # Convert reasoning paths (if present)
+        converted_reasoning_paths: List[ReasoningPath] = []
+        raw_paths_for_nlg: List[dict] = []
+        if result.reasoning_paths:
+            for path in result.reasoning_paths:
+                # path is ReasoningPathDetail dataclass
+                converted_reasoning_paths.append(
+                    ReasoningPath(
+                        path=[c for c in getattr(path, "concepts", [])],
+                        confidence=getattr(path, "confidence", 0.0),
+                    )
+                )
+                raw_paths_for_nlg.append({
+                    "concepts": getattr(path, "concepts", []),
+                    "concept_ids": getattr(path, "concept_ids", []),
+                    "association_types": getattr(path, "association_types", []),
+                    "confidence": getattr(path, "confidence", 0.0),
+                    "explanation": getattr(path, "explanation", ""),
+                })
+        
+        # Optional NLG post-processing (grounded, no-LLM)
+        final_answer_text = result.answer
+        try:
+            import os
+            if os.getenv("SUTRA_NLG_ENABLED", "true").lower() == "true":
+                from sutra_nlg import NLGConfig, NLGRealizer
+                tone = request.tone or os.getenv("SUTRA_NLG_TONE", "friendly")
+                moves = request.moves or ["define", "evidence"]
+                realizer = NLGRealizer(NLGConfig(tone=tone, moves=moves))
+                final_answer_text, grounded_sentences, nlg_meta = realizer.realize(
+                    query=request.query,
+                    answer=result.answer,
+                    reasoning_paths=raw_paths_for_nlg,
+                )
+                logger.info(
+                    "NLG applied: template=%s tone=%s moves=%s evidence_count=%d",
+                    nlg_meta.get("template_id"), tone, ",".join(moves), len(nlg_meta.get("evidence_used") or []),
+                )
+        except Exception as e:
+            logger.warning("NLG failed, falling back to raw answer: %s", e)
+            final_answer_text = result.answer
 
         # Convert semantic support if available
         semantic_support = None
         if result.semantic_support:
-            semantic_support = [
-                SemanticMatch(concept=concept, similarity=similarity)
-                for concept, similarity in result.semantic_support
-            ]
+            # result.semantic_support is already list of dicts from engine
+            try:
+                semantic_support = [
+                    SemanticMatch(concept=item.get("concept_id") or item.get("concept", ""),
+                                  similarity=float(item.get("similarity", 0.0)))
+                    for item in result.semantic_support
+                ]
+            except Exception:
+                semantic_support = None
 
         # Build confidence breakdown
         confidence_breakdown = ConfidenceBreakdown(
-            graph_confidence=result.graph_confidence,
-            semantic_confidence=result.semantic_confidence,
+            graph_confidence=getattr(result, "graph_confidence", 0.0),
+            semantic_confidence=getattr(result, "semantic_confidence", 0.0),
             final_confidence=result.confidence,
         )
 
         return QueryResponse(
-            answer=result.answer,
+            answer=final_answer_text,
             confidence=result.confidence,
             confidence_breakdown=confidence_breakdown,
-            reasoning_paths=reasoning_paths,
+            reasoning_paths=converted_reasoning_paths,
             semantic_support=semantic_support,
-            explanation=result.explanation,
-            timestamp=result.timestamp.isoformat(),
+            explanation=result.explanation or "",
+            timestamp=(result.timestamp if isinstance(result.timestamp, str) else getattr(result, "timestamp", "")) or datetime.utcnow().isoformat(),
         )
 
     except Exception as e:

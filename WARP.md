@@ -58,6 +58,7 @@ gRPC-first microservices architecture with containerized deployment. All service
 - **sutra-core**: Core graph reasoning engine with concepts, associations, and multi-path plan aggregation (MPPA)
 - **sutra-storage**: Production-ready Rust storage with ConcurrentStorage (57K writes/sec, <0.01ms reads), single-file architecture, and lock-free concurrency  
 - **sutra-hybrid**: Semantic embeddings integration (SutraAI class) that combines graph reasoning with optional similarity matching
+- **sutra-nlg**: Grounded, template-driven NLG (no LLM) used by Hybrid for human-like, explainable responses
 - **sutra-api**: Production REST API with FastAPI, rate limiting, and comprehensive endpoints
 - **sutra-control**: Modern React-based control center with secure FastAPI gateway for system monitoring and management
 - **sutra-client**: Streamlit-based web interface for interactive AI queries and knowledge exploration
@@ -153,6 +154,14 @@ make check  # Runs format, lint, and test
 ### Deployment
 
 **⚡ Single Source of Truth: `./sutra-deploy.sh`**
+
+#### Hybrid + NLG (Docker)
+- Build: `docker build -f packages/sutra-hybrid/Dockerfile -t sutra-hybrid:nlg .`
+- Run: `docker run --rm -p 8001:8000 -e SUTRA_STORAGE_SERVER=storage-server:50051 -e SUTRA_NLG_ENABLED=true -e SUTRA_NLG_TONE=friendly sutra-hybrid:nlg`
+
+Environment variables:
+- `SUTRA_NLG_ENABLED` (default true) — enable grounded NLG post-processing
+- `SUTRA_NLG_TONE` — friendly|formal|concise|regulatory
 
 All deployment operations are managed through one script:
 
@@ -299,6 +308,13 @@ export PYTHONPATH=/app:$PYTHONPATH
 ```
 
 ### Reasoning Configuration
+
+### Grounded NLG Configuration (Hybrid)
+- Grounded responses only (no LLM); template-driven
+- Optional parameters on `/sutra/query`:
+  - `tone`: friendly|formal|concise|regulatory
+  - `moves`: e.g., ["define","evidence"]
+- Fallback: if NLG fails, Hybrid returns raw retrieved answer
 - **Confidence decay**: 0.85 per reasoning step
 - **Max reasoning depth**: 6 hops
 - **Consensus threshold**: 50% agreement for multi-path aggregation
@@ -332,6 +348,12 @@ The system has comprehensive testing at multiple levels:
 - **Package-specific tests**: In respective `packages/*/tests/` directories
 
 ## Common Development Tasks
+
+### Adding New NLG Templates (sutra-nlg)
+1. Add a template in `packages/sutra-nlg/sutra_nlg/templates.py` or persist as concepts in storage (future)
+2. Include tone, moves, and pattern with slots
+3. Validate via `pytest packages/sutra-nlg`
+4. Rebuild Hybrid Docker image to include changes
 
 ### Adding New Reasoning Strategies
 1. Implement in `sutra_core/reasoning/paths.py`

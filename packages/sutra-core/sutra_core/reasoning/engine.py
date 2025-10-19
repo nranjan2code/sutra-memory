@@ -305,6 +305,15 @@ class ReasoningEngine:
         self.query_count = 0
         self.learning_events = 0
         self.cache_hits = 0
+        
+        # Event emission for observability (eat your own dogfood)
+        self._event_emitter = None
+        try:
+            from ..events import EventEmitter
+            self._event_emitter = EventEmitter(self.storage, component="reasoning_engine")
+            logger.info("Event emission enabled for reasoning engine")
+        except Exception as e:
+            logger.warning(f"Event emission not available: {e}")
 
         logger.info("Sutra AI Reasoning Engine initialized with native HNSW")
 
@@ -340,6 +349,11 @@ class ReasoningEngine:
             Consensus result with answer, confidence, and explanation
         """
         self.query_count += 1
+        start_time = time.time()
+        
+        # Emit query start event
+        if self._event_emitter:
+            self._event_emitter.emit_query_start(question)
 
         # Check cache first
         if self.enable_caching:
@@ -364,21 +378,39 @@ class ReasoningEngine:
                             pass
 
         # Process query through full reasoning pipeline
-        result = self.query_processor.process_query(
-            question, num_reasoning_paths=num_reasoning_paths, **kwargs
-        )
+        try:
+            result = self.query_processor.process_query(
+                question, num_reasoning_paths=num_reasoning_paths, **kwargs
+            )
 
-        # Cache result
-        if self.enable_caching:
-            self._update_cache(question, result)
+            # Cache result
+            if self.enable_caching:
+                self._update_cache(question, result)
 
-        # Log performance
-        logger.debug(
-            f"Query processed: {result.confidence:.2f} confidence, "
-            f"{result.consensus_strength:.2f} consensus"
-        )
+            # Emit query complete event
+            duration_ms = (time.time() - start_time) * 1000
+            if self._event_emitter:
+                self._event_emitter.emit_query_complete(question, duration_ms, result.confidence)
+                
+                # Emit alerts for low confidence or high latency
+                if result.confidence < 0.3:
+                    self._event_emitter.emit_low_confidence(question, result.confidence)
+                if duration_ms > 1000:
+                    self._event_emitter.emit_high_latency(question, duration_ms)
 
-        return result
+            # Log performance
+            logger.debug(
+                f"Query processed: {result.confidence:.2f} confidence, "
+                f"{result.consensus_strength:.2f} consensus"
+            )
+
+            return result
+        except Exception as e:
+            # Emit query failed event
+            duration_ms = (time.time() - start_time) * 1000
+            if self._event_emitter:
+                self._event_emitter.emit_query_failed(question, duration_ms, str(e))
+            raise
 
     def learn(
         self,

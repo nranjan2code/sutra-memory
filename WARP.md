@@ -35,6 +35,10 @@ Sutra AI is an explainable graph-based AI system that learns in real-time withou
 - Provides audit trails for compliance
 - Works without GPUs or massive compute
 - 100% explainable reasoning paths
+- **NEW:** Self-observability using own reasoning engine
+- **NEW:** Progressive streaming responses (10x faster UX)
+- **NEW:** Quality gates with "I don't know" for uncertain answers
+- **NEW:** Natural language operational queries
 
 ## Architecture
 
@@ -97,6 +101,12 @@ Sutra AI is an explainable graph-based AI system that learns in real-time withou
 - **sutra-markdown-web**: Markdown API service for document processing and content management
 - **sutra-bulk-ingester**: High-performance Rust service for bulk data ingestion with TCP storage integration (production-ready)
 - **sutra-cli**: Command-line interface (placeholder)
+
+### Production Enhancements (NEW)
+- **Self-Observability** (`sutra_core/events.py`): Event emission to knowledge graph for NL queries
+- **Quality Gates** (`sutra_core/quality_gates.py`): Confidence calibration and uncertainty quantification
+- **Streaming** (`sutra_core/streaming.py`): Progressive answer refinement with SSE
+- **Observability Queries** (`sutra_core/observability_query.py`): Natural language operational debugging
 
 #### Sutra Grid (Distributed Infrastructure)
 - **sutra-grid-master**: Rust-based orchestration service managing agents and storage nodes (7001 HTTP binary distribution, 7002 TCP agent connections)

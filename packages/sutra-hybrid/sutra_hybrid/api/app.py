@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from ..engine import SutraAI
-from . import openai_endpoints, sutra_endpoints
+from . import openai_endpoints, sutra_endpoints, streaming_endpoints
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +44,7 @@ async def lifespan(app: FastAPI):
     # Set AI instance in endpoint modules
     openai_endpoints.set_ai_instance(_ai_instance)
     sutra_endpoints.set_ai_instance(_ai_instance)
+    streaming_endpoints.set_ai_instance(_ai_instance)
 
     logger.info("Sutra AI API started successfully")
 
@@ -140,6 +141,7 @@ def create_app(ai_instance: Optional[SutraAI] = None) -> FastAPI:
     # Include routers
     app.include_router(openai_endpoints.router)
     app.include_router(sutra_endpoints.router)
+    app.include_router(streaming_endpoints.router)
 
     # Root endpoint
     @app.get("/")

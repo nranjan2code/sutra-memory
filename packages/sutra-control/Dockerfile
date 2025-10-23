@@ -2,7 +2,7 @@
 # Client -> Python Gateway -> gRPC -> Internal Services
 
 # Stage 1: Build React frontend
-FROM sutra-base-node:latest AS frontend-builder
+FROM node:18-slim AS frontend-builder
 
 WORKDIR /build
 
@@ -18,7 +18,7 @@ RUN npm ci --silent --include=dev
 RUN npm run build
 
 # Stage 2: Python backend with built React app
-FROM sutra-base-python:latest
+FROM python:3.11-slim
 
 # System dependencies already in base image
 RUN adduser --disabled-password --gecos '' --uid 1000 sutra

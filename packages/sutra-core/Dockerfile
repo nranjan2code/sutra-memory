@@ -1,5 +1,5 @@
 # Dockerfile for Sutra Core Python Package
-FROM sutra-base-python:latest
+FROM python:3.11-slim
 
 # System dependencies already in base image
 RUN adduser --disabled-password --gecos '' --uid 1000 sutra

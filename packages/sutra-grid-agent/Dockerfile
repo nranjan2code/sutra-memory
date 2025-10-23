@@ -1,6 +1,6 @@
 # Multi-stage build for Sutra Grid Agent
 # Stage 1: Builder
-FROM sutra-base-rust:latest AS builder
+FROM rust:1.82-slim AS builder
 
 # Build dependencies already in base image
 
@@ -29,13 +29,13 @@ WORKDIR /build/sutra-grid-agent
 RUN cargo build --release --bin sutra-grid-agent
 
 # Stage 2: Runtime
-FROM sutra-base-runtime:latest
+FROM debian:bookworm-slim
 
 # Runtime dependencies already in base image
 
 # Create non-root user
-RUN addgroup -g 1000 sutra && \
-    adduser -D -u 1000 -G sutra sutra
+RUN groupadd -g 1000 sutra && \
+    useradd -m -u 1000 -g sutra sutra
 
 # Create directories for storage nodes and config
 RUN mkdir -p /data /config /storage-nodes && \

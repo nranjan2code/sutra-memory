@@ -1,19 +1,22 @@
-# Minimal Sutra Hybrid - TCP protocol orchestrator (Target: ~250-350MB)
-# Build from monorepo root: docker build -f packages/sutra-hybrid/Dockerfile .
+# Production Sutra Hybrid - Optimized Multi-Stage Build (Target: 150-200MB)
+# Build from monorepo root: docker build -f packages/sutra-hybrid/Dockerfile -t sutra-hybrid:latest .
 
-# Stage 1: Builder
-FROM sutra-base-python:latest AS builder
+# Stage 1: Builder with full toolchain
+FROM python:3.11-slim AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ make \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-
-# Build dependencies already in base image
 
 # Copy required packages
 COPY packages/sutra-storage-client-tcp ./packages/sutra-storage-client-tcp
 COPY packages/sutra-core ./packages/sutra-core
 COPY packages/sutra-nlg ./packages/sutra-nlg
 
-# Requirements
+# Requirements (minimal versions only)
 RUN cat > hybrid-requirements.txt <<EOF
 typing_extensions>=4.12.0
 numpy>=1.24.0,<2.0.0
@@ -26,39 +29,52 @@ msgpack>=1.0.0
 requests>=2.31.0
 EOF
 
-# Install
-RUN pip install --no-cache-dir typing_extensions>=4.12.0 && \
-    pip install --no-cache-dir --user ./packages/sutra-storage-client-tcp && \
-    pip install --no-cache-dir --user ./packages/sutra-core && \
-    pip install --no-cache-dir --user ./packages/sutra-nlg && \
-    pip install --no-cache-dir --user --no-compile -r hybrid-requirements.txt && \
-    find /root/.local -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
-    find /root/.local -type f -name "*.pyc" -delete || true
+# Install with aggressive cleanup
+RUN pip install --no-cache-dir --prefix=/install typing_extensions>=4.12.0 && \
+    pip install --no-cache-dir --prefix=/install ./packages/sutra-storage-client-tcp && \
+    pip install --no-cache-dir --prefix=/install ./packages/sutra-core && \
+    pip install --no-cache-dir --prefix=/install ./packages/sutra-nlg && \
+    pip install --no-cache-dir --prefix=/install --no-compile -r hybrid-requirements.txt && \
+    # Aggressive cleanup
+    find /install -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
+    find /install -type f -name "*.pyc" -delete && \
+    find /install -type f -name "*.pyo" -delete && \
+    find /install -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true && \
+    find /install -type d -name "test" -exec rm -rf {} + 2>/dev/null || true && \
+    find /install -type d -name "*.dist-info" -exec rm -rf {}/direct_url.json {} + 2>/dev/null || true && \
+    find /install -type f -name "*.so" -exec strip {} + 2>/dev/null || true && \
+    # Remove numpy tests and docs (huge)
+    rm -rf /install/lib/python*/site-packages/numpy/tests && \
+    rm -rf /install/lib/python*/site-packages/numpy/*/tests && \
+    rm -rf /install/lib/python*/site-packages/sklearn/datasets/data && \
+    rm -rf /install/lib/python*/site-packages/sklearn/datasets/descr
 
-# Stage 2: Runtime
-FROM sutra-base-python:latest
+# Stage 2: Minimal runtime (NO build tools)
+FROM python:3.11-slim
 
-# Runtime dependencies already in base image
-
-# Python dependencies in base image
+# PRODUCTION: Only runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/* /tmp/*
 
 # Create non-root user
-RUN adduser -D -u 1000 sutra
+RUN useradd -m -u 1000 sutra
 
 WORKDIR /app
 
-# Copy installed packages
-COPY --from=builder /root/.local /home/sutra/.local
+# Copy ONLY installed packages from builder
+COPY --from=builder /install /usr/local
 
 # Copy hybrid code
 COPY packages/sutra-hybrid/sutra_hybrid ./sutra_hybrid
 
+# Set ownership
+RUN chown -R sutra:sutra /app
+
 # Switch to non-root user
 USER sutra
-
-# PATH and Python path
-ENV PATH=/home/sutra/.local/bin:$PATH \
-    PYTHONPATH=/home/sutra/.local/lib/python3.11/site-packages
 
 # Expose port
 EXPOSE 8000
@@ -74,4 +90,4 @@ ENV PYTHONUNBUFFERED=1 \
     SUTRA_USE_SEMANTIC_EMBEDDINGS=true
 
 # Run FastAPI app
-CMD ["uvicorn", "sutra_hybrid.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python3", "-m", "uvicorn", "sutra_hybrid.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

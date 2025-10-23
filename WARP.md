@@ -520,39 +520,59 @@ uvicorn sutra_api.main:app --host 0.0.0.0 --port 8000
 
 ### Build and Distribution
 
-**Multi-Stage Build Process:**
-1. **Rust workspace**: `cargo build --release` (6 crates with optimized builds)
-2. **Python packages**: Editable installs via `requirements-dev.txt` (15 packages)
-3. **Frontend**: React/TypeScript with Vite (`npm run build`)
-4. **Docker images**: Multi-stage builds with production optimizations
+**⚡ Single Source of Truth: `./build-all.sh` + `./sutra-deploy.sh`**
 
+See **BUILD_AND_DEPLOY.md** for complete build and deployment guide.
+
+**Quick Build (All 9 Services):**
 ```bash
-# Build Docker images (via deployment script)
-./sutra-deploy.sh build
+# Build all Docker images (ZERO failures required)
+./build-all.sh
 
-# Manual Docker builds
-docker-compose -f docker-compose-grid.yml build
-
-# Individual service builds
-docker-compose -f docker-compose-grid.yml build storage-server
-docker-compose -f docker-compose-grid.yml build sutra-api
-
-# Rust workspace build
-cargo build --release
-
-# Python package builds
-pip install -e packages/sutra-core/
-pip install -r requirements-dev.txt
-
-# Frontend build
-cd packages/sutra-control && npm run build
+# Expected result: 9/9 services built successfully
+# - Storage Server (~166 MB)
+# - API (~275 MB)
+# - Hybrid (~531 MB)
+# - Client (~83 MB)
+# - Control Center (~387 MB)
+# - Grid Master (~148 MB)
+# - Grid Agent (~146 MB)
+# - Bulk Ingester (~245 MB)
+# - Embedding Service (~1.32 GB)
+# Total: ~3.3 GB
 ```
 
-**Build Artifacts:**
-- Docker images: `sutra-*:latest` tags
-- Rust binaries: Optimized release builds with LTO
-- Python wheels: Editable development installs
-- Frontend assets: Production React builds
+**Official Base Images (NO custom images):**
+- `python:3.11-slim` - Python runtime
+- `rust:1.82-slim` - Rust compiler (v1.82 required for indexmap compatibility)
+- `node:18-slim` - Node.js runtime
+- `nginx:alpine` - Web server
+- `debian:bookworm-slim` - Minimal Linux runtime
+
+**Build Verification:**
+```bash
+# Verify all 9 images built
+docker images | grep "^sutra" | wc -l
+# Expected: 9
+
+# Check image sizes
+docker images | grep "^sutra"
+```
+
+**Production Deployment:**
+```bash
+# Deploy complete system
+./sutra-deploy.sh up
+
+# Verify health
+./sutra-deploy.sh status
+```
+
+**See BUILD_AND_DEPLOY.md for:**
+- Complete troubleshooting guide
+- Development workflow
+- Clean rebuild procedures
+- Production requirements
 
 ## Key Components
 

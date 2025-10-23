@@ -7,7 +7,7 @@ services:
   storage-server:
     build:
       context: .
-      dockerfile: Dockerfile.test-storage
+      dockerfile: ./packages/sutra-storage/Dockerfile
     image: sutra-storage-server:latest
     container_name: sutra-storage
     ports:
@@ -39,7 +39,7 @@ services:
   grid-event-storage:
     build:
       context: .
-      dockerfile: Dockerfile.test-storage
+      dockerfile: ./packages/sutra-storage/Dockerfile
     image: sutra-storage-server:latest
     container_name: sutra-grid-events
     ports:

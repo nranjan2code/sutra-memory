@@ -205,9 +205,22 @@ Sutra Grid manages storage nodes across multiple agents with:
 
 ## Quick Start
 
+**📖 [BUILD_AND_DEPLOY.md](BUILD_AND_DEPLOY.md)** - **SINGLE SOURCE OF TRUTH** for building and deploying  
 **📖 [Full Production Guide](docs/PRODUCTION_GUIDE.md)** - Complete documentation with configuration, monitoring, API reference, best practices, and troubleshooting.
 
-### 1. Deploy with Docker (Recommended)
+### 1. Build All Services (Required)
+
+**⚡ Build all 9 services (ZERO failures accepted):**
+
+```bash
+# Build all Docker images
+./build-all.sh
+
+# Verify build (9/9 services required)
+./verify-build.sh
+```
+
+### 2. Deploy with Docker
 
 **⚡ Single command deployment:**
 
@@ -235,9 +248,9 @@ open http://localhost:8001    # Hybrid API (Streaming + NLG)
 ./sutra-deploy.sh down        # Stop all services
 ```
 
-**See [DEPLOYMENT.md](DEPLOYMENT.md) for complete documentation.**
+**See [BUILD_AND_DEPLOY.md](BUILD_AND_DEPLOY.md) for complete documentation.**
 
-### 2. Test End-to-End
+### 3. Test End-to-End
 
 ```bash
 # Run the end-to-end test
@@ -246,7 +259,7 @@ python test_direct_workflow.py
 
 This tests: Learn → Save → Reload → Query → Multi-strategy → Audit
 
-### 3. Use the API
+### 4. Use the API
 
 **Standard Query:**
 ```bash

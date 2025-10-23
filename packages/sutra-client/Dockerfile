@@ -1,6 +1,6 @@
 # Multi-stage build for Sutra Client
 # Stage 1: Builder
-FROM sutra-base-node:latest AS builder
+FROM node:18-slim AS builder
 
 WORKDIR /build
 
@@ -17,9 +17,10 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Runtime with nginx
-FROM sutra-base-nginx:latest
+FROM nginx:alpine
 
-# curl already in base image
+# Install curl for health check
+RUN apk add --no-cache curl
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/nginx.conf

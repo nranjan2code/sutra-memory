@@ -1,7 +1,11 @@
 # Multi-stage Docker build for Rust + Python bulk ingester
-FROM sutra-base-rust:latest AS rust-builder
+FROM rust:1.82-slim AS rust-builder
 
-# Build dependencies already in base image
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -15,12 +19,12 @@ COPY packages/sutra-protocol ../sutra-protocol/
 RUN cargo build --release
 
 # Python runtime stage
-FROM sutra-base-python:latest
+FROM python:3.11-slim
 
 # Runtime dependencies already in base image
 
 # Create app user
-RUN adduser -D -s /bin/bash app
+RUN useradd -m -s /bin/bash app
 
 # Set working directory
 WORKDIR /app

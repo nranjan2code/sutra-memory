@@ -1,6 +1,6 @@
 # Multi-stage build for Sutra Grid Master
 # Stage 1: Builder
-FROM sutra-base-rust:latest AS builder
+FROM rust:1.82-slim AS builder
 
 # Build dependencies already in base image
 
@@ -31,13 +31,13 @@ RUN cargo build --release --bin sutra-grid-master
 # RUN cargo build --release --bin sutra-grid-cli
 
 # Stage 2: Runtime
-FROM sutra-base-runtime:latest
+FROM debian:bookworm-slim
 
 # Runtime dependencies already in base image
 
 # Create non-root user
-RUN addgroup -g 1000 sutra && \
-    adduser -D -u 1000 -G sutra sutra
+RUN groupadd -g 1000 sutra && \
+    useradd -m -u 1000 -g sutra sutra
 
 # Create data and config directories
 RUN mkdir -p /data /config && chown -R sutra:sutra /data /config

@@ -1,48 +1,61 @@
-# Multi-stage build for Sutra Storage Server
-# Stage 1: Builder
-FROM sutra-base-rust:latest AS builder
+# Production Sutra Storage Server - Optimized Multi-Stage Build (Target: 10-15MB)
+# Build from monorepo root: docker build -f packages/sutra-storage/Dockerfile -t sutra-storage-server:latest .
 
-# Build dependencies already in base image
+# Stage 1: Builder with full Rust toolchain
+FROM rust:1.82-slim AS builder
+
+# Install build dependencies and nightly
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/* && \
+    rustup install nightly && \
+    rustup default nightly
 
 WORKDIR /build
 
 # Copy manifests
-COPY packages/sutra-storage/Cargo.toml packages/sutra-storage/Cargo.lock packages/sutra-storage/build.rs ./
+COPY packages/sutra-storage/Cargo.toml packages/sutra-storage/Cargo.lock ./
 COPY packages/sutra-storage/proto ./proto
 COPY packages/sutra-storage/src ./src
 
-# Build for release with static linking
-RUN cargo build --release --bin storage_server_simple
+# Build for release with static linking and optimization
+RUN cargo build --release --bin storage-server && \
+    strip /build/target/release/storage-server
 
-# Stage 2: Runtime
-FROM sutra-base-runtime:latest
+# Stage 2: Minimal runtime (NO build tools, NO Rust toolchain)
+FROM debian:bookworm-slim
 
-# Runtime dependencies already in base image
+# PRODUCTION: Only essential runtime libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/* /tmp/*
 
 # Create non-root user
-RUN addgroup -g 1000 sutra && \
-    adduser -D -u 1000 -G sutra sutra
+RUN groupadd -g 1000 sutra && \
+    useradd -m -u 1000 -g sutra sutra
 
 # Create data directory
 RUN mkdir -p /data && chown sutra:sutra /data
 
 WORKDIR /app
 
-# Copy binary from builder
-COPY --from=builder /build/target/release/storage_server_simple /app/storage_server
+# Copy ONLY the stripped binary from builder
+COPY --from=builder /build/target/release/storage-server /app/storage_server
 
 # Set ownership
-RUN chown -R sutra:sutra /app
+RUN chown sutra:sutra /app/storage_server && \
+    chmod +x /app/storage_server
 
 # Switch to non-root user
 USER sutra
 
-# Expose gRPC port
+# Expose TCP port
 EXPOSE 50051
 
-# Health check
+# Health check (using nc since we removed curl)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD grpc_health_probe -addr=:50051 || exit 1
+    CMD nc -z localhost 50051 || exit 1
 
 # Environment variables
 ENV RUST_LOG=info \

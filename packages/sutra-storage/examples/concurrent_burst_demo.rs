@@ -13,17 +13,18 @@ use std::time::{Duration, Instant};
 fn main() {
     println!("=== Concurrent Memory Burst Demo ===\n");
     
-    // Create concurrent memory
+    // Create concurrent memory with default adaptive config
     let config = ConcurrentConfig {
-        reconcile_interval_ms: 10,
-        memory_threshold: 10_000,
         storage_path: "./demo_storage".into(),
+        memory_threshold: 10_000,
+        vector_dimension: 768,
+        ..Default::default()
     };
     
     let memory = Arc::new(ConcurrentMemory::new(config));
     println!("✓ Concurrent memory system started");
     println!("  - Write log capacity: 100,000 entries");
-    println!("  - Reconciliation every 10ms");
+    println!("  - Adaptive reconciliation (1-100ms dynamic)");
     println!("  - Memory threshold: 10,000 concepts\n");
     
     // Simulation 1: Learning burst

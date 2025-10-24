@@ -32,12 +32,13 @@ pub mod learning_pipeline;
 mod write_log;
 mod read_view;
 mod reconciler;
+mod adaptive_reconciler; // 🔥 NEW: AI-native adaptive reconciliation
 mod concurrent_memory;
 mod mmap_store;
 mod parallel_paths;
 
 // Scalability modules
-mod hnsw_persistence;
+// mod hnsw_persistence;  // DEPRECATED - replaced by hnsw_container with USearch
 mod hnsw_container;
 mod sharded_storage;
 mod storage_trait;
@@ -72,12 +73,13 @@ pub use concurrent_memory::{ConcurrentMemory, ConcurrentConfig, ConcurrentStats,
 pub use write_log::{WriteLog, WriteEntry, WriteLogStats, WriteLogError};
 pub use read_view::{ReadView, GraphSnapshot, ConceptNode};
 pub use reconciler::{Reconciler, ReconcilerConfig, ReconcilerStats};
+pub use adaptive_reconciler::{AdaptiveReconciler, AdaptiveReconcilerConfig, AdaptiveReconcilerStats}; // 🔥 NEW
 pub use mmap_store::{MmapStore, MmapStats};
 pub use parallel_paths::{ParallelPathFinder, PathResult};
 
 // Scalability exports
-pub use hnsw_persistence::{HnswPersistence, HnswConfig, HnswStats as HnswPersistenceStats, DistanceMetric};
-pub use hnsw_container::{HnswContainer, HnswConfig as HnswContainerConfig, HnswContainerStats};
+// pub use hnsw_persistence::{HnswPersistence, HnswConfig, HnswStats as HnswPersistenceStats, DistanceMetric};  // DEPRECATED
+pub use hnsw_container::{HnswContainer, HnswConfig, HnswContainerStats};
 pub use sharded_storage::{ShardedStorage, ShardConfig, ShardMap, ShardStats, AggregatedStats};
 pub use storage_trait::LearningStorage;
 

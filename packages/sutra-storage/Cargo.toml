@@ -35,7 +35,8 @@ serde_json = "1.0"                 # JSON serialization
 simd-json = "0.13"                 # Fast JSON with SIMD
 
 # Vector search (HNSW) - incremental updates, persistence
-hnsw_rs = "0.3"                    # HNSW with incremental insert support
+# hnsw_rs = "0.3"                    # HNSW with incremental insert support (DEPRECATED - lifetime issues)
+usearch = "2.21"                   # USearch - production HNSW with true persistence
 
 # Python bindings (OPTIONAL - only for Python extension, not binary)
 pyo3 = { version = "0.20", features = ["extension-module", "abi3-py38"], optional = true }

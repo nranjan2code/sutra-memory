@@ -12,11 +12,11 @@ use crate::event_emitter::StorageEventEmitter;
 use crate::hnsw_container::{HnswContainer, HnswConfig as HnswContainerConfig};
 use crate::parallel_paths::{ParallelPathFinder, PathResult};
 use crate::read_view::{ConceptNode, ReadView};
-use crate::reconciler::{Reconciler, ReconcilerConfig, ReconcilerStats};
+use crate::adaptive_reconciler::{AdaptiveReconciler, AdaptiveReconcilerConfig, AdaptiveReconcilerStats};
 use crate::types::{AssociationRecord, AssociationType, ConceptId};
 use crate::wal::{WriteAheadLog, Operation};
 use crate::write_log::{WriteLog, WriteLogError, WriteLogStats};
-use hnsw_rs::prelude::*;
+// use hnsw_rs::prelude::*;  // DEPRECATED - using usearch via hnsw_container
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -30,7 +30,8 @@ pub struct ConcurrentConfig {
     /// Storage base path
     pub storage_path: PathBuf,
     
-    /// Reconciliation interval (milliseconds)
+    /// Reconciliation interval (milliseconds) - Deprecated: Use adaptive config instead
+    #[deprecated(note = "Use adaptive_reconciler_config for dynamic intervals")]
     pub reconcile_interval_ms: u64,
     
     /// Memory threshold before disk flush (number of concepts)
@@ -38,15 +39,19 @@ pub struct ConcurrentConfig {
     
     /// Vector dimension for HNSW index
     pub vector_dimension: usize,
+    
+    /// Adaptive reconciler configuration (AI-native self-optimizing)
+    pub adaptive_reconciler_config: AdaptiveReconcilerConfig,
 }
 
 impl Default for ConcurrentConfig {
     fn default() -> Self {
         Self {
             storage_path: PathBuf::from("./storage"),
-            reconcile_interval_ms: 10, // 10ms
+            reconcile_interval_ms: 10, // Legacy - ignored in favor of adaptive config
             memory_threshold: 50_000,
             vector_dimension: 768, // Default: EmbeddingGemma dimension
+            adaptive_reconciler_config: AdaptiveReconcilerConfig::default(),
         }
     }
 }
@@ -59,8 +64,8 @@ pub struct ConcurrentMemory {
     /// Read plane (immutable snapshots)
     read_view: Arc<ReadView>,
     
-    /// Background reconciler
-    reconciler: Reconciler,
+    /// Background reconciler (AI-native adaptive)
+    reconciler: AdaptiveReconciler,
     
     /// Vectors stored for HNSW indexing (legacy - kept for compatibility)
     vectors: Arc<RwLock<HashMap<ConceptId, Vec<f32>>>>,
@@ -141,27 +146,22 @@ impl ConcurrentMemory {
             }
         }
         
-        let reconciler_config = ReconcilerConfig {
-            reconcile_interval_ms: config.reconcile_interval_ms,
-            disk_flush_threshold: config.memory_threshold,
-            storage_path: config.storage_path.clone(),
-            ..Default::default()
-        };
-        
-        let mut reconciler = Reconciler::new(
-            reconciler_config,
-            Arc::clone(&write_log),
-            Arc::clone(&read_view),
-        );
-        
-        // Start reconciler thread immediately
-        reconciler.start();
-        
         // Initialize event emitter (reads EVENT_STORAGE env var)
         let node_id = std::env::var("STORAGE_NODE_ID")
             .unwrap_or_else(|_| format!("storage-{}", std::process::id()));
         let event_storage_addr = std::env::var("EVENT_STORAGE").ok();
         let event_emitter = StorageEventEmitter::new(node_id.clone(), event_storage_addr);
+        
+        // 🚀 PRODUCTION: Initialize adaptive reconciler (AI-native self-optimizing)
+        let mut reconciler = AdaptiveReconciler::new(
+            config.adaptive_reconciler_config.clone(),
+            Arc::clone(&write_log),
+            Arc::clone(&read_view),
+            Arc::new(event_emitter.clone()),
+        );
+        
+        // Start reconciler thread immediately
+        reconciler.start();
         
         // 🔥 PRODUCTION: Initialize HNSW container with persistence (100× faster startup)
         let hnsw_config = HnswContainerConfig {
@@ -673,8 +673,8 @@ impl ConcurrentMemory {
         self.write_log.stats()
     }
     
-    /// Get reconciler statistics
-    pub fn reconciler_stats(&self) -> ReconcilerStats {
+    /// Get adaptive reconciler statistics (AI-native metrics)
+    pub fn reconciler_stats(&self) -> AdaptiveReconcilerStats {
         self.reconciler.stats()
     }
     
@@ -744,10 +744,10 @@ pub struct SnapshotInfo {
 }
 
 /// Complete system statistics
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConcurrentStats {
     pub write_log: WriteLogStats,
-    pub reconciler: ReconcilerStats,
+    pub reconciler: AdaptiveReconcilerStats,
     pub snapshot: SnapshotInfo,
 }
 

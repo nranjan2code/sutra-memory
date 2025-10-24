@@ -4,17 +4,19 @@
 /// system to monitor storage performance metrics in real-time.
 
 use crate::types::ConceptId;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tracing::{debug, warn};
 
 /// Storage event emitter that sends metrics to Grid event storage
+#[derive(Clone)]
 pub struct StorageEventEmitter {
     node_id: String,
     event_storage_addr: Option<String>,
     sender: Option<mpsc::UnboundedSender<StorageEvent>>,
-    worker_handle: Option<JoinHandle<()>>,
+    worker_handle: Option<Arc<JoinHandle<()>>>,
 }
 
 /// Internal event representation before serialization
@@ -70,11 +72,11 @@ impl StorageEventEmitter {
         };
 
         let worker_handle = if let (Some(addr), Some(rx)) = (event_storage_addr.as_ref(), receiver) {
-            Some(tokio::spawn(Self::worker_loop(
+            Some(Arc::new(tokio::spawn(Self::worker_loop(
                 node_id.clone(),
                 addr.clone(),
                 rx,
-            )))
+            ))))
         } else {
             None
         };
@@ -297,16 +299,6 @@ impl StorageEventEmitter {
 
         debug!("Event emitter worker stopped for node {}", node_id);
     }
-
-    /// Shutdown the emitter gracefully
-    pub async fn shutdown(self) {
-        // Drop sender to signal worker to stop
-        drop(self.sender);
-
-        if let Some(handle) = self.worker_handle {
-            let _ = tokio::time::timeout(Duration::from_secs(5), handle).await;
-        }
-    }
 }
 
 impl Default for StorageEventEmitter {
@@ -325,8 +317,6 @@ mod tests {
         
         // Should not crash when no event storage configured
         emitter.emit_metrics(1000, 5000, 50000, 10, 512);
-        
-        emitter.shutdown().await;
     }
 
     #[tokio::test]
@@ -334,7 +324,5 @@ mod tests {
         let emitter = StorageEventEmitter::new("test-node".to_string(), None);
         
         emitter.emit_query_performance("semantic", 3, 10, 25, 0.85);
-        
-        emitter.shutdown().await;
     }
 }

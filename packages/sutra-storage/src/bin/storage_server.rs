@@ -7,7 +7,7 @@ use std::env;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use sutra_storage::{ConcurrentConfig, ConcurrentMemory, ShardedStorage, ShardConfig};
+use sutra_storage::{AdaptiveReconcilerConfig, ConcurrentConfig, ConcurrentMemory, ShardedStorage, ShardConfig};
 use sutra_storage::tcp_server::{StorageServer, ShardedStorageServer};
 use tracing::{info, error, warn};
 use tracing_subscriber;
@@ -35,7 +35,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse::<u16>()
         .unwrap_or(50051);
 
-    let reconcile_interval_ms = env::var("RECONCILE_INTERVAL_MS")
+    // Adaptive reconciler configuration (env vars for fine-tuning)
+    let base_interval_ms = env::var("RECONCILE_BASE_INTERVAL_MS")
         .unwrap_or_else(|_| "10".to_string())
         .parse::<u64>()
         .unwrap_or(10);
@@ -63,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("  Storage mode: {}", storage_mode);
     info!("  Storage path: {}", storage_path);
     info!("  Listen address: {}:{}", host, port);
-    info!("  Reconcile interval: {}ms", reconcile_interval_ms);
+    info!("  Base reconcile interval: {}ms (adaptive: 1-100ms)", base_interval_ms);
     info!("  Memory threshold: {} writes", memory_threshold);
     info!("  Vector dimension: {}", vector_dimension);
     if storage_mode == "sharded" {
@@ -72,6 +73,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
 
+    // Create adaptive reconciler config
+    let adaptive_config = AdaptiveReconcilerConfig {
+        base_interval_ms,
+        ..Default::default()
+    };
+
     // Initialize storage based on mode
     match storage_mode.as_str() {
         "sharded" => {
@@ -79,9 +86,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             let shard_config = ConcurrentConfig {
                 storage_path: PathBuf::from(&storage_path), // Will be overridden per shard
-                reconcile_interval_ms,
                 memory_threshold,
                 vector_dimension,
+                adaptive_reconciler_config: adaptive_config.clone(),
+                ..Default::default()
             };
             
             let config = ShardConfig {
@@ -102,7 +110,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("  Shards: {}", stats.num_shards);
             
             // Create sharded server
-            let server = Arc::new(ShardedStorageServer::new(sharded_storage));
+            let server = Arc::new(ShardedStorageServer::new(sharded_storage).await);
             
             info!("🚀 Starting SHARDED TCP server on {}", addr);
             
@@ -121,9 +129,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             let config = ConcurrentConfig {
                 storage_path: storage_path.into(),
-                reconcile_interval_ms,
                 memory_threshold,
                 vector_dimension,
+                adaptive_reconciler_config: adaptive_config,
+                ..Default::default()
             };
             
             let storage = ConcurrentMemory::new(config);
@@ -135,7 +144,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("  Sequence: {}", stats.snapshot.sequence);
             
             // Create server
-            let server = Arc::new(StorageServer::new(storage));
+            let server = Arc::new(StorageServer::new(storage).await);
             
             info!("🚀 Starting SINGLE TCP server on {}", addr);
             

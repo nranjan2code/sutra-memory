@@ -150,9 +150,15 @@ impl WriteAheadLog {
         let sequence = self.next_sequence.fetch_add(1, Ordering::SeqCst);
         let entry = LogEntry::new(sequence, operation, self.current_transaction);
         
-        // Serialize as JSON with newline delimiter
-        let json = serde_json::to_string(&entry).context("Failed to serialize entry")?;
-        writeln!(self.writer, "{}", json).context("Failed to write entry")?;
+        // Serialize as MessagePack (binary format - matches TCP protocol)
+        let bytes = rmp_serde::to_vec(&entry).context("Failed to serialize entry")?;
+        
+        // Write length prefix (4 bytes, little-endian)
+        let len_bytes = (bytes.len() as u32).to_le_bytes();
+        self.writer.write_all(&len_bytes).context("Failed to write length")?;
+        
+        // Write entry data
+        self.writer.write_all(&bytes).context("Failed to write entry")?;
         
         if self.fsync {
             self.writer.flush().context("Failed to flush")?;
@@ -213,15 +219,33 @@ impl WriteAheadLog {
     
     /// Read all entries from the log
     pub fn read_entries<P: AsRef<Path>>(path: P) -> Result<Vec<LogEntry>> {
-        let content = std::fs::read_to_string(path)
-            .context("Failed to read WAL file")?;
+        use std::io::Read;
+        
+        let mut file = File::open(path)
+            .context("Failed to open WAL file")?;
         
         let mut entries = Vec::new();
-        for line in content.lines() {
-            if line.trim().is_empty() {
-                continue;
+        
+        loop {
+            // Read length prefix (4 bytes, little-endian)
+            let mut len_buf = [0u8; 4];
+            match file.read_exact(&mut len_buf) {
+                Ok(()) => {},
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    // End of file reached
+                    break;
+                }
+                Err(e) => return Err(e).context("Failed to read length prefix"),
             }
-            let entry: LogEntry = serde_json::from_str(line)
+            let len = u32::from_le_bytes(len_buf) as usize;
+            
+            // Read entry data
+            let mut entry_buf = vec![0u8; len];
+            file.read_exact(&mut entry_buf)
+                .context("Failed to read entry data")?;
+            
+            // Deserialize from MessagePack
+            let entry: LogEntry = rmp_serde::from_slice(&entry_buf)
                 .context("Failed to deserialize WAL entry")?;
             entries.push(entry);
         }

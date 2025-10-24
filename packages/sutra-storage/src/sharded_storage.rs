@@ -275,6 +275,9 @@ mod tests {
             storage.learn_concept(id, content, Some(vector), 1.0, 0.9).unwrap();
         }
         
+        // Wait for adaptive reconciler to process all writes
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        
         let stats = storage.stats();
         assert_eq!(stats.total_concepts, 100);
         assert_eq!(stats.num_shards, 4);
@@ -310,6 +313,9 @@ mod tests {
             let vector = vec![i as f32 / 50.0; 10];
             storage.learn_concept(id, format!("C{}", i).into_bytes(), Some(vector), 1.0, 0.9).unwrap();
         }
+        
+        // Wait for adaptive reconciler to process all writes and build HNSW index
+        std::thread::sleep(std::time::Duration::from_millis(300));
         
         // Search across all shards
         let query = vec![0.5; 10];

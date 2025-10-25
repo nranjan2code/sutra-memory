@@ -30,6 +30,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         default_limit: int = 60,
         window_seconds: int = 60,
         endpoint_limits: Dict[str, int] = None,
+        trusted_proxies: list = None,
+        behind_proxy: bool = False,
     ):
         """
         Initialize rate limiting middleware.
@@ -45,6 +47,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.default_limit = default_limit
         self.window_seconds = window_seconds
         self.endpoint_limits = endpoint_limits or {}
+        self.trusted_proxies = set(trusted_proxies or [])
+        self.behind_proxy = behind_proxy
 
         # Track requests: {(ip, endpoint): [(timestamp, ...)]}
         self.request_log: Dict[Tuple[str, str], list] = defaultdict(list)
@@ -88,17 +92,37 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
     def _get_client_ip(self, request: Request) -> str:
-        """Extract client IP from request."""
-        # Check for proxy headers first
+        """
+        Extract REAL client IP from request.
+        
+        Security: Only trusts X-Forwarded-For if behind_proxy is True.
+        """
+        # Not behind proxy - use direct connection IP only
+        if not self.behind_proxy:
+            if request.client:
+                return request.client.host
+            return "unknown"
+        
+        # Behind proxy - validate X-Forwarded-For
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
-            return forwarded.split(",")[0].strip()
-
+            ips = [ip.strip() for ip in forwarded.split(",")]
+            
+            # If trusted proxies configured, take rightmost untrusted IP
+            if self.trusted_proxies:
+                for ip in reversed(ips):
+                    if ip not in self.trusted_proxies:
+                        return ip
+            else:
+                # No trusted proxies, take leftmost
+                return ips[0]
+        
+        # Fallback to X-Real-IP
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
             return real_ip
 
-        # Fallback to direct client
+        # Final fallback
         if request.client:
             return request.client.host
 

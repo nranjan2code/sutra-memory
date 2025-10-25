@@ -20,7 +20,12 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-COMPOSE_FILE="docker-compose-grid.yml"
+SECURE_MODE="${SUTRA_SECURE_MODE:-false}"  # Set SUTRA_SECURE_MODE=true for production security
+if [ "$SECURE_MODE" = "true" ]; then
+    COMPOSE_FILE="docker-compose-secure.yml"
+else
+    COMPOSE_FILE="docker-compose-grid.yml"
+fi
 PROJECT_NAME="sutra-grid"
 BUILD_TIMEOUT=600
 STARTUP_TIMEOUT=120
@@ -57,6 +62,11 @@ print_header() {
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════╗"
     echo "║       Sutra Grid Command Center v2.0 (Production)            ║"
+    if [ "$SECURE_MODE" = "true" ]; then
+        echo "║             🔒 SECURITY MODE ENABLED 🔒                      ║"
+    else
+        echo "║          ⚠️  Development Mode (No Auth) ⚠️                    ║"
+    fi
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
 }
@@ -101,6 +111,24 @@ check_prerequisites() {
     if [ ! -f "docker/haproxy.cfg" ]; then
         log_error "HAProxy config not found: docker/haproxy.cfg"
         ((missing++))
+    fi
+    
+    # Security mode prerequisites
+    if [ "$SECURE_MODE" = "true" ]; then
+        if [ ! -f "scripts/generate-secrets.sh" ]; then
+            log_error "Security script not found: scripts/generate-secrets.sh"
+            ((missing++))
+        fi
+        if [ ! -d ".secrets" ]; then
+            log_warning "Secrets not generated. Run: ./scripts/generate-secrets.sh"
+            log_info "Auto-generating secrets..."
+            if bash scripts/generate-secrets.sh; then
+                log_success "Secrets generated"
+            else
+                log_error "Failed to generate secrets"
+                ((missing++))
+            fi
+        fi
     fi
     
     if [ $missing -gt 0 ]; then

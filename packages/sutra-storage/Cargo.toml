@@ -59,6 +59,14 @@ reqwest = { version = '0.11', features = ['json'] }  # HTTP client for embedding
 regex = "1.10"                     # Pattern matching for association extraction
 once_cell = "1.19"                 # Lazy static initialization
 
+# Security and Authentication
+sha2 = "0.10"                      # SHA-256 hashing
+hmac = "0.12"                      # HMAC authentication
+base64 = "0.21"                    # Base64 encoding for tokens
+tokio-rustls = "0.24"              # TLS for TCP connections
+rustls = "0.21"                    # Rust TLS implementation
+rustls-pemfile = "1.0"             # PEM certificate parsing
+
 [dev-dependencies]
 criterion = "0.5"                  # Benchmarking
 proptest = "1.4"                   # Property-based testing

@@ -266,7 +266,7 @@ impl StorageServer {
     }
 
 /// Handle storage request
-    async fn handle_request(&self, request: StorageRequest) -> StorageResponse {
+    pub async fn handle_request(&self, request: StorageRequest) -> StorageResponse {
         use crate::types::{ConceptId, AssociationType};
 
         match request {

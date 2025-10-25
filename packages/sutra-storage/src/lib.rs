@@ -47,12 +47,17 @@ mod transaction; // 🔥 NEW: 2PC transaction coordinator for cross-shard atomic
 // Self-monitoring module (eating our own dogfood)
 mod event_emitter;
 
+// Security and authentication
+pub mod auth;
+pub mod tls;
+
 // Python bindings (OPTIONAL - conditional compilation)
 #[cfg(feature = "python-bindings")]
 mod python_concurrent;
 
 // TCP server for distributed architecture
 pub mod tcp_server;
+pub mod secure_tcp_server;
 
 pub use types::{
     ConceptId, AssociationId, AssociationType, ConceptRecord, AssociationRecord,

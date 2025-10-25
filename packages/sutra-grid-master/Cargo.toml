@@ -30,7 +30,7 @@ chrono = "0.4"
 sutra-grid-events = { path = "../sutra-grid-events" }
 
 # Binary distribution (HTTP)
-axum = "0.7"
+axum = "0.8"
 tower = "0.4"
 tower-http = { version = "0.5", features = ["fs", "trace"] }
 sha2 = "0.10"

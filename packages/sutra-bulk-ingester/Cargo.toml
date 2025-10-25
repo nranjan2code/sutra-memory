@@ -52,7 +52,7 @@ flate2 = "1.0"
 zstd = "0.13"
 
 # HTTP client for external APIs
-reqwest = { version = "0.11", features = ["json", "stream"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
 
 # Configuration
 config = "0.13"

@@ -152,31 +152,31 @@ Benefits:
 - 8GB RAM minimum (16GB recommended)
 - macOS, Linux, or Windows with WSL2
 
-### 1. Build All Services
+### 1. Deploy (Single Command)
 
 ```bash
 # Clone repository
 git clone <repository-url>
 cd sutra-models
 
-# Build all 9 Docker images
-./build-all.sh
-
-# Verify (requires 9/9 success)
-./verify-build.sh
+# Complete installation (builds + starts all services)
+./sutra-deploy.sh install
 ```
 
-### 2. Deploy
+### 2. Alternative: Manual Steps
 
 ```bash
-# First-time installation
-./sutra-deploy.sh install
+# Build images only
+./sutra-deploy.sh build
 
-# Or start existing services
+# Start services
 ./sutra-deploy.sh up
 
 # Check status
 ./sutra-deploy.sh status
+
+# Complete reset
+./sutra-deploy.sh clean
 ```
 
 ### 3. Access Services
@@ -313,9 +313,10 @@ sutra-models/
 │   ├── sutra-grid-agent/      # Node management
 │   └── ... (16 packages total)
 ├── docs/                      # Complete documentation
-├── scripts/                   # Deployment & testing scripts
-├── sutra-deploy.sh           # Main deployment script
-├── build-all.sh              # Build all services
+├── scripts/                   # Testing & validation scripts
+├── sutra-deploy.sh           # Single deployment command center
+├── QUICKSTART.md             # 2-command quick start
+├── DEPLOYMENT.md             # Complete deployment guide
 └── README.md                 # This file
 ```
 

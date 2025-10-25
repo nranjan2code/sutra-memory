@@ -373,7 +373,7 @@ impl GridEvent {
                     node_id, concept_count, edge_count, write_throughput / 1000, read_latency_us, memory_usage_mb)
             }
             GridEvent::QueryPerformance { node_id, query_type, query_depth, result_count, latency_ms, confidence, .. } => {
-                format!("Query {} on {}: type={}, depth={}, {} results, {}ms, conf={:.2}",
+                format!("Query on {}: type={}, depth={}, {} results, {}ms, conf={:.2}",
                     node_id, query_type, query_depth, result_count, latency_ms, confidence)
             }
             GridEvent::EmbeddingLatency { service_instance, batch_size, latency_ms, dimension, cache_hit, .. } => {

@@ -54,6 +54,14 @@ services:
       - STORAGE_PATH=/data
       - STORAGE_HOST=0.0.0.0
       - STORAGE_PORT=50051
+      - VECTOR_DIMENSION=768
+      # Use HA embedding service (same as main storage)
+      - SUTRA_EMBEDDING_SERVICE_URL=http://embedding-ha:8888
+      - SUTRA_EMBEDDING_TIMEOUT_SEC=30
+      - SUTRA_MIN_ASSOCIATION_CONFIDENCE=0.5
+      - SUTRA_MAX_ASSOCIATIONS_PER_CONCEPT=10
+    depends_on:
+      - embedding-ha
     networks:
       - sutra-network
     restart: unless-stopped
@@ -195,11 +203,17 @@ services:
   # EMBEDDING SERVICE HA (3 Replicas + HAProxy)
   # ============================================================================
   
-  # Embedding Service Replica 1
-  embedding-1:
+  # Embedding Service Base (builds image for HA replicas)
+  embedding-service-builder:
     build:
       context: ./packages/sutra-embedding-service
       dockerfile: Dockerfile
+    image: sutra-embedding-service:latest
+    profiles:
+      - build-only  # Only built, not started
+  
+  # Embedding Service Replica 1
+  embedding-1:
     image: sutra-embedding-service:latest
     container_name: embedding-1
     environment:
@@ -230,9 +244,6 @@ services:
   
   # Embedding Service Replica 2
   embedding-2:
-    build:
-      context: ./packages/sutra-embedding-service
-      dockerfile: Dockerfile
     image: sutra-embedding-service:latest
     container_name: embedding-2
     environment:
@@ -263,9 +274,6 @@ services:
   
   # Embedding Service Replica 3
   embedding-3:
-    build:
-      context: ./packages/sutra-embedding-service
-      dockerfile: Dockerfile
     image: sutra-embedding-service:latest
     container_name: embedding-3
     environment:
@@ -317,37 +325,6 @@ services:
       retries: 3
       start_period: 5s
   
-  # Legacy alias for backward compatibility
-  sutra-embedding-service:
-    image: alpine:latest
-    container_name: sutra-embedding-service-deprecated
-    command: |
-      sh -c 'echo "⚠️  sutra-embedding-service is deprecated. Use embedding-ha instead." && tail -f /dev/null'
-    ports:
-      - "8888:8888"
-    environment:
-      - PORT=8888
-      - EMBEDDING_MODEL=nomic-ai/nomic-embed-text-v1.5
-      - EMBEDDING_BATCH_SIZE=64
-      - EMBEDDING_MAX_WAIT_MS=50
-      - TRANSFORMERS_CACHE=/tmp/.cache/huggingface
-      - HF_HOME=/tmp/.cache/huggingface
-      - HOME=/tmp
-    networks:
-      - sutra-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8888/health').raise_for_status()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s  # Longer start period for model loading
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-        reservations:
-          memory: 2G
 
   # Sutra Hybrid (Semantic Embeddings API)
   sutra-hybrid:
@@ -364,12 +341,12 @@ services:
       - SUTRA_STORAGE_SERVER=storage-server:50051
       - SUTRA_USE_SEMANTIC_EMBEDDINGS=true
       - SUTRA_EMBEDDING_PROVIDER=service
-      - SUTRA_EMBEDDING_SERVICE_URL=http://sutra-embedding-service:8888
+      - SUTRA_EMBEDDING_SERVICE_URL=http://embedding-ha:8888
       - SUTRA_EMBEDDING_MODEL=nomic-embed-text
       - SUTRA_VECTOR_DIMENSION=768
     depends_on:
       - storage-server
-      - sutra-embedding-service
+      - embedding-ha
     networks:
       - sutra-network
     restart: unless-stopped
@@ -461,7 +438,7 @@ services:
       - RUST_LOG=info
       - SUTRA_STORAGE_MODE=server
       - SUTRA_STORAGE_SERVER=storage-server:50051
-      - SUTRA_EMBEDDING_SERVICE_URL=http://sutra-embedding-service:8888
+      - SUTRA_EMBEDDING_SERVICE_URL=http://embedding-ha:8888
       - SUTRA_GRID_MASTER=grid-master:7001
       - INGESTER_WORKERS=2
       - INGESTER_BATCH_SIZE=100

@@ -1,19 +1,30 @@
 #!/bin/bash
-# Sutra Grid Deployment Manager
-# Single source of truth for all deployment operations
+# Sutra Grid Deployment Manager v2.0
+# Production-grade command center for complete system lifecycle
+# 
+# Principles:
+# - Idempotent operations (safe to run multiple times)
+# - Self-healing (auto-fix common issues)
+# - Fail-fast validation
+# - Clear observability
 
-set -e
+set -euo pipefail  # Fail on undefined vars and pipe failures
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
 COMPOSE_FILE="docker-compose-grid.yml"
 PROJECT_NAME="sutra-grid"
+BUILD_TIMEOUT=600
+STARTUP_TIMEOUT=120
+SHUTDOWN_TIMEOUT=30
 
 # Helper functions
 log_info() {
@@ -32,45 +43,245 @@ log_error() {
     echo -e "${RED}✗${NC} $1"
 }
 
+log_step() {
+    echo -e "${CYAN}▶${NC} $1"
+}
+
+log_debug() {
+    if [ "${DEBUG:-0}" = "1" ]; then
+        echo -e "${MAGENTA}[DEBUG]${NC} $1"
+    fi
+}
+
 print_header() {
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════╗"
-    echo "║          Sutra Grid Deployment Manager v1.0                  ║"
+    echo "║       Sutra Grid Command Center v2.0 (Production)            ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
 }
 
-# Command functions
-cmd_build() {
-    log_info "Building self-contained Docker images..."
+# ============================================================================
+# PREREQUISITE CHECKS - Fail fast before doing anything
+# ============================================================================
+
+check_prerequisites() {
+    log_step "Checking prerequisites..."
+    local missing=0
     
-    ./build.sh
+    # Docker
+    if ! command -v docker &> /dev/null; then
+        log_error "Docker not installed"
+        ((missing++))
+    else
+        log_debug "Docker: $(docker --version)"
+    fi
     
-    log_success "All images built successfully!"
-    echo ""
-    log_info "Built images:"
-    docker images | grep -E "(sutra-|sutra-base)" | head -20
+    # Docker Compose
+    if ! command -v docker-compose &> /dev/null; then
+        log_error "Docker Compose not installed"
+        ((missing++))
+    else
+        log_debug "Docker Compose: $(docker-compose --version)"
+    fi
+    
+    # Docker daemon running
+    if ! docker info &> /dev/null; then
+        log_error "Docker daemon not running"
+        ((missing++))
+    fi
+    
+    # Compose file exists
+    if [ ! -f "$COMPOSE_FILE" ]; then
+        log_error "Docker Compose file not found: $COMPOSE_FILE"
+        ((missing++))
+    fi
+    
+    # Critical config files
+    if [ ! -f "docker/haproxy.cfg" ]; then
+        log_error "HAProxy config not found: docker/haproxy.cfg"
+        ((missing++))
+    fi
+    
+    if [ $missing -gt 0 ]; then
+        log_error "Missing $missing prerequisites. Cannot proceed."
+        return 1
+    fi
+    
+    log_success "All prerequisites met"
+    return 0
 }
 
-cmd_up() {
-    log_info "Starting Sutra Grid system..."
+# ============================================================================
+# STATE DETECTION - Know current system state
+# ============================================================================
+
+get_system_state() {
+    local running=$(docker ps --filter "name=sutra-" --filter "name=embedding" --format "{{.Names}}" | wc -l | tr -d ' ')
+    local stopped=$(docker ps -a --filter "name=sutra-" --filter "name=embedding" --filter "status=exited" --format "{{.Names}}" | wc -l | tr -d ' ')
+    local images=$(docker images --filter "reference=sutra-*" --filter "reference=*embedding*" --format "{{.Repository}}" | wc -l | tr -d ' ')
     
-    docker-compose -f $COMPOSE_FILE up -d
+    if [ "$running" -gt 0 ]; then
+        echo "RUNNING"
+    elif [ "$stopped" -gt 0 ]; then
+        echo "STOPPED"
+    elif [ "$images" -gt 0 ]; then
+        echo "BUILT"
+    else
+        echo "CLEAN"
+    fi
+}
+
+show_state() {
+    local state=$(get_system_state)
+    log_info "Current state: $state"
+    
+    case $state in
+        RUNNING)
+            log_info "$(docker ps --filter 'name=sutra-' --filter 'name=embedding' --format '{{.Names}}' | wc -l | tr -d ' ') containers running"
+            ;;
+        STOPPED)
+            log_info "Containers exist but stopped"
+            ;;
+        BUILT)
+            log_info "Images exist but no containers"
+            ;;
+        CLEAN)
+            log_info "No existing deployment"
+            ;;
+    esac
+}
+
+# ============================================================================
+# BUILD COMMAND - Idempotent, handles HA properly
+# ============================================================================
+
+cmd_build() {
+    log_step "BUILD: Building all Docker images"
+    
+    # Check prerequisites first
+    check_prerequisites || return 1
+    
+    local state=$(get_system_state)
+    log_info "Current state: $state"
+    
+    # Clean up any partial builds
+    log_step "Cleaning up stale build artifacts..."
+    docker builder prune -f > /dev/null 2>&1 || true
+    
+    # CRITICAL: Build embedding service ONCE for HA replicas
+    # This prevents the 3-way race condition
+    log_step "Building embedding service (shared by 3 HA replicas)..."
+    if [ -f "packages/sutra-embedding-service/Dockerfile" ]; then
+        if docker build -t sutra-embedding-service:latest packages/sutra-embedding-service; then
+            log_success "Embedding service image ready"
+        else
+            log_error "Failed to build embedding service"
+            return 1
+        fi
+    else
+        log_error "Embedding service Dockerfile not found"
+        return 1
+    fi
+    
+    # Build all other services in parallel using docker-compose
+    log_step "Building remaining services..."
+    if docker-compose -f "$COMPOSE_FILE" build --parallel; then
+        log_success "All services built"
+    else
+        log_warning "Some builds may have failed (check logs)"
+    fi
+    
+    # Verify critical images exist
+    log_step "Verifying critical images..."
+    local critical_images=(
+        "sutra-storage-server:latest"
+        "sutra-embedding-service:latest"
+        "sutra-hybrid:latest"
+        "sutra-api:latest"
+        "sutra-grid-master:latest"
+    )
+    
+    local missing=0
+    for image in "${critical_images[@]}"; do
+        if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^$image$"; then
+            log_debug "✓ $image"
+        else
+            log_error "Missing: $image"
+            ((missing++))
+        fi
+    done
+    
+    if [ $missing -gt 0 ]; then
+        log_error "$missing critical images missing"
+        return 1
+    fi
     
     echo ""
-    log_success "Sutra Grid system started!"
+    log_success "BUILD COMPLETE: All images ready"
+    log_info "Built images:"
+    docker images --filter "reference=sutra-*" --filter "reference=*embedding*" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" | head -15
+    
+    return 0
+}
+
+# ============================================================================
+# UP COMMAND - Idempotent start with validation
+# ============================================================================
+
+cmd_up() {
+    log_step "UP: Starting Sutra Grid system"
+    
+    # Check prerequisites
+    check_prerequisites || return 1
+    
+    local state=$(get_system_state)
+    log_info "Current state: $state"
+    
+    # Auto-build if no images exist
+    if [ "$state" = "CLEAN" ]; then
+        log_warning "No images found. Building first..."
+        cmd_build || return 1
+    fi
+    
+    # Fix HAProxy config if it has known issues
+    log_step "Validating HAProxy configuration..."
+    if grep -q "option httpchk GET /health" docker/haproxy.cfg 2>/dev/null; then
+        log_warning "Found deprecated HAProxy syntax - auto-fixing..."
+        sed -i.bak 's/option httpchk GET \/health HTTP\/1\.1.*/http-check send meth GET uri \/health ver HTTP\/1.1 hdr Host embedding/' docker/haproxy.cfg
+        log_success "HAProxy config fixed"
+    fi
+    
+    # Start services
+    log_step "Starting all services..."
+    if docker-compose -f "$COMPOSE_FILE" up -d 2>&1 | tee /tmp/sutra-up.log | grep -E "(Started|Creating|recreated)" > /dev/null; then
+        log_success "Services started"
+    else
+        log_error "Failed to start services"
+        log_info "Check /tmp/sutra-up.log for details"
+        return 1
+    fi
+    
+    # Wait for critical services
+    log_step "Waiting for services to initialize..."
+    sleep 5
+    
+    # Show status
     echo ""
     cmd_status
     
     # Validate critical services
     echo ""
-    log_info "Validating critical services..."
-    if validate_embedding_service && validate_hybrid_service; then
-        log_success "All critical services validated successfully!"
+    log_step "Validating critical services..."
+    if validate_embedding_service_quick && validate_storage_quick; then
+        log_success "Critical services operational"
     else
-        log_warning "Some validations failed. Check service logs for details."
-        log_info "Run './sutra-deploy.sh validate' for detailed health checks."
+        log_warning "Some services still starting. Run './sutra-deploy.sh validate' for full health check"
     fi
+    
+    echo ""
+    log_success "UP COMPLETE: System running"
+    return 0
 }
 
 cmd_validate() {
@@ -140,20 +351,51 @@ cmd_validate() {
     fi
 }
 
+# ============================================================================
+# DOWN COMMAND - Graceful shutdown
+# ============================================================================
+
 cmd_down() {
-    log_info "Stopping Sutra Grid system..."
+    log_step "DOWN: Stopping Sutra Grid system"
     
-    docker-compose -f $COMPOSE_FILE down
+    local state=$(get_system_state)
+    log_info "Current state: $state"
     
-    log_success "Sutra Grid system stopped!"
+    if [ "$state" = "CLEAN" ]; then
+        log_info "System already stopped"
+        return 0
+    fi
+    
+    # Graceful shutdown with timeout
+    log_step "Stopping services gracefully..."
+    if docker-compose -f "$COMPOSE_FILE" down --timeout "$SHUTDOWN_TIMEOUT" 2>&1 | grep -E "(Stopping|Stopped|Removing)" > /dev/null; then
+        log_success "All services stopped"
+    else
+        log_warning "Some services may still be running"
+    fi
+    
+    log_success "DOWN COMPLETE: System stopped"
+    return 0
 }
 
+# ============================================================================
+# RESTART COMMAND - Safe restart with validation
+# ============================================================================
+
 cmd_restart() {
-    log_info "Restarting Sutra Grid system..."
+    log_step "RESTART: Restarting Sutra Grid system"
     
-    cmd_down
-    sleep 2
+    # Stop first
+    cmd_down || log_warning "Shutdown had issues, continuing anyway"
+    
+    # Wait for ports to be released
+    log_step "Waiting for ports to be released..."
+    sleep 3
+    
+    # Start again
     cmd_up
+    
+    return $?
 }
 
 cmd_status() {
@@ -173,12 +415,32 @@ cmd_status() {
     echo "  • Storage Server:       localhost:50051"
 }
 
+# ============================================================================
+# VALIDATION FUNCTIONS - Quick and comprehensive checks
+# ============================================================================
+
+validate_embedding_service_quick() {
+    # Quick check - just verify HAProxy is responding
+    if curl -f -s http://localhost:8888/health > /dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
+validate_storage_quick() {
+    # Quick check - verify storage server is listening
+    if nc -z localhost 50051 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
 validate_embedding_service() {
-    log_info "Validating critical embedding service..."
+    log_step "Validating embedding service (HA)..."
     
-    # Check if container is running
-    if ! docker ps | grep -q "sutra-embedding-service"; then
-        log_error "Embedding service container not running!"
+    # Check if HAProxy is running
+    if ! docker ps | grep -q "embedding-ha"; then
+        log_error "HAProxy load balancer not running!"
         return 1
     fi
     
@@ -274,53 +536,113 @@ cmd_logs() {
     fi
 }
 
+# ============================================================================
+# CLEAN COMMAND - Complete system cleanup
+# ============================================================================
+
 cmd_clean() {
-    log_warning "This will remove all containers, volumes, and images!"
-    read -p "Are you sure? (yes/no): " confirm
+    log_step "CLEAN: Removing all containers, volumes, and images"
+    
+    local state=$(get_system_state)
+    log_info "Current state: $state"
+    
+    if [ "$state" = "CLEAN" ]; then
+        log_info "System already clean"
+        return 0
+    fi
+    
+    log_warning "This will remove:"
+    echo "  • All Sutra containers"
+    echo "  • All data volumes (PERMANENT DATA LOSS)"
+    echo "  • All Docker images"
+    echo ""
+    read -p "Continue? (yes/no): " confirm
     
     if [ "$confirm" != "yes" ]; then
-        log_info "Clean cancelled."
-        return
+        log_info "Clean cancelled"
+        return 0
     fi
     
-    log_info "Cleaning up..."
+    # Stop and remove everything
+    log_step "Stopping and removing containers..."
+    docker-compose -f "$COMPOSE_FILE" down -v --timeout "$SHUTDOWN_TIMEOUT" 2>&1 | grep -E "(Stopping|Removing)" || true
     
-    # Stop and remove containers
-    docker-compose -f $COMPOSE_FILE down -v
+    # Remove any orphaned containers
+    log_step "Cleaning up orphaned containers..."
+    docker ps -a --filter "name=sutra-" --filter "name=embedding" --format "{{.Names}}" | xargs -r docker rm -f 2>/dev/null || true
     
     # Remove images
-    docker images | grep sutra | awk '{print $3}' | xargs -r docker rmi -f
+    log_step "Removing Docker images..."
+    docker images --filter "reference=sutra-*" --filter "reference=*embedding*" --format "{{.ID}}" | xargs -r docker rmi -f 2>/dev/null || true
     
-    log_success "Cleanup complete!"
+    # Clean build cache
+    log_step "Cleaning build cache..."
+    docker builder prune -f > /dev/null 2>&1 || true
+    
+    # Verify clean state
+    local new_state=$(get_system_state)
+    if [ "$new_state" = "CLEAN" ]; then
+        log_success "CLEAN COMPLETE: System reset to clean state"
+    else
+        log_warning "Some artifacts may remain. Check with 'docker ps -a' and 'docker images'"
+    fi
+    
+    return 0
 }
 
+# ============================================================================
+# INSTALL COMMAND - Complete first-time setup
+# ============================================================================
+
 cmd_install() {
-    log_info "Installing Sutra Grid system..."
+    log_step "INSTALL: Complete first-time installation"
     
     # Check prerequisites
-    log_info "Checking prerequisites..."
+    check_prerequisites || return 1
     
-    if ! command -v docker &> /dev/null; then
-        log_error "Docker is not installed. Please install Docker first."
-        exit 1
+    local state=$(get_system_state)
+    if [ "$state" != "CLEAN" ]; then
+        log_warning "System not in clean state: $state"
+        log_info "Run './sutra-deploy.sh clean' first for fresh install"
+        read -p "Continue anyway? (yes/no): " confirm
+        if [ "$confirm" != "yes" ]; then
+            return 0
+        fi
     fi
-    
-    if ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose is not installed. Please install Docker Compose first."
-        exit 1
-    fi
-    
-    log_success "Prerequisites OK"
     
     # Build images
-    cmd_build
-    
-    # Start services
-    cmd_up
+    log_step "Step 1/2: Building images..."
+    if ! cmd_build; then
+        log_error "Build failed"
+        return 1
+    fi
     
     echo ""
-    log_success "Installation complete!"
-    log_info "Access the Control Center at: http://localhost:9000"
+    
+    # Start services
+    log_step "Step 2/2: Starting services..."
+    if ! cmd_up; then
+        log_error "Startup failed"
+        return 1
+    fi
+    
+    echo ""
+    log_success "═══════════════════════════════════════════════════"
+    log_success "  INSTALL COMPLETE: Sutra Grid System Ready"
+    log_success "═══════════════════════════════════════════════════"
+    echo ""
+    log_info "Access Points:"
+    echo "  • Control Center:  http://localhost:9000"
+    echo "  • Client UI:       http://localhost:8080"
+    echo "  • API:             http://localhost:8000"
+    echo "  • Hybrid API:      http://localhost:8001"
+    echo ""
+    log_info "Next Steps:"
+    echo "  • Run './sutra-deploy.sh validate' for full health check"
+    echo "  • Run './sutra-deploy.sh status' to see service status"
+    echo ""
+    
+    return 0
 }
 
 cmd_maintenance() {

@@ -6,7 +6,7 @@ FROM rust:1.82-slim AS builder
 
 # Install build dependencies and nightly
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev \
+    build-essential pkg-config libssl-dev \
     && rm -rf /var/lib/apt/lists/* && \
     rustup install nightly && \
     rustup default nightly

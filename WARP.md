@@ -35,7 +35,7 @@ This document provides structured guidance for AI assistants (like WARP at warp.
 - ✅ Quality gates with "I don't know" for uncertain answers
 - ✅ Natural language operational queries
 
-### Production Status (2025-10-24)
+### Production Status (2025-10-25)
 
 **✅ PRODUCTION-READY** - Storage engine grade: **A+ (95/100)**
 
@@ -44,6 +44,28 @@ This document provides structured guidance for AI assistants (like WARP at warp.
 - ✅ 57K writes/sec, <0.01ms reads maintained
 - ✅ 107 tests passed, production-grade guarantees
 - ✅ Ready for 5M-10M+ concepts with enterprise-grade durability
+- ✅ **Single-path deployment** - Zero confusion, one command center
+
+### Deployment Infrastructure v2.0 (2025-10-25)
+
+**✅ COMPLETE: Production-Grade Single Command Center**
+
+**What Changed:**
+- ✅ One command center: `sutra-deploy.sh` v2.0
+- ✅ All redundant scripts deleted (clean slate)
+- ✅ Idempotent, self-healing operations
+- ✅ Auto-fixes HA embedding configuration
+- ✅ State-aware (CLEAN/BUILT/STOPPED/RUNNING)
+- ✅ Comprehensive health validation
+
+**Quick Start:**
+```bash
+./sutra-deploy.sh clean    # Complete reset
+./sutra-deploy.sh install  # Build + start all
+./sutra-deploy.sh status   # Check health
+```
+
+**See:** `QUICKSTART.md`, `DEPLOYMENT.md`, `docs/DEPLOYMENT_INFRASTRUCTURE_V2.md`
 
 ---
 
@@ -85,13 +107,13 @@ FORBIDDEN:
 
 ```bash
 # Storage Server (docker-compose-grid.yml)
-VECTOR_DIMENSION=768                                           # MUST be 768
-SUTRA_EMBEDDING_SERVICE_URL=http://sutra-embedding-service:8888  # MUST point to service
+VECTOR_DIMENSION=768                                    # MUST be 768
+SUTRA_EMBEDDING_SERVICE_URL=http://embedding-ha:8888   # HA load balancer (REQUIRED)
 
 # Hybrid Service
-SUTRA_EMBEDDING_SERVICE_URL=http://sutra-embedding-service:8888  # MUST match storage
-SUTRA_VECTOR_DIMENSION=768                                     # MUST be 768
-SUTRA_USE_SEMANTIC_EMBEDDINGS=true                            # MUST be true
+SUTRA_EMBEDDING_SERVICE_URL=http://embedding-ha:8888   # HA load balancer (REQUIRED)
+SUTRA_VECTOR_DIMENSION=768                              # MUST be 768
+SUTRA_USE_SEMANTIC_EMBEDDINGS=true                      # MUST be true
 ```
 
 #### Verification Commands
@@ -129,7 +151,7 @@ class SutraAI:
         os.environ["SUTRA_STORAGE_MODE"] = "server"
         
         # 2. Embedding service processor FIRST (CRITICAL)
-        service_url = os.getenv("SUTRA_EMBEDDING_SERVICE_URL", "http://sutra-embedding-service:8888")
+        service_url = os.getenv("SUTRA_EMBEDDING_SERVICE_URL", "http://embedding-ha:8888")
         self.embedding_processor = EmbeddingServiceProvider(service_url=service_url)
         
         # 3. Core components
@@ -313,27 +335,45 @@ make check   # format, lint, test
 
 ### Deployment
 
-**⚡ Single Source of Truth: `./sutra-deploy.sh`**
+**⚡ Single Command Center v2.0: `./sutra-deploy.sh`**
 
+**Production Features:**
+- ✅ Idempotent (safe to run multiple times)
+- ✅ Self-healing (auto-fixes common issues)
+- ✅ State-aware (knows current system state)
+- ✅ HA-aware (handles embedding service properly)
+- ✅ Fail-fast validation
+
+**Core Commands:**
 ```bash
-# First-time installation
-./sutra-deploy.sh install
+# Complete first-time installation
+./sutra-deploy.sh install   # Build + start all services
 
-# Start all services (10-service ecosystem)
-./sutra-deploy.sh up
+# Daily operations
+./sutra-deploy.sh up         # Start services (auto-builds if needed)
+./sutra-deploy.sh down       # Stop services gracefully
+./sutra-deploy.sh restart    # Restart all services
+./sutra-deploy.sh status     # Show service status & URLs
 
-# Start with bulk ingester (11 services)
+# Maintenance
+./sutra-deploy.sh build      # Rebuild Docker images
+./sutra-deploy.sh validate   # Comprehensive health checks
+./sutra-deploy.sh logs [svc] # View logs (all or specific)
+./sutra-deploy.sh clean      # Complete system reset
+
+# Interactive
+./sutra-deploy.sh maintenance # Interactive menu
+```
+
+**Advanced:**
+```bash
+# Enable debug output
+DEBUG=1 ./sutra-deploy.sh status
+
+# Start with bulk ingester profile
 docker-compose -f docker-compose-grid.yml --profile bulk-ingester up -d
 
-# System management
-./sutra-deploy.sh status    # Check health
-./sutra-deploy.sh validate  # Health checks
-./sutra-deploy.sh logs      # View logs
-./sutra-deploy.sh restart   # Restart services
-./sutra-deploy.sh down      # Stop services
-./sutra-deploy.sh clean     # Complete cleanup
-
-# CRITICAL: Before deployment
+# Production smoke test
 ./scripts/smoke-test-embeddings.sh
 ```
 

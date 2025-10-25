@@ -96,9 +96,16 @@ class Settings(BaseSettings):
                 )
                 return limits
             except Exception as e:
-                # Fallback to simple edition on error
-                return EditionLimits(
-                    edition=Edition.SIMPLE,
+                # Fallback to simple edition on error - create proper instance
+                from dataclasses import make_dataclass
+                Limits = make_dataclass('Limits', [
+                    ('learn_per_min', int),
+                    ('reason_per_min', int),
+                    ('max_concepts', int),
+                    ('max_dataset_gb', int),
+                    ('ingest_workers', int),
+                ])
+                return Limits(
                     learn_per_min=10,
                     reason_per_min=50,
                     max_concepts=100_000,
@@ -106,12 +113,22 @@ class Settings(BaseSettings):
                     ingest_workers=2,
                 )
         else:
-            # Feature flags not available - use config values
-            return type('Limits', (), {
-                'learn_per_min': self.rate_limit_learn,
-                'reason_per_min': self.rate_limit_reason,
-                'max_concepts': self.max_concepts or 100_000,
-            })
+            # Feature flags not available - create proper instance
+            from dataclasses import make_dataclass
+            Limits = make_dataclass('Limits', [
+                ('learn_per_min', int),
+                ('reason_per_min', int),
+                ('max_concepts', int),
+                ('max_dataset_gb', int),
+                ('ingest_workers', int),
+            ])
+            return Limits(
+                learn_per_min=self.rate_limit_learn,
+                reason_per_min=self.rate_limit_reason,
+                max_concepts=self.max_concepts or 100_000,
+                max_dataset_gb=1,
+                ingest_workers=2,
+            )
 
 
 # Global settings instance

@@ -22,6 +22,7 @@ Explainable reasoning over your private domain knowledge—without frontier LLMs
 - ✅ **Adaptive Reconciliation** - Self-optimizing storage (80% CPU savings)
 - ✅ **Production Grade** - 107 tests passing, DoS protection, input validation
 - ✅ **Semantic Query API** - Advanced semantic filtering, temporal reasoning, causal/contradiction detection
+- ✅ **🔒 Dependency Management** - Comprehensive vulnerability scanning, SBOM generation, automated updates
 
 **[📖 Complete Documentation](docs/INDEX.md)** | **[🚀 Quick Start](#quick-start)** | **[📊 Benchmarks](#performance)**
 
@@ -432,6 +433,35 @@ See: **[docs/security/PRODUCTION_SECURITY_SETUP.md](docs/security/PRODUCTION_SEC
 
 ---
 
+## 🔒 Dependency Management
+
+### Comprehensive Security & Compliance
+
+**Sutra includes enterprise-grade dependency management integrated into the Control Center:**
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Vulnerability Scanning** | Multi-language (Python, Rust, Node.js) | ✅ |
+| **SBOM Generation** | CycloneDX and SPDX formats | ✅ |
+| **License Compliance** | GPL/AGPL/LGPL detection | ✅ |
+| **Automated Updates** | Dependabot + GitHub Actions | ✅ |
+| **Control Center UI** | Real-time dashboard | ✅ |
+| **Health Score** | 0-100 scoring system | ✅ |
+
+### Quick Dependency Check
+
+```bash
+# Run local scan
+./scripts/scan-dependencies.sh
+
+# Or use Control Center
+http://localhost:9000  # Navigate to Dependencies tab
+```
+
+**[Complete Dependency Management Guide →](docs/dependency-management/QUICK_START.md)**
+
+---
+
 ## Documentation
 
 ### Essential Reading
@@ -441,6 +471,7 @@ See: **[docs/security/PRODUCTION_SECURITY_SETUP.md](docs/security/PRODUCTION_SEC
 - **[API Reference](docs/api/API_REFERENCE.md)** - All endpoints documented
 - **[Architecture Overview](WARP.md)** - System design and patterns
 - **[Troubleshooting](TROUBLESHOOTING.md)** - Common issues and fixes
+- **[🔒 Dependency Management](docs/dependency-management/QUICK_START.md)** - Security & compliance
 
 ### Component Documentation
 

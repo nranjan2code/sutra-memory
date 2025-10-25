@@ -8,14 +8,14 @@ import {
   Alert,
 } from '@mui/material';
 import {
-  Workspace as SimpleIcon,
+  Category as SimpleIcon,
   Star as CommunityIcon,
   Diamond as EnterpriseIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
 import { EditionInfo } from '../../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = '/api';  // Use gateway proxy
 
 export const EditionBadge: React.FC = () => {
   const [editionInfo, setEditionInfo] = useState<EditionInfo | null>(null);

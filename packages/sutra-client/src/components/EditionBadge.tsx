@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Chip, Tooltip, Box, Typography, CircularProgress, Alert } from '@mui/material'
 import {
-  Workspace as SimpleIcon,
+  Category as SimpleIcon,
   Star as CommunityIcon,
   Diamond as EnterpriseIcon,
   Warning as WarningIcon,

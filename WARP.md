@@ -971,7 +971,67 @@ docker logs sutra-hybrid --tail 50
 
 ---
 
-## Recent Major Features
+## Dependency Management System (2025-10-25)
+
+### 🔒 Enterprise-Grade Security & Compliance
+
+**Status:** ✅ PRODUCTION-READY - Full Integration Complete
+
+**What Was Delivered:**
+
+**Control Center Integration:**
+- ✅ React dashboard with Material UI (DependencyDashboard.tsx)
+- ✅ Backend scanner service (dependency_scanner.py)
+- ✅ REST API endpoints (5 new endpoints)
+- ✅ Real-time vulnerability monitoring
+- ✅ SBOM generation (CycloneDX format)
+- ✅ Health score visualization (0-100)
+
+**CI/CD Automation:**
+- ✅ GitHub Actions workflow (dependency-security.yml)
+- ✅ Daily vulnerability scans
+- ✅ PR blocking for critical issues
+- ✅ Dependabot configuration (all ecosystems)
+- ✅ Automated PR creation for updates
+
+**Multi-Language Support:**
+- ✅ Python: pip-audit, pip-licenses
+- ✅ Rust: cargo-audit, cargo-outdated
+- ✅ Node.js: npm audit
+- ✅ Docker: Base image scanning
+- ✅ License compliance checking
+
+**Features:**
+- Parallel package scanning
+- Vulnerability aggregation by severity
+- License violation detection (GPL/AGPL/LGPL)
+- Outdated package tracking
+- Local CLI tool (scan-dependencies.sh)
+- Comprehensive reporting
+
+**Access:**
+```bash
+# Quick scan
+./scripts/scan-dependencies.sh
+
+# Control Center UI
+http://localhost:9000/dependencies
+
+# API endpoints
+GET  /api/dependencies/scan
+GET  /api/dependencies/summary
+GET  /api/dependencies/sbom
+GET  /api/dependencies/vulnerabilities
+```
+
+**Documentation:**
+- `docs/dependency-management/ARCHITECTURE.md` - System design
+- `docs/dependency-management/DESIGN.md` - Design principles
+- `docs/dependency-management/QUICK_START.md` - User guide
+
+---
+
+### Recent Major Features
 
 ### ✨ Semantic Reasoning System Complete (2025-01-26)
 
@@ -1275,6 +1335,78 @@ AdaptiveReconciler {
 
 **Test Results:** 102 tests passed ✅
 
+### Simple Edition Deployment Complete (2025-10-25)
+
+**Status:** ✅ PRODUCTION-READY - Simple Edition fully operational
+
+**What Was Fixed:**
+
+1. **Edition System Integration**
+   - ✅ Fixed API config fallback (proper dataclass instances)
+   - ✅ Edition-aware image verification in deployment script
+   - ✅ Three-tier licensing complete (Simple/Community/Enterprise)
+
+2. **Service Fixes**
+   - ✅ sutra-control: Added missing `toml` dependency
+   - ✅ sutra-client: Added `/api/edition` nginx proxy endpoint
+   - ✅ NLG service: Configured with Gemma 3 270M model
+   - ✅ bulk-ingester: Added curl for health checks
+
+3. **NLG Model Configuration**
+   - Model: `google/gemma-3-270m-it` (smallest Gemma 3)
+   - Size: 270M parameters (vs 2B for gemma-2)
+   - Auth: HuggingFace token support added
+   - Status: Healthy and loaded
+
+4. **Deployment Script Improvements**
+   - Edition-aware critical image verification
+   - Grid Master only required for Enterprise edition
+   - Simple edition: 7 containers (no HA, no Grid)
+
+**Working Services:**
+```
+✅ sutra-storage     (healthy) - Core storage engine
+✅ sutra-api        (healthy) - REST API with edition info
+✅ sutra-hybrid     (healthy) - Semantic AI
+✅ sutra-client     (healthy) - Web UI with edition badge
+✅ sutra-control    (healthy) - Control Center
+✅ nlg-single       (healthy) - Gemma 3 270M NLG
+✅ embedding-single (working) - nomic-embed-text-v1.5 (768-d)
+✅ bulk-ingester    (working) - Bulk data ingestion
+```
+
+**Verified Functionality:**
+```bash
+# Edition endpoint
+curl http://localhost:8000/edition
+# Returns: Simple edition with correct limits
+
+# Learning test
+curl -X POST http://localhost:8001/sutra/learn \
+  -d '{"text":"Test fact"}'
+# Returns: Successfully learned 1 concept
+
+# NLG health
+curl http://localhost:8889/health
+# Returns: google/gemma-3-270m-it loaded
+```
+
+**Service URLs:**
+- Client UI: http://localhost:8080
+- Control Center: http://localhost:9000
+- API: http://localhost:8000
+- Hybrid API: http://localhost:8001
+- NLG Service: http://localhost:8889
+- Embedding Service: http://localhost:8888
+
+**Files Modified:**
+- `sutra-deploy.sh` - Edition-aware verification
+- `packages/sutra-api/sutra_api/config.py` - Fixed edition limits fallback
+- `packages/sutra-control/backend/requirements.txt` - Added toml
+- `packages/sutra-client/nginx.conf` - Added /api/edition proxy
+- `packages/sutra-bulk-ingester/Dockerfile` - Added curl
+- `docker-compose-grid.yml` - Gemma 3 270M, HF token support
+
 ---
 
 ## Performance Characteristics
@@ -1311,6 +1443,6 @@ No proprietary techniques - all methods from published work.
 
 ---
 
-**Last Updated:** 2025-10-24  
-**Status:** Production-Ready  
+**Last Updated:** 2025-10-25  
+**Status:** Production-Ready - Simple Edition Deployed  
 **Documentation:** See `docs/INDEX.md` for complete documentation map

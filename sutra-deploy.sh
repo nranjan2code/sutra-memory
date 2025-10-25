@@ -335,15 +335,19 @@ cmd_build() {
         log_warning "Some builds may have failed (check logs)"
     fi
     
-    # Verify critical images exist
-    log_step "Verifying critical images..."
+    # Verify critical images exist (edition-aware)
+    log_step "Verifying critical images for ${EDITION} edition..."
     local critical_images=(
         "sutra-storage-server:latest"
         "sutra-embedding-service:latest"
         "sutra-hybrid:latest"
         "sutra-api:latest"
-        "sutra-grid-master:latest"
     )
+    
+    # Add Grid Master only for Enterprise edition
+    if [ "$EDITION" = "enterprise" ]; then
+        critical_images+=("sutra-grid-master:latest")
+    fi
     
     local missing=0
     for image in "${critical_images[@]}"; do

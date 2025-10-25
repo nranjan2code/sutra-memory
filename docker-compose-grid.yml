@@ -405,9 +405,10 @@ services:
     ports:
       - "8889:8889"  # Direct access
     environment:
-      - NLG_MODEL=${SUTRA_NLG_MODEL:-google/gemma-2-2b-it}
+      - NLG_MODEL=${SUTRA_NLG_MODEL:-google/gemma-3-270m-it}
       - INSTANCE_ID=nlg-single
       - PORT=8889
+      - HF_TOKEN=${HF_TOKEN}
     networks:
       - sutra-network
     restart: unless-stopped

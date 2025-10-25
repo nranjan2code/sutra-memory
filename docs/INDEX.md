@@ -61,6 +61,21 @@
 
 ---
 
+## Security & Compliance
+
+### Dependency Management
+- [Quick Start](dependency-management/QUICK_START.md) - Get started in 5 minutes
+- [Architecture](dependency-management/ARCHITECTURE.md) - System design
+- [Design](dependency-management/DESIGN.md) - Design principles
+- [Documentation Index](dependency-management/README.md) - All dependency docs
+
+### Security
+- [Security Overview](security/README.md) - Security documentation
+- [Production Security](security/PRODUCTION_SECURITY_SETUP.md) - Production setup
+- [Security Audit](security/SECURITY_AUDIT_REPORT.md) - Vulnerability analysis
+
+---
+
 ## Reference
 
 - [Documentation Audit](DOCUMENTATION_AUDIT_2025.md) - Complete analysis
@@ -68,4 +83,4 @@
 
 ---
 
-**Last Updated**: October 24, 2025
+**Last Updated**: October 25, 2025

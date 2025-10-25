@@ -23,6 +23,8 @@ from pydantic import BaseModel
 # from sutra_storage_client.client import StorageClient  # TODO: Add when available
 # Import Grid API integration
 from grid_api import GridManager
+# Import dependency scanner
+from dependency_scanner import DependencyScanner, PackageHealth, VulnerabilitySeverity
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -383,6 +385,170 @@ async def semantic_query_gateway(request: dict):
     except Exception as e:
         logger.error(f"Semantic query gateway failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== Dependency Management Endpoints =====
+
+@app.get("/api/dependencies/scan")
+async def scan_dependencies():
+    """Scan all packages for dependencies and vulnerabilities"""
+    try:
+        from pathlib import Path
+        project_root = Path("/app").parent.parent  # Adjust based on Docker setup
+        scanner = DependencyScanner(project_root)
+        health_reports = await scanner.scan_all_packages()
+        
+        # Convert to JSON-serializable format
+        results = {}
+        for path, health in health_reports.items():
+            results[path] = {
+                "package_type": health.package_type.value,
+                "total_dependencies": health.total_dependencies,
+                "outdated_count": health.outdated_count,
+                "vulnerable_count": health.vulnerable_count,
+                "critical_vulns": health.critical_vulns,
+                "high_vulns": health.high_vulns,
+                "last_scanned": health.last_scanned.isoformat(),
+                "dependencies": [
+                    {
+                        "name": dep.name,
+                        "version": dep.version,
+                        "latest_version": dep.latest_version,
+                        "outdated": dep.outdated,
+                        "vulnerabilities": [
+                            {
+                                "severity": vuln.severity.value,
+                                "cve": vuln.cve,
+                                "description": vuln.description,
+                                "fixed_version": vuln.fixed_version
+                            }
+                            for vuln in dep.vulnerabilities
+                        ]
+                    }
+                    for dep in health.dependencies
+                ]
+            }
+        
+        return {"packages": results}
+    except Exception as e:
+        logger.error(f"Dependency scan failed: {e}")
+        raise HTTPException(status_code=500, detail="Dependency scan failed")
+
+
+@app.get("/api/dependencies/summary")
+async def get_dependency_summary():
+    """Get summary of dependency health across all packages"""
+    try:
+        from pathlib import Path
+        project_root = Path("/app").parent.parent
+        scanner = DependencyScanner(project_root)
+        health_reports = await scanner.scan_all_packages()
+        
+        # Calculate totals
+        total_deps = 0
+        total_outdated = 0
+        total_vulnerable = 0
+        total_critical = 0
+        total_high = 0
+        package_count = len(health_reports)
+        
+        for health in health_reports.values():
+            total_deps += health.total_dependencies
+            total_outdated += health.outdated_count
+            total_vulnerable += health.vulnerable_count
+            total_critical += health.critical_vulns
+            total_high += health.high_vulns
+        
+        # Get unique dependency counts by type
+        python_deps = set()
+        rust_deps = set()
+        node_deps = set()
+        
+        for health in health_reports.values():
+            for dep in health.dependencies:
+                if dep.package_type.value == "python":
+                    python_deps.add(dep.name)
+                elif dep.package_type.value == "rust":
+                    rust_deps.add(dep.name)
+                elif dep.package_type.value == "node":
+                    node_deps.add(dep.name)
+        
+        return {
+            "summary": {
+                "total_packages": package_count,
+                "total_dependencies": total_deps,
+                "unique_python": len(python_deps),
+                "unique_rust": len(rust_deps),
+                "unique_node": len(node_deps),
+                "outdated_dependencies": total_outdated,
+                "vulnerable_dependencies": total_vulnerable,
+                "critical_vulnerabilities": total_critical,
+                "high_vulnerabilities": total_high,
+                "health_score": max(0, 100 - (total_critical * 10 + total_high * 5 + total_outdated))
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to get dependency summary: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get summary")
+
+
+@app.get("/api/dependencies/sbom")
+async def get_sbom():
+    """Generate Software Bill of Materials (SBOM)"""
+    try:
+        from pathlib import Path
+        project_root = Path("/app").parent.parent
+        scanner = DependencyScanner(project_root)
+        sbom = await scanner.generate_sbom()
+        return sbom
+    except Exception as e:
+        logger.error(f"SBOM generation failed: {e}")
+        raise HTTPException(status_code=500, detail="SBOM generation failed")
+
+
+@app.get("/api/dependencies/vulnerabilities")
+async def get_vulnerabilities(
+    severity: Optional[str] = None,
+    package_type: Optional[str] = None
+):
+    """Get all vulnerabilities, optionally filtered"""
+    try:
+        from pathlib import Path
+        project_root = Path("/app").parent.parent
+        scanner = DependencyScanner(project_root)
+        health_reports = await scanner.scan_all_packages()
+        
+        vulnerabilities = []
+        for path, health in health_reports.items():
+            for dep in health.dependencies:
+                # Filter by package type if specified
+                if package_type and dep.package_type.value != package_type:
+                    continue
+                
+                for vuln in dep.vulnerabilities:
+                    # Filter by severity if specified
+                    if severity and vuln.severity.value != severity:
+                        continue
+                    
+                    vulnerabilities.append({
+                        "package": dep.name,
+                        "version": dep.version,
+                        "package_type": dep.package_type.value,
+                        "severity": vuln.severity.value,
+                        "cve": vuln.cve,
+                        "description": vuln.description,
+                        "fixed_version": vuln.fixed_version,
+                        "package_path": path
+                    })
+        
+        # Sort by severity (critical first)
+        severity_order = {"critical": 0, "high": 1, "moderate": 2, "low": 3, "info": 4}
+        vulnerabilities.sort(key=lambda x: severity_order.get(x["severity"], 5))
+        
+        return {"vulnerabilities": vulnerabilities}
+    except Exception as e:
+        logger.error(f"Failed to get vulnerabilities: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get vulnerabilities")
 
 
 @app.websocket("/ws")

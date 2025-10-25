@@ -21,7 +21,8 @@ RUN cargo build --release
 # Python runtime stage
 FROM python:3.11-slim
 
-# Runtime dependencies already in base image
+# Install runtime dependencies including curl for health checks
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 # Create app user
 RUN useradd -m -s /bin/bash app

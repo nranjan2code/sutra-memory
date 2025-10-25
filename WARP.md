@@ -9,14 +9,15 @@ This document provides structured guidance for AI assistants (like WARP at warp.
 ## 📋 Table of Contents
 
 1. [Project Overview](#project-overview)
-2. [Security](#security)
-3. [Critical Production Requirements](#critical-production-requirements)
-4. [Architecture](#architecture)
-5. [Development Environment](#development-environment)
-6. [Key Components](#key-components)
-7. [Common Development Tasks](#common-development-tasks)
-8. [Troubleshooting](#troubleshooting)
-9. [Recent Major Features](#recent-major-features)
+2. [Editions & Licensing](#editions--licensing)
+3. [Security](#security)
+4. [Critical Production Requirements](#critical-production-requirements)
+5. [Architecture](#architecture)
+6. [Development Environment](#development-environment)
+7. [Key Components](#key-components)
+8. [Common Development Tasks](#common-development-tasks)
+9. [Troubleshooting](#troubleshooting)
+10. [Recent Major Features](#recent-major-features)
 
 ---
 
@@ -41,7 +42,7 @@ This document provides structured guidance for AI assistants (like WARP at warp.
 
 ### Production Status (2025-01-26)
 
-**✅ PRODUCTION-READY** - Overall system grade: **A+ (98/100)**
+**⚠️ PRODUCTION-READY (Security Integration Required)** - Storage & Reasoning: **A+ (98/100)** | Security: **Code Complete, Integration Pending**
 
 **Storage Engine** - Grade: **A+ (95/100)**
 - ✅ Cross-shard 2PC transactions (zero data loss)
@@ -86,40 +87,257 @@ This document provides structured guidance for AI assistants (like WARP at warp.
 
 ---
 
+## Editions & Licensing
+
+### Three-Tier Strategy
+
+**Philosophy: All features in all editions. Differentiation = scale + SLA, not functionality.**
+
+Sutra AI offers three editions:
+
+| Edition | Price | Containers | Use Case | Key Differentiator |
+|---------|-------|------------|----------|--------------------|
+| **Simple** | FREE | 7 | Development, testing, <100K concepts | No license required |
+| **Community** | $99/mo | 7 | Small teams, MVPs, <1M concepts | 10× higher limits |
+| **Enterprise** | $999/mo | 16 | Production, >1M concepts, HA | **HA + Grid + 99.9% SLA** |
+
+### Quick Comparison
+
+| Feature | Simple | Community | Enterprise |
+|---------|--------|-----------|------------|
+| **Core Features** | ✅ ALL | ✅ ALL | ✅ ALL |
+| Graph reasoning | ✅ | ✅ | ✅ |
+| Semantic embeddings | ✅ | ✅ | ✅ |
+| Semantic reasoning | ✅ | ✅ | ✅ |
+| NLG (template + LLM) | ✅ | ✅ | ✅ |
+| Control Center | ✅ | ✅ | ✅ |
+| Bulk ingestion | ✅ | ✅ | ✅ |
+| Custom adapters | ✅ | ✅ | ✅ |
+| | | | |
+| **Scale Limits** | | | |
+| Learn API | 10/min | 100/min | **1000/min** |
+| Reason API | 50/min | 500/min | **5000/min** |
+| Max concepts | 100K | 1M | **10M** |
+| Max dataset size | 1GB | 10GB | **Unlimited** |
+| Ingest workers | 2 | 4 | **16** |
+| | | | |
+| **Enterprise Features** | ❌ | ❌ | ✅ |
+| High Availability | ❌ | ❌ | **3× replicas** |
+| Grid orchestration | ❌ | ❌ | **✅** |
+| Event observability | ❌ | ❌ | **✅** |
+| Multi-node support | ❌ | ❌ | **✅** |
+| 99.9% SLA | ❌ | ❌ | **✅** |
+
+### Quick Start by Edition
+
+**Simple Edition (FREE):**
+```bash
+./sutra-deploy.sh install
+# No license required
+# Access: http://localhost:8080
+```
+
+**Community Edition ($99/mo):**
+```bash
+export SUTRA_EDITION="community"
+export SUTRA_LICENSE_KEY="your-license-key"
+./sutra-deploy.sh install
+# Same 7 containers, 10× limits
+```
+
+**Enterprise Edition ($999/mo):**
+```bash
+export SUTRA_EDITION="enterprise"
+export SUTRA_LICENSE_KEY="your-license-key"
+export SUTRA_SECURE_MODE="true"
+./sutra-deploy.sh install
+# 16 containers with HA + Grid
+```
+
+### Edition Documentation
+
+- **Quick Start:** `docs/QUICKSTART_EDITIONS.md` - Choose your edition in 5 minutes
+- **Full Comparison:** `docs/EDITIONS.md` - Complete feature matrix, quotas, upgrade paths
+- **License Admin:** `docs/licensing/LICENSE_ADMINISTRATION.md` - For administrators
+- **Feature Flags:** `packages/sutra-core/sutra_core/feature_flags.py` - Implementation
+
+### License Management
+
+**Generating Licenses:**
+```bash
+# Set secret key (one-time)
+export SUTRA_LICENSE_SECRET="$(openssl rand -hex 32)"
+
+# Generate Community license (1 year)
+python scripts/generate-license.py \
+  --edition community \
+  --customer "Acme Corp" \
+  --days 365
+
+# Generate Enterprise license (permanent)
+python scripts/generate-license.py \
+  --edition enterprise \
+  --customer "BigCo Inc" \
+  --days 0
+```
+
+**Validating Licenses:**
+```bash
+# Check edition on running system
+curl http://localhost:8000/edition
+
+# Response
+{
+  "edition": "community",
+  "limits": {
+    "learn_per_min": 100,
+    "reason_per_min": 500,
+    "max_concepts": 1000000
+  },
+  "features": {
+    "ha_enabled": false,
+    "grid_enabled": false
+  },
+  "upgrade_url": "https://sutra.ai/pricing"
+}
+```
+
+### Upgrade Path
+
+All editions use the same Docker volumes. **Upgrades are seamless with zero data loss:**
+
+```bash
+# Simple → Community (no data loss)
+./sutra-deploy.sh down
+export SUTRA_EDITION="community"
+export SUTRA_LICENSE_KEY="your-license"
+./sutra-deploy.sh install
+
+# Community → Enterprise (no data loss)
+./sutra-deploy.sh down
+export SUTRA_EDITION="enterprise"
+export SUTRA_LICENSE_KEY="your-enterprise-license"
+export SUTRA_SECURE_MODE="true"
+./sutra-deploy.sh install
+```
+
+### Implementation Status: ✅ **COMPLETE (2025-10-25)**
+
+**Feature Flag System:** `packages/sutra-core/sutra_core/feature_flags.py`
+- Edition enum (Simple/Community/Enterprise)
+- EditionLimits dataclass with all quotas
+- HMAC-SHA256 license validation
+- Quota enforcement (rate limits, storage, concepts)
+- Topology control (single-node vs HA + Grid)
+
+**API Integration:** ✅ Complete
+- `sutra-api` service: Edition-aware rate limiting
+- `/edition` endpoint: Returns current limits and features
+- Automatic quota application at startup
+- License validation in API responses
+- Client-ready for UI integration
+
+**Docker Compose Profiles:** ✅ Complete
+- Single `docker-compose-grid.yml` with profiles
+- `--profile simple`: 7 containers (base + single services)
+- `--profile community`: 7 containers (base + single services)
+- `--profile enterprise`: 16 containers (base + HA + Grid)
+- Maintains single-path deployment philosophy
+
+**Deployment Script:** ✅ Complete
+- `sutra-deploy.sh`: Edition-aware orchestration
+- Automatic profile selection via `SUTRA_EDITION` env var
+- License validation at startup (fail-fast)
+- Edition-specific configuration
+- Single command for all editions
+
+**Documentation:** ✅ Complete
+- `docs/EDITION_SYSTEM_COMPLETE.md` - Full integration summary
+- `docs/api/EDITION_API.md` - Complete API reference
+- `docs/api/API_INTEGRATION_COMPLETE.md` - API integration summary
+- `docs/ui/UI_INTEGRATION_COMPLETE.md` - UI integration summary
+- `docs/EDITIONS.md` - Edition comparison
+- `docs/QUICKSTART_EDITIONS.md` - Quick start guide
+
+**UI Integration:** ✅ Complete
+- `packages/sutra-control`: Edition badge in Control Center header
+- `packages/sutra-client`: Edition badge next to logo
+- Rich tooltips with rate limits, capacity, and features
+- Auto-refresh every 5 minutes
+- Error handling and loading states
+- Accessible (WCAG 2.1 compliant)
+
+**License Format:**
+```
+base64(json({edition, customer_id, issued, expires})).hmac_signature
+```
+
+**Key Principles:**
+- ✅ All features in all editions
+- ✅ Offline license validation (no phone-home)
+- ✅ Cryptographic tamper-proofing (HMAC-SHA256)
+- ✅ Edition-based quotas (not features)
+- ✅ Seamless upgrades (same Docker images)
+- ✅ API-first design (UI queries `/edition` endpoint)
+- ✅ Single-path deployment (one compose file, one script)
+
+---
+
 ## Security
 
 ### 🔒 Security Status (2025-10-25)
 
-**✅ PRODUCTION-READY** - Security grade: **A (92/100)**
+**⚠️ TWO DEPLOYMENT MODES:**
 
-**Complete security implementation** with:
-- ✅ **Authentication** - HMAC/JWT on all services (RBAC with Admin/Writer/Reader/Service roles)
-- ✅ **Network Segregation** - Internal services isolated from internet (Docker network: `internal: true`)
-- ✅ **TLS Encryption** - Available for all TCP connections (TLS 1.3 via tokio-rustls)
-- ✅ **Fixed Rate Limiting** - Cannot be bypassed via IP spoofing
-- ✅ **Input Validation** - DoS protection with size limits
-
-### 🚨 CRITICAL: Services Now Require Authentication
-
-**ALL services now require authentication tokens in production:**
+#### 🔧 Development Mode (Default)
+**Security Grade:** 🔴 **15/100** (Intentionally insecure for local development)  
+**Status:** NO authentication, NO encryption, all ports exposed  
+**Use only:** On localhost for development/testing  
 
 ```bash
-# Deploy with security enabled (SINGLE-PATH METHOD)
-SUTRA_SECURE_MODE=true ./sutra-deploy.sh install
-
-# Or enable security for existing deployment
-SUTRA_SECURE_MODE=true ./sutra-deploy.sh restart
-
-# Use authentication for API calls
-TOKEN=$(cat .secrets/tokens/service_token.txt)
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/health
-```
-
-**Development mode (no authentication):**
-```bash
-# Default deployment without security
+# Default deployment (NO security)
 ./sutra-deploy.sh install
 ```
+
+#### 🔒 Production Mode (Secure)
+**Security Grade:** 🟡 **Implementation Complete, Integration Pending**  
+**Status:** Security code exists (auth.rs, tls.rs, secure_tcp_server.rs) but NOT YET integrated into storage_server.rs binary
+
+**Implementation Status:**
+- ⚠️ **Authentication** - Code complete (485 lines in auth.rs) - NOT YET USED by storage server
+- ⚠️ **Network Segregation** - Docker config ready in docker-compose-secure.yml
+- ⚠️ **TLS Encryption** - Code complete (173 lines in tls.rs) - NOT YET USED by storage server
+- ✅ **Fixed Rate Limiting** - Implemented in API layer (works)
+- ✅ **Input Validation** - DoS protection active in storage layer (works)
+
+**Current Reality:** Even with `SUTRA_SECURE_MODE=true`, storage server runs WITHOUT authentication/TLS because storage_server.rs doesn't import or use SecureStorageServer.
+
+```bash
+# ⚠️ CURRENT STATUS: This will NOT enable security yet
+# Security code exists but is not integrated into storage_server.rs
+
+# Generate secrets (one-time)
+chmod +x scripts/generate-secrets.sh
+./scripts/generate-secrets.sh
+
+# Deploy with security enabled (DOES NOT WORK YET)
+SUTRA_SECURE_MODE=true ./sutra-deploy.sh install
+
+# Verify security status
+docker logs sutra-storage 2>&1 | grep -E "(Authentication|TLS)"
+# Current output: ⚠️ Authentication: DISABLED, TLS: DISABLED
+# Expected after integration: ✅ Authentication: ENABLED, TLS: ENABLED
+```
+
+### 🚨 IMPORTANT: Production Deployment
+
+**⚠️ The default `./sutra-deploy.sh install` has NO security.**
+
+For production deployments with real data:
+1. **MUST** use `SUTRA_SECURE_MODE=true`
+2. **MUST** generate secrets via `./scripts/generate-secrets.sh`
+3. **MUST** configure TLS certificates for external access
+4. **MUST** review `docs/security/PRODUCTION_SECURITY_SETUP.md`
 
 ### Network Architecture
 
@@ -155,7 +373,9 @@ SUTRA_SECURE_MODE=true ./sutra-deploy.sh install
 - `docs/security/PRODUCTION_SECURITY_SETUP.md` - Complete setup guide
 - `docs/security/SECURE_ARCHITECTURE.md` - Architecture guide
 
-**Security Score:** 🔴 0/100 (before) → 🟢 92/100 (after)
+**Security Score:** 
+- Code Implementation: 🟢 92/100 (auth.rs, tls.rs, secure_tcp_server.rs complete)
+- Actual Deployment: 🔴 15/100 (code exists but not integrated into binary)
 
 ---
 

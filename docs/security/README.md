@@ -130,8 +130,10 @@ This directory contains comprehensive security documentation for Sutra Models, i
 
 ### 🔒 Security Score
 
-**Before:** 🔴 0/100 (Critical vulnerabilities)  
-**After:** 🟢 92/100 (Production-ready)
+**Before:** 🔴 0/100 (No security code)  
+**Code Implementation:** 🟢 92/100 (auth.rs, tls.rs, secure_tcp_server.rs complete)  
+**Actual Deployment:** 🔴 15/100 (code NOT integrated into storage_server.rs)  
+**After Integration:** 🟢 92/100 (Will be production-ready)
 
 ### 📊 Services Protected
 
@@ -155,13 +157,16 @@ This directory contains comprehensive security documentation for Sutra Models, i
 
 ### Production Deployment
 
+⚠️ **CRITICAL:** Security code exists but is NOT yet integrated into storage_server.rs binary.
+
 ```bash
-# One command - does everything (auto-generates secrets, builds, deploys)
+# One command - sets env vars but security NOT active yet
 SUTRA_SECURE_MODE=true ./sutra-deploy.sh install
 
-# Verify security mode
-./sutra-deploy.sh status
-# Expected: 🔒 SECURITY MODE ENABLED 🔒
+# Verify security status
+docker logs sutra-storage | grep -E "(Authentication|TLS)"
+# Current: ⚠️ Authentication: DISABLED, TLS: DISABLED
+# Reason: storage_server.rs doesn't use SecureStorageServer
 ```
 
 ### Development Deployment

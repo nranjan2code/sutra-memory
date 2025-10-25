@@ -4,6 +4,7 @@ import type {
   LearnResponse,
   MetricsResponse,
   HealthResponse,
+  EditionResponse,
 } from '../types/api'
 
 const API_BASE = '/api'
@@ -46,6 +47,14 @@ export const sutraApi = {
    */
   async getHealth(): Promise<HealthResponse> {
     const { data } = await api.get('/health')
+    return data
+  },
+
+  /**
+   * Get edition information
+   */
+  async getEdition(): Promise<EditionResponse> {
+    const { data } = await api.get('/edition')
     return data
   },
 

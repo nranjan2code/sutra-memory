@@ -187,14 +187,47 @@ Benefits:
 - 8GB RAM minimum (16GB recommended)
 - macOS, Linux, or Windows with WSL2
 
-### 1. Deploy (Single Command)
+### ⚠️ IMPORTANT: Choose Your Deployment Mode
+
+**Sutra has TWO deployment modes:** **[Complete Guide →](DEPLOYMENT_MODES.md)**
+
+#### 🔧 Development Mode (Default)
+**For:** Local development, testing, learning  
+**Security:** ⚠️ NO authentication, NO encryption  
+**DO NOT USE:** With sensitive data or network-accessible deployments
+
+#### 🔒 Production Mode Status
+**Security Code:** ✅ Complete (auth.rs, tls.rs, secure_tcp_server.rs)  
+**Integration:** ⚠️ NOT YET integrated into storage_server.rs binary  
+**Current Status:** Even `SUTRA_SECURE_MODE=true` runs WITHOUT security
+
+```bash
+# Development deployment (NO security)
+./sutra-deploy.sh install
+```
+
+#### 🔒 Production Mode (Secure)
+**For:** Production deployments, regulated industries, real data  
+**Security:** ✅ HMAC/JWT auth, ✅ TLS 1.3 encryption, ✅ RBAC, ✅ Network isolation  
+**Required for:** Healthcare, finance, legal, any public deployment
+
+```bash
+# Production deployment (WITH security)
+SUTRA_SECURE_MODE=true ./sutra-deploy.sh install
+
+# See: docs/security/QUICK_START_SECURITY.md for complete setup
+```
+
+**📖 Read [DEPLOYMENT_MODES.md](DEPLOYMENT_MODES.md) for detailed comparison and compliance information.**
+
+### 1. Deploy (Development Mode)
 
 ```bash
 # Clone repository
 git clone <repository-url>
 cd sutra-models
 
-# Complete installation (builds + starts all services)
+# Development installation (NO security - localhost only)
 ./sutra-deploy.sh install
 ```
 
@@ -293,6 +326,50 @@ curl -X POST http://localhost:8000/api/semantic/contradictions \
 ```
 
 **[Complete Quick Start Guide →](docs/guides/QUICK_START.md)**
+
+---
+
+## 🔒 Production Deployment
+
+**⚠️ The default deployment mode has NO security for development convenience.**
+
+For production deployments:
+
+### 1. Quick Production Deploy
+
+```bash
+# Generate secrets (one-time)
+chmod +x scripts/generate-secrets.sh
+./scripts/generate-secrets.sh
+
+# Deploy with security enabled
+SUTRA_SECURE_MODE=true ./sutra-deploy.sh install
+
+# Verify security is active
+docker logs sutra-storage 2>&1 | grep "Authentication: ENABLED"
+```
+
+### 2. Security Features (Production Mode Only)
+
+| Feature | Development Mode | Production Mode |
+|---------|-----------------|----------------|
+| **Authentication** | ❌ None | ✅ HMAC-SHA256/JWT |
+| **Encryption** | ❌ Plaintext | ✅ TLS 1.3 |
+| **RBAC** | ❌ N/A | ✅ Admin/Writer/Reader/Service |
+| **Network Isolation** | ❌ All ports exposed | ✅ Internal services isolated |
+| **Rate Limiting** | ⚠️ Bypassable | ✅ Validated |
+| **Audit Logging** | ❌ None | ✅ Complete trails |
+
+### 3. Complete Production Setup
+
+See: **[docs/security/PRODUCTION_SECURITY_SETUP.md](docs/security/PRODUCTION_SECURITY_SETUP.md)**
+
+**Includes:**
+- Certificate management (Let's Encrypt)
+- Secrets management (HashiCorp Vault)
+- Docker Swarm/Kubernetes deployment
+- Compliance requirements (HIPAA, SOC 2, GDPR)
+- Monitoring and alerting
 
 ---
 

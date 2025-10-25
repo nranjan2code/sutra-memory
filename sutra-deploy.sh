@@ -20,6 +20,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
+EDITION="${SUTRA_EDITION:-simple}"  # simple | community | enterprise
 SECURE_MODE="${SUTRA_SECURE_MODE:-false}"  # Set SUTRA_SECURE_MODE=true for production security
 if [ "$SECURE_MODE" = "true" ]; then
     COMPOSE_FILE="docker-compose-secure.yml"
@@ -30,6 +31,9 @@ PROJECT_NAME="sutra-grid"
 BUILD_TIMEOUT=600
 STARTUP_TIMEOUT=120
 SHUTDOWN_TIMEOUT=30
+
+# Edition-specific profile
+PROFILE="$EDITION"
 
 # Helper functions
 log_info() {
@@ -61,14 +65,122 @@ log_debug() {
 print_header() {
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════╗"
-    echo "║       Sutra Grid Command Center v2.0 (Production)            ║"
+    case $EDITION in
+        simple)
+            echo "║    Sutra AI - Simple Edition (FREE) v3.0                     ║"
+            echo "║    Single-node • No HA • 7 containers                        ║"
+            ;;
+        community)
+            echo "║    Sutra AI - Community Edition (\$99/mo) v3.0                ║"
+            echo "║    Single-node • 10× limits • 7 containers                   ║"
+            ;;
+        enterprise)
+            echo "║    Sutra AI - Enterprise Edition (\$999/mo) v3.0              ║"
+            echo "║    HA + Grid • Production-ready • 16 containers              ║"
+            ;;
+    esac
     if [ "$SECURE_MODE" = "true" ]; then
         echo "║             🔒 SECURITY MODE ENABLED 🔒                      ║"
-    else
-        echo "║          ⚠️  Development Mode (No Auth) ⚠️                    ║"
     fi
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
+}
+
+# ============================================================================
+# EDITION CONFIGURATION - Set environment variables based on edition
+# ============================================================================
+
+set_edition_config() {
+    log_step "Configuring ${EDITION} edition..."
+    
+    case $EDITION in
+        simple)
+            # Simple Edition (FREE) - Single-node, low limits
+            export SUTRA_EDITION="simple"
+            export SUTRA_EMBEDDING_URL="http://embedding-single:8888"
+            export SUTRA_NLG_URL="http://nlg-single:8889"
+            export SUTRA_STORAGE_MODE="single"
+            export SUTRA_NUM_SHARDS="1"
+            export SUTRA_INGEST_WORKERS="2"
+            export SUTRA_GRID_MASTER_URL=""
+            
+            log_info "Edition: Simple (FREE)"
+            log_info "  • 7 containers (single-node)"
+            log_info "  • 10 learn/min, 50 reason/min"
+            log_info "  • 100K max concepts"
+            log_info "  • No license required"
+            ;;
+            
+        community)
+            # Community Edition ($99/mo) - Single-node, higher limits
+            export SUTRA_EDITION="community"
+            export SUTRA_EMBEDDING_URL="http://embedding-single:8888"
+            export SUTRA_NLG_URL="http://nlg-single:8889"
+            export SUTRA_STORAGE_MODE="single"
+            export SUTRA_NUM_SHARDS="1"
+            export SUTRA_INGEST_WORKERS="4"
+            export SUTRA_GRID_MASTER_URL=""
+            
+            # Validate license
+            if [ -z "${SUTRA_LICENSE_KEY:-}" ]; then
+                log_error "Community edition requires SUTRA_LICENSE_KEY"
+                echo ""
+                log_info "Get your license at: https://sutra.ai/pricing"
+                echo ""
+                return 1
+            fi
+            
+            log_success "Edition: Community (\$99/mo)"
+            log_info "  • 7 containers (single-node)"
+            log_info "  • 100 learn/min, 500 reason/min"
+            log_info "  • 1M max concepts"
+            log_info "  • License validated"
+            ;;
+            
+        enterprise)
+            # Enterprise Edition ($999/mo) - HA + Grid, highest limits
+            export SUTRA_EDITION="enterprise"
+            export SUTRA_EMBEDDING_URL="http://embedding-ha:8888"
+            export SUTRA_NLG_URL="http://nlg-ha:8889"
+            export SUTRA_STORAGE_MODE="sharded"
+            export SUTRA_NUM_SHARDS="4"
+            export SUTRA_INGEST_WORKERS="16"
+            export SUTRA_GRID_MASTER_URL="http://grid-master:7001"
+            
+            # Validate license
+            if [ -z "${SUTRA_LICENSE_KEY:-}" ]; then
+                log_error "Enterprise edition requires SUTRA_LICENSE_KEY"
+                echo ""
+                log_info "Get your license at: https://sutra.ai/pricing"
+                echo ""
+                return 1
+            fi
+            
+            # Enforce security for enterprise
+            if [ "$SECURE_MODE" != "true" ]; then
+                log_warning "Enterprise edition requires SUTRA_SECURE_MODE=true"
+                log_info "Setting SECURE_MODE=true automatically"
+                export SUTRA_SECURE_MODE="true"
+                SECURE_MODE="true"
+            fi
+            
+            log_success "Edition: Enterprise (\$999/mo)"
+            log_info "  • 16 containers (HA + Grid)"
+            log_info "  • 1000 learn/min, 5000 reason/min"
+            log_info "  • 10M max concepts"
+            log_info "  • Security mode: ENABLED"
+            log_info "  • License validated"
+            ;;
+            
+        *)
+            log_error "Invalid edition: $EDITION"
+            log_info "Valid editions: simple, community, enterprise"
+            return 1
+            ;;
+    esac
+    
+    echo ""
+    return 0
 }
 
 # ============================================================================
@@ -187,6 +299,9 @@ show_state() {
 cmd_build() {
     log_step "BUILD: Building all Docker images"
     
+    # Set edition configuration
+    set_edition_config || return 1
+    
     # Check prerequisites first
     check_prerequisites || return 1
     
@@ -212,10 +327,10 @@ cmd_build() {
         return 1
     fi
     
-    # Build all other services in parallel using docker-compose
-    log_step "Building remaining services..."
-    if docker-compose -f "$COMPOSE_FILE" build --parallel; then
-        log_success "All services built"
+    # Build all other services in parallel using docker-compose with profile
+    log_step "Building remaining services for ${EDITION} edition..."
+    if docker-compose -f "$COMPOSE_FILE" --profile "$PROFILE" build --parallel; then
+        log_success "All services built for ${EDITION} edition"
     else
         log_warning "Some builds may have failed (check logs)"
     fi
@@ -258,7 +373,10 @@ cmd_build() {
 # ============================================================================
 
 cmd_up() {
-    log_step "UP: Starting Sutra Grid system"
+    log_step "UP: Starting Sutra ${EDITION} Edition"
+    
+    # Set edition configuration
+    set_edition_config || return 1
     
     # Check prerequisites
     check_prerequisites || return 1
@@ -280,13 +398,17 @@ cmd_up() {
         log_success "HAProxy config fixed"
     fi
     
-    # Start services
-    log_step "Starting all services..."
-    if docker-compose -f "$COMPOSE_FILE" up -d 2>&1 | tee /tmp/sutra-up.log | grep -E "(Started|Creating|recreated)" > /dev/null; then
-        log_success "Services started"
+    # Start services with edition profile
+    log_step "Starting services for ${EDITION} edition..."
+    log_info "Using profile: ${PROFILE}"
+    log_debug "Command: docker-compose -f $COMPOSE_FILE --profile $PROFILE up -d"
+    
+    if docker-compose -f "$COMPOSE_FILE" --profile "$PROFILE" up -d 2>&1 | tee /tmp/sutra-up.log | grep -qE "(Started|Creating|recreated|up-to-date)"; then
+        log_success "Services started for ${EDITION} edition"
     else
         log_error "Failed to start services"
         log_info "Check /tmp/sutra-up.log for details"
+        cat /tmp/sutra-up.log
         return 1
     fi
     
@@ -308,7 +430,21 @@ cmd_up() {
     fi
     
     echo ""
-    log_success "UP COMPLETE: System running"
+    log_success "UP COMPLETE: ${EDITION} edition running"
+    
+    # Edition-specific post-start info
+    case $EDITION in
+        simple)
+            log_info "Upgrade to Community: SUTRA_EDITION=community SUTRA_LICENSE_KEY=xxx ./sutra-deploy.sh install"
+            ;;
+        community)
+            log_info "Upgrade to Enterprise: SUTRA_EDITION=enterprise SUTRA_LICENSE_KEY=xxx ./sutra-deploy.sh install"
+            ;;
+        enterprise)
+            log_success "Enterprise features active: HA, Grid, Security"
+            ;;
+    esac
+    
     return 0
 }
 
@@ -394,12 +530,13 @@ cmd_down() {
         return 0
     fi
     
-    # Graceful shutdown with timeout
+    # Graceful shutdown with timeout (all profiles)
     log_step "Stopping services gracefully..."
-    if docker-compose -f "$COMPOSE_FILE" down --timeout "$SHUTDOWN_TIMEOUT" 2>&1 | grep -E "(Stopping|Stopped|Removing)" > /dev/null; then
+    # Note: down without --profile stops ALL services regardless of profile
+    if docker-compose -f "$COMPOSE_FILE" down --timeout "$SHUTDOWN_TIMEOUT" 2>&1 | grep -qE "(Stopping|Stopped|Removing|removed)"; then
         log_success "All services stopped"
     else
-        log_warning "Some services may still be running"
+        log_info "No services to stop or already stopped"
     fi
     
     log_success "DOWN COMPLETE: System stopped"

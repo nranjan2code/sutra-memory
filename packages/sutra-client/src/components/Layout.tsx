@@ -3,6 +3,7 @@ import { AppBar, Box, Toolbar, Typography, Tooltip } from '@mui/material'
 import { Psychology as PsychologyIcon, FiberManualRecord } from '@mui/icons-material'
 import { sutraApi } from '../services/api'
 import { useAppStore } from '../services/store'
+import EditionBadge from './EditionBadge'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -62,6 +63,7 @@ export default function Layout({ children }: LayoutProps) {
             >
               Sutra AI
             </Typography>
+            <EditionBadge />
           </Box>
           <Box sx={{ flexGrow: 1 }} />
           <Tooltip

@@ -28,6 +28,9 @@ from .models import (
     ConceptDetail,
     ContradictionRequest,
     ContradictionResponse,
+    EditionFeaturesResponse,
+    EditionLimitsResponse,
+    EditionResponse,
     ErrorResponse,
     HealthResponse,
     LearnRequest,
@@ -145,6 +148,65 @@ async def health_check(client=Depends(get_storage_client)):
         version=settings.api_version,
         uptime_seconds=get_uptime(),
         concepts_loaded=concepts_loaded,
+    )
+
+
+# Edition information endpoint
+@app.get("/edition", response_model=EditionResponse, tags=["System"])
+async def get_edition_info():
+    """
+    Get current edition information, limits, and features.
+    
+    Returns the active edition, rate limits, quotas, and available features.
+    This information is useful for clients to adapt their behavior based on
+    the deployment edition.
+    """
+    from datetime import datetime
+    
+    # Get edition limits from settings
+    limits = settings.get_edition_limits()
+    
+    # Determine if license is valid (if using enterprise/community)
+    license_valid = True
+    license_expires = None
+    
+    if settings.edition in ["community", "enterprise"] and settings.license_key:
+        try:
+            # Validate license using feature flags
+            from sutra_core.feature_flags import validate_license
+            license_data = validate_license(settings.license_key)
+            if license_data.get("expires"):
+                license_expires = datetime.fromtimestamp(
+                    license_data["expires"]
+                ).isoformat()
+        except Exception as e:
+            logger.warning(f"License validation failed: {e}")
+            license_valid = False
+    
+    # Determine features based on edition
+    ha_enabled = settings.edition == "enterprise"
+    grid_enabled = settings.edition == "enterprise"
+    observability_enabled = settings.edition == "enterprise"
+    multi_node = settings.edition == "enterprise"
+    
+    return EditionResponse(
+        edition=settings.edition,
+        limits=EditionLimitsResponse(
+            learn_per_min=limits.learn_per_min,
+            reason_per_min=limits.reason_per_min,
+            max_concepts=limits.max_concepts,
+            max_dataset_gb=limits.max_dataset_gb,
+            ingest_workers=limits.ingest_workers,
+        ),
+        features=EditionFeaturesResponse(
+            ha_enabled=ha_enabled,
+            grid_enabled=grid_enabled,
+            observability_enabled=observability_enabled,
+            multi_node=multi_node,
+        ),
+        license_valid=license_valid,
+        license_expires=license_expires,
+        upgrade_url="https://sutra.ai/pricing",
     )
 
 

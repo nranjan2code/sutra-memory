@@ -20,11 +20,14 @@ services:
       - STORAGE_HOST=0.0.0.0
       - STORAGE_PORT=50051
       - VECTOR_DIMENSION=768
-      # Sharded Storage Configuration
-      - SUTRA_STORAGE_MODE=sharded
-      - SUTRA_NUM_SHARDS=4
-      # Unified Learning Pipeline Configuration (HA)
-      - SUTRA_EMBEDDING_SERVICE_URL=http://embedding-ha:8888
+      # Edition Configuration
+      - SUTRA_EDITION=${SUTRA_EDITION:-simple}
+      - SUTRA_LICENSE_KEY=${SUTRA_LICENSE_KEY}
+      # Sharded Storage Configuration (edition-dependent)
+      - SUTRA_STORAGE_MODE=${SUTRA_STORAGE_MODE:-single}
+      - SUTRA_NUM_SHARDS=${SUTRA_NUM_SHARDS:-1}
+      # Unified Learning Pipeline Configuration (edition-dependent)
+      - SUTRA_EMBEDDING_SERVICE_URL=${SUTRA_EMBEDDING_URL:-http://embedding-single:8888}
       - SUTRA_EMBEDDING_TIMEOUT_SEC=30
       - SUTRA_MIN_ASSOCIATION_CONFIDENCE=0.5
       - SUTRA_MAX_ASSOCIATIONS_PER_CONCEPT=10
@@ -38,7 +41,7 @@ services:
       retries: 3
       start_period: 10s
 
-  # Grid Event Storage (Reserved for Grid Observability)
+  # Grid Event Storage (Reserved for Grid Observability - Enterprise Only)
   grid-event-storage:
     build:
       context: .
@@ -55,6 +58,8 @@ services:
       - STORAGE_HOST=0.0.0.0
       - STORAGE_PORT=50051
       - VECTOR_DIMENSION=768
+      # Edition Configuration
+      - SUTRA_EDITION=enterprise
       # Use HA embedding service (same as main storage)
       - SUTRA_EMBEDDING_SERVICE_URL=http://embedding-ha:8888
       - SUTRA_EMBEDDING_TIMEOUT_SEC=30
@@ -71,12 +76,14 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    profiles:
+      - enterprise
 
   # ============================================================================
   # GRID INFRASTRUCTURE
   # ============================================================================
   
-  # Grid Master (Orchestration & Coordination)
+  # Grid Master (Orchestration & Coordination - Enterprise Only)
   grid-master:
     build:
       context: .
@@ -92,6 +99,9 @@ services:
       - GRID_MASTER_TCP_PORT=7002
       - GRID_MASTER_HTTP_PORT=7001
       - EVENT_STORAGE=grid-event-storage:50051
+      # Edition enforcement
+      - SUTRA_EDITION=enterprise
+      - SUTRA_LICENSE_KEY=${SUTRA_LICENSE_KEY}
     depends_on:
       - grid-event-storage
     networks:
@@ -103,8 +113,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    profiles:
+      - enterprise
 
-  # Grid Agent 1 (Node Management)
+  # Grid Agent 1 (Node Management - Enterprise Only)
   grid-agent-1:
     build:
       context: .
@@ -123,6 +135,8 @@ services:
       - EVENT_STORAGE=grid-event-storage:50051
       - AGENT_ID=agent-001
       - MAX_STORAGE_NODES=5
+      # Edition enforcement
+      - SUTRA_EDITION=enterprise
     depends_on:
       - grid-master
       - grid-event-storage
@@ -135,8 +149,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    profiles:
+      - enterprise
 
-  # Grid Agent 2 (Additional Node Management)
+  # Grid Agent 2 (Additional Node Management - Enterprise Only)
   grid-agent-2:
     build:
       context: .
@@ -155,6 +171,8 @@ services:
       - EVENT_STORAGE=grid-event-storage:50051
       - AGENT_ID=agent-002
       - MAX_STORAGE_NODES=5
+      # Edition enforcement
+      - SUTRA_EDITION=enterprise
     depends_on:
       - grid-master
       - grid-event-storage
@@ -167,6 +185,8 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    profiles:
+      - enterprise
 
   # ============================================================================
   # API LAYER
@@ -185,6 +205,11 @@ services:
       - PYTHONUNBUFFERED=1
       - SUTRA_STORAGE_MODE=server
       - SUTRA_STORAGE_SERVER=storage-server:50051
+      # Edition Configuration
+      - SUTRA_EDITION=${SUTRA_EDITION:-simple}
+      - SUTRA_LICENSE_KEY=${SUTRA_LICENSE_KEY}
+      - SUTRA_LICENSE_SECRET=${SUTRA_LICENSE_SECRET}
+      # Rate limits are set by feature flags, but keep for backwards compatibility
       - SUTRA_RATE_LIMIT_LEARN=100
       - SUTRA_RATE_LIMIT_REASON=200
     depends_on:
@@ -200,17 +225,49 @@ services:
       start_period: 10s
 
   # ============================================================================
-  # EMBEDDING SERVICE HA (3 Replicas + HAProxy)
+  # EMBEDDING SERVICES
   # ============================================================================
   
-  # Embedding Service Base (builds image for HA replicas)
-  embedding-service-builder:
+  # Single Embedding Service (Simple & Community Editions)
+  embedding-single:
     build:
       context: ./packages/sutra-embedding-service
       dockerfile: Dockerfile
     image: sutra-embedding-service:latest
+    container_name: embedding-single
+    ports:
+      - "8888:8888"  # Direct access
+    environment:
+      - RUST_LOG=info
+      - EMBEDDING_PORT=8888
+      - MODEL_PATH=/models/nomic-embed-text-v1.5
+      - CACHE_SIZE=10000
+      - BATCH_SIZE=32
+      - INSTANCE_ID=embedding-single
+    volumes:
+      - ./packages/sutra-embedding-service/models:/models:ro
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
     profiles:
-      - build-only  # Only built, not started
+      - simple
+      - community
+  
+  # ============================================================================
+  # EMBEDDING SERVICE HA (Enterprise Edition Only)
+  # ============================================================================
   
   # Embedding Service Replica 1
   embedding-1:
@@ -241,6 +298,8 @@ services:
           memory: 2G
         reservations:
           memory: 1G
+    profiles:
+      - enterprise
   
   # Embedding Service Replica 2
   embedding-2:
@@ -271,6 +330,8 @@ services:
           memory: 2G
         reservations:
           memory: 1G
+    profiles:
+      - enterprise
   
   # Embedding Service Replica 3
   embedding-3:
@@ -301,6 +362,8 @@ services:
           memory: 2G
         reservations:
           memory: 1G
+    profiles:
+      - enterprise
   
   # HAProxy Load Balancer for Embedding Services
   embedding-ha:
@@ -324,10 +387,48 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+    profiles:
+      - enterprise
   
 
   # ============================================================================
-  # NLG SERVICE HA (3 Replicas + HAProxy) - Optional via SUTRA_NLG_ENABLED
+  # NLG SERVICES
+  # ============================================================================
+  
+  # Single NLG Service (Simple & Community Editions)
+  nlg-single:
+    build:
+      context: ./packages/sutra-nlg-service
+      dockerfile: Dockerfile
+    image: sutra-nlg-service:latest
+    container_name: nlg-single
+    ports:
+      - "8889:8889"  # Direct access
+    environment:
+      - NLG_MODEL=${SUTRA_NLG_MODEL:-google/gemma-2-2b-it}
+      - INSTANCE_ID=nlg-single
+      - PORT=8889
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8889/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 5G
+        reservations:
+          memory: 3G
+    profiles:
+      - simple
+      - community
+  
+  # ============================================================================
+  # NLG SERVICE HA (Enterprise Edition Only)
   # ============================================================================
   
   # NLG Service Replica 1
@@ -383,7 +484,7 @@ services:
         reservations:
           memory: 3G
     profiles:
-      - nlg-hybrid
+      - enterprise
   
   # NLG Service Replica 3
   nlg-3:
@@ -409,7 +510,7 @@ services:
         reservations:
           memory: 3G
     profiles:
-      - nlg-hybrid
+      - enterprise
   
   # HAProxy Load Balancer for NLG Services
   nlg-ha:
@@ -434,9 +535,9 @@ services:
       retries: 3
       start_period: 5s
     profiles:
-      - nlg-hybrid
+      - enterprise
 
-  # Sutra Hybrid (Semantic Embeddings API + Optional NLG)
+  # Sutra Hybrid (Semantic Embeddings API + NLG)
   sutra-hybrid:
     build:
       context: .
@@ -449,18 +550,22 @@ services:
       - PYTHONUNBUFFERED=1
       - SUTRA_STORAGE_MODE=server
       - SUTRA_STORAGE_SERVER=storage-server:50051
+      # Edition Configuration
+      - SUTRA_EDITION=${SUTRA_EDITION:-simple}
+      - SUTRA_LICENSE_KEY=${SUTRA_LICENSE_KEY}
+      - SUTRA_LICENSE_SECRET=${SUTRA_LICENSE_SECRET}
+      # Semantic Embeddings
       - SUTRA_USE_SEMANTIC_EMBEDDINGS=true
       - SUTRA_EMBEDDING_PROVIDER=service
-      - SUTRA_EMBEDDING_SERVICE_URL=http://embedding-ha:8888
+      - SUTRA_EMBEDDING_SERVICE_URL=${SUTRA_EMBEDDING_URL:-http://embedding-single:8888}
       - SUTRA_EMBEDDING_MODEL=nomic-embed-text
       - SUTRA_VECTOR_DIMENSION=768
-      # NLG Configuration (optional - enabled via SUTRA_NLG_ENABLED)
-      - SUTRA_NLG_ENABLED=${SUTRA_NLG_ENABLED:-false}
-      - SUTRA_NLG_MODE=${SUTRA_NLG_MODE:-template}
-      - SUTRA_NLG_SERVICE_URL=http://nlg-ha:8889
+      # NLG Configuration (always enabled)
+      - SUTRA_NLG_ENABLED=true
+      - SUTRA_NLG_MODE=${SUTRA_NLG_MODE:-hybrid}
+      - SUTRA_NLG_SERVICE_URL=${SUTRA_NLG_URL:-http://nlg-single:8889}
     depends_on:
       - storage-server
-      - embedding-ha
     networks:
       - sutra-network
     restart: unless-stopped
@@ -488,12 +593,15 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
       - ENVIRONMENT=production
+      # Edition Configuration
+      - SUTRA_EDITION=${SUTRA_EDITION:-simple}
+      - SUTRA_LICENSE_KEY=${SUTRA_LICENSE_KEY}
+      # Service URLs
       - SUTRA_STORAGE_SERVER=storage-server:50051
-      - SUTRA_GRID_MASTER=grid-master:7001
+      - SUTRA_GRID_MASTER=${SUTRA_GRID_MASTER_URL:-}
       - PORT=9000
     depends_on:
       - storage-server
-      - grid-master
       - sutra-api
       - sutra-hybrid
     networks:
@@ -517,6 +625,9 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # Edition Configuration (for UI display)
+      - SUTRA_EDITION=${SUTRA_EDITION:-simple}
+      # Service URLs
       - SUTRA_API_URL=http://sutra-api:8000
       - SUTRA_HYBRID_URL=http://sutra-hybrid:8000
     depends_on:
@@ -536,7 +647,7 @@ services:
   # BULK INGESTION LAYER (Optional - can be disabled)
   # ============================================================================
   
-  # Primary Bulk Ingester Service (Optional)
+  # Primary Bulk Ingester Service
   sutra-bulk-ingester:
     build:
       context: .
@@ -550,17 +661,20 @@ services:
       - ingestion-jobs:/jobs     # Job state persistence
     environment:
       - RUST_LOG=info
+      # Edition Configuration
+      - SUTRA_EDITION=${SUTRA_EDITION:-simple}
+      - SUTRA_LICENSE_KEY=${SUTRA_LICENSE_KEY}
+      # Service Configuration
       - SUTRA_STORAGE_MODE=server
       - SUTRA_STORAGE_SERVER=storage-server:50051
-      - SUTRA_EMBEDDING_SERVICE_URL=http://embedding-ha:8888
-      - SUTRA_GRID_MASTER=grid-master:7001
-      - INGESTER_WORKERS=2
+      - SUTRA_EMBEDDING_SERVICE_URL=${SUTRA_EMBEDDING_URL:-http://embedding-single:8888}
+      - SUTRA_GRID_MASTER=${SUTRA_GRID_MASTER_URL:-}
+      # Worker configuration (set by feature flags based on edition)
+      - INGESTER_WORKERS=${SUTRA_INGEST_WORKERS:-2}
       - INGESTER_BATCH_SIZE=100
       - INGESTER_MEMORY_LIMIT=2048
     depends_on:
       storage-server:
-        condition: service_healthy
-      grid-master:
         condition: service_healthy
     networks:
       - sutra-network
@@ -571,8 +685,6 @@ services:
       timeout: 3s
       retries: 3
       start_period: 20s
-    profiles:
-      - bulk-ingester  # Optional profile - only start when requested
 
 # ============================================================================
 # NETWORKING & STORAGE

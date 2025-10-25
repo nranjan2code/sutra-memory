@@ -2,14 +2,48 @@
 
 **Domain-Specific Reasoning Engine for Your Knowledge**
 
-## 🚀 Deploy in 2 Commands
+## ⚠️ Choose Your Mode
+
+**Sutra has TWO deployment modes:**
+
+### 🔧 Development Mode (Default - NO Security)
 
 ```bash
 ./sutra-deploy.sh clean
 ./sutra-deploy.sh install
 ```
 
-That's it! The system will:
+**Use for:** Local development, testing, learning  
+**Security:** ❌ NO authentication, NO encryption  
+**⚠️ WARNING:** Only use on localhost, never with real data
+
+### 🔒 Production Mode (Secure)
+
+```bash
+# Generate secrets (one-time)
+chmod +x scripts/generate-secrets.sh
+./scripts/generate-secrets.sh
+
+# Deploy securely
+SUTRA_SECURE_MODE=true ./sutra-deploy.sh install
+```
+
+**Use for:** Production, real data, regulated industries  
+**Security:** ✅ HMAC/JWT + TLS 1.3 + RBAC + Network isolation  
+**See:** `docs/security/QUICK_START_SECURITY.md` for complete setup
+
+---
+
+## 🚀 Quick Deploy (Development)
+
+This deploys **without security** for local development:
+
+```bash
+./sutra-deploy.sh clean
+./sutra-deploy.sh install
+```
+
+The system will:
 1. ✅ Build all Docker images (handles HA properly)
 2. ✅ Start all 13 services (storage, reasoning, embeddings)
 3. ✅ Validate critical components

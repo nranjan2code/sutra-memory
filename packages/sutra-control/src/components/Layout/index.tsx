@@ -34,6 +34,7 @@ import { Settings } from '../Settings';
 import Grid from '../Grid';
 import BulkIngester from '../BulkIngester';
 import { ConnectionStatus } from '../ConnectionStatus';
+import { EditionBadge } from '../EditionBadge';
 
 const DRAWER_WIDTH = 280;
 
@@ -106,6 +107,7 @@ export const Layout: React.FC = () => {
           </Typography>
 
           <Stack direction="row" spacing={1} alignItems="center">
+            <EditionBadge />
             <ConnectionStatus />
             
             <IconButton color="inherit">

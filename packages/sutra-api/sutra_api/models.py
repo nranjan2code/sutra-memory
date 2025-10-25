@@ -159,6 +159,36 @@ class ErrorResponse(BaseModel):
     detail: Optional[str] = Field(None, description="Detailed error information")
 
 
+class EditionLimitsResponse(BaseModel):
+    """Edition-specific limits."""
+    
+    learn_per_min: int = Field(..., description="Learn API calls per minute")
+    reason_per_min: int = Field(..., description="Reason API calls per minute")
+    max_concepts: int = Field(..., description="Maximum number of concepts")
+    max_dataset_gb: int = Field(..., description="Maximum dataset size in GB")
+    ingest_workers: int = Field(..., description="Number of parallel ingest workers")
+
+
+class EditionFeaturesResponse(BaseModel):
+    """Edition-specific features."""
+    
+    ha_enabled: bool = Field(..., description="High availability enabled")
+    grid_enabled: bool = Field(..., description="Grid orchestration enabled")
+    observability_enabled: bool = Field(..., description="Event observability enabled")
+    multi_node: bool = Field(..., description="Multi-node support enabled")
+
+
+class EditionResponse(BaseModel):
+    """Response model for edition information."""
+    
+    edition: str = Field(..., description="Current edition (simple/community/enterprise)")
+    limits: EditionLimitsResponse = Field(..., description="Edition-specific limits")
+    features: EditionFeaturesResponse = Field(..., description="Edition-specific features")
+    license_valid: bool = Field(..., description="Whether license is valid")
+    license_expires: Optional[str] = Field(None, description="License expiration date (ISO 8601)")
+    upgrade_url: str = Field(..., description="URL to upgrade edition")
+
+
 # ======================== SEMANTIC QUERY MODELS ========================
 
 class SemanticFilterRequest(BaseModel):

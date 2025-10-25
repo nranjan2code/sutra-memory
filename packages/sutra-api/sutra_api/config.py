@@ -9,6 +9,23 @@ from typing import Optional
 
 from pydantic_settings import BaseSettings
 
+# Import feature flags for edition-aware configuration
+try:
+    from sutra_core.feature_flags import (
+        Edition,
+        EditionLimits,
+        detect_edition,
+        get_edition_limits,
+    )
+    FEATURE_FLAGS_AVAILABLE = True
+except ImportError:
+    FEATURE_FLAGS_AVAILABLE = False
+    # Fallback to simple edition
+    class Edition:
+        SIMPLE = "simple"
+        COMMUNITY = "community"
+        ENTERPRISE = "enterprise"
+
 
 class Settings(BaseSettings):
     """API configuration settings."""
@@ -52,9 +69,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
-    # Rate Limiting (requests per minute)
-    rate_limit_learn: int = 60
-    rate_limit_reason: int = 30
+    # Edition Configuration
+    edition: str = "simple"  # simple, community, enterprise
+    license_key: Optional[str] = None
+
+    # Rate Limiting (requests per minute) - Default fallback values
+    # These will be overridden by edition-specific limits
+    rate_limit_learn: int = 10
+    rate_limit_reason: int = 50
     rate_limit_search: int = 100
 
     class Config:
@@ -63,6 +85,42 @@ class Settings(BaseSettings):
         env_prefix = "SUTRA_"
         case_sensitive = False
 
+    def get_edition_limits(self):
+        """Get edition-specific limits."""
+        if FEATURE_FLAGS_AVAILABLE:
+            try:
+                # Detect edition from environment
+                edition_enum, limits = detect_edition(
+                    license_key=self.license_key,
+                    edition_override=self.edition
+                )
+                return limits
+            except Exception as e:
+                # Fallback to simple edition on error
+                return EditionLimits(
+                    edition=Edition.SIMPLE,
+                    learn_per_min=10,
+                    reason_per_min=50,
+                    max_concepts=100_000,
+                    max_dataset_gb=1,
+                    ingest_workers=2,
+                )
+        else:
+            # Feature flags not available - use config values
+            return type('Limits', (), {
+                'learn_per_min': self.rate_limit_learn,
+                'reason_per_min': self.rate_limit_reason,
+                'max_concepts': self.max_concepts or 100_000,
+            })
+
 
 # Global settings instance
 settings = Settings()
+
+# Apply edition-based rate limits at startup
+if FEATURE_FLAGS_AVAILABLE:
+    limits = settings.get_edition_limits()
+    settings.rate_limit_learn = limits.learn_per_min
+    settings.rate_limit_reason = limits.reason_per_min
+    if limits.max_concepts:
+        settings.max_concepts = limits.max_concepts

@@ -44,7 +44,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Plugin system via PyO3 (optional)
-pyo3 = { version = "0.20", features = ["extension-module", "multiple-pymethods"], optional = true }
+pyo3 = { version = "0.27", features = ["extension-module", "multiple-pymethods"], optional = true }
 pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"], optional = true }
 
 # Compression for large datasets

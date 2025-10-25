@@ -39,7 +39,7 @@ simd-json = "0.13"                 # Fast JSON with SIMD
 usearch = "2.21"                   # USearch - production HNSW with true persistence
 
 # Python bindings (OPTIONAL - only for Python extension, not binary)
-pyo3 = { version = "0.20", features = ["extension-module", "abi3-py38"], optional = true }
+pyo3 = { version = "0.27", features = ["extension-module", "abi3-py38"], optional = true }
 numpy = { version = "0.20", optional = true }     # NumPy integration
 
 # Utilities

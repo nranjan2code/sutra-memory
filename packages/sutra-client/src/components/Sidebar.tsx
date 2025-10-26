@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { Box, Drawer, IconButton, TextField, useMediaQuery, useTheme } from '@mui/material'
 import { Menu, Search as SearchIcon } from '@mui/icons-material'
-import { useNavigate } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import ConversationList from './ConversationList'
 import SpaceSelector from './SpaceSelector'
 import SpaceManagement from './SpaceManagement'
-import { conversationApi } from '../services/api'
 
 interface SidebarProps {
   open: boolean
@@ -16,7 +14,6 @@ interface SidebarProps {
 const SIDEBAR_WIDTH = 280
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -24,26 +21,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const [currentSpaceId, setCurrentSpaceId] = useState<string | null>(null)
   const [showSpaceManagement, setShowSpaceManagement] = useState(false)
   const [spaceManagementMode, setSpaceManagementMode] = useState<'create' | 'edit'>('create')
-
-  // Create new conversation mutation
-  const createConversation = useMutation({
-    mutationFn: () => conversationApi.createConversation(currentSpaceId || 'default-space'),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] })
-      navigate(`/chat/${data.conversation.id}`)
-      if (isMobile) {
-        onClose()
-      }
-    },
-  })
-
-  const handleNewChat = () => {
-    if (!currentSpaceId) {
-      alert('Please select a space first')
-      return
-    }
-    createConversation.mutate()
-  }
 
   const handleSpaceChange = (spaceId: string) => {
     setCurrentSpaceId(spaceId)

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   Box,
   Select,
@@ -12,7 +11,6 @@ import {
 import { Add, Settings, Folder } from '@mui/icons-material'
 import { useQuery } from '@tanstack/react-query'
 import { spaceApi } from '../services/api'
-import type { Space } from '../types/api'
 
 interface SpaceSelectorProps {
   selectedSpaceId: string | null
@@ -34,7 +32,7 @@ export default function SpaceSelector({
   })
 
   const spaces = spacesData?.spaces || []
-  const currentSpace = spaces.find((s) => s.space_id === selectedSpaceId)
+  const currentSpace = spaces.find((s: any) => s.space_id === selectedSpaceId)
 
   const handleChange = (event: SelectChangeEvent<string>) => {
     onSpaceChange(event.target.value)
@@ -81,7 +79,7 @@ export default function SpaceSelector({
                 </Box>
               )
             }
-            const space = spaces.find((s) => s.space_id === value)
+            const space = spaces.find((s: any) => s.space_id === value)
             if (!space) return 'Unknown Space'
             
             return (
@@ -116,7 +114,7 @@ export default function SpaceSelector({
               <em>No spaces available</em>
             </MenuItem>
           ) : (
-            spaces.map((space) => (
+            spaces.map((space: any) => (
               <MenuItem key={space.space_id} value={space.space_id}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
                   <Box

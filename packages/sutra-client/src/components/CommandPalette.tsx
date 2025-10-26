@@ -5,7 +5,7 @@
  * Provides quick access to conversations, messages, and spaces.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuickSearch, SearchResult } from '../hooks/useSearch';
 import SearchResults from './SearchResults';

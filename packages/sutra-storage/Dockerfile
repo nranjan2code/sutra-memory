@@ -19,8 +19,12 @@ COPY packages/sutra-storage/proto ./proto
 COPY packages/sutra-storage/src ./src
 
 # Build for release with static linking and optimization
-RUN cargo build --release --bin storage-server && \
-    strip /build/target/release/storage-server
+# Use BuildKit cache mounts for faster incremental builds
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --bin storage-server && \
+    cp /build/target/release/storage-server /tmp/storage-server && \
+    strip /tmp/storage-server
 
 # Stage 2: Minimal runtime (NO build tools, NO Rust toolchain)
 FROM debian:bookworm-slim
@@ -41,7 +45,7 @@ RUN mkdir -p /data && chown sutra:sutra /data
 WORKDIR /app
 
 # Copy ONLY the stripped binary from builder
-COPY --from=builder /build/target/release/storage-server /app/storage_server
+COPY --from=builder /tmp/storage-server /app/storage_server
 
 # Set ownership
 RUN chown sutra:sutra /app/storage_server && \

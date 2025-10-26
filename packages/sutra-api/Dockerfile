@@ -18,6 +18,9 @@ uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-multipart>=0.0.6
+argon2-cffi>=23.1.0
+pyjwt[crypto]>=2.8.0
+python-jose>=3.3.0
 EOF
 
 # Install packages

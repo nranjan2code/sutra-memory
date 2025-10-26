@@ -2,7 +2,7 @@
 # Client -> Python Gateway -> gRPC -> Internal Services
 
 # Stage 1: Build React frontend
-FROM node:18-slim AS frontend-builder
+FROM node:20-slim AS frontend-builder
 
 WORKDIR /build
 

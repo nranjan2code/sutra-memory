@@ -1,6 +1,6 @@
 # Multi-stage build for Sutra Client
 # Stage 1: Builder
-FROM node:18-slim AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /build
 

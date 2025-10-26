@@ -9,7 +9,7 @@ from typing import Dict, Any
 import logging
 
 from ..middleware.auth import get_current_active_user
-from ..dependencies import get_user_storage_client, get_domain_storage_clients, get_graph_service
+from ..dependencies import get_user_storage_client, get_graph_service
 from ..models.graph import (
     MessageGraphRequest,
     MessageGraphResponse,

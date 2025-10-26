@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogTitle,
@@ -16,7 +16,6 @@ import {
   TableHead,
   TableRow,
   IconButton,
-  Chip,
   MenuItem,
   Select,
   FormControl,
@@ -25,7 +24,7 @@ import {
   CircularProgress,
   Typography,
 } from '@mui/material'
-import { Delete, Edit, Close, PersonAdd } from '@mui/icons-material'
+import { Delete, Close, PersonAdd } from '@mui/icons-material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { spaceApi } from '../services/api'
 
@@ -83,14 +82,18 @@ export default function SpaceManagement({
     queryKey: ['space', spaceId],
     queryFn: () => spaceApi.getSpace(spaceId!),
     enabled: mode === 'edit' && !!spaceId,
-    onSuccess: (data) => {
-      setSpaceName(data.name)
-      setSpaceDescription(data.description)
-      setDomainStorage(data.domain_storage)
-      setSpaceIcon(data.icon)
-      setSpaceColor(data.color)
-    },
   })
+
+  // Update form state when space data is loaded
+  useEffect(() => {
+    if (spaceData) {
+      setSpaceName(spaceData.name)
+      setSpaceDescription(spaceData.description)
+      setDomainStorage(spaceData.domain_storage)
+      setSpaceIcon(spaceData.icon)
+      setSpaceColor(spaceData.color)
+    }
+  }, [spaceData])
 
   // Fetch members if editing
   const { data: membersData, isLoading: isLoadingMembers } = useQuery({
@@ -221,19 +224,6 @@ export default function SpaceManagement({
   const handleDeleteSpace = () => {
     if (window.confirm('Are you sure you want to delete this space? This action cannot be undone.')) {
       deleteSpace.mutate()
-    }
-  }
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'error'
-      case 'write':
-        return 'warning'
-      case 'read':
-        return 'default'
-      default:
-        return 'default'
     }
   }
 
@@ -415,7 +405,7 @@ export default function SpaceManagement({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {members.map((member) => (
+                    {members.map((member: any) => (
                       <TableRow key={member.user_id}>
                         <TableCell>{member.email}</TableCell>
                         <TableCell>{member.full_name || '-'}</TableCell>

@@ -23,9 +23,9 @@ NC='\033[0m' # No Color
 EDITION="${SUTRA_EDITION:-simple}"  # simple | community | enterprise
 SECURE_MODE="${SUTRA_SECURE_MODE:-false}"  # Set SUTRA_SECURE_MODE=true for production security
 if [ "$SECURE_MODE" = "true" ]; then
-    COMPOSE_FILE="docker-compose-secure.yml"
+    COMPOSE_FILE="sutrabuild/compose/docker-compose-secure.yml"
 else
-    COMPOSE_FILE="docker-compose-grid.yml"
+    COMPOSE_FILE="sutrabuild/compose/docker-compose-grid.yml"
 fi
 PROJECT_NAME="sutra-grid"
 BUILD_TIMEOUT=600
@@ -220,21 +220,21 @@ check_prerequisites() {
     fi
     
     # Critical config files
-    if [ ! -f "docker/haproxy.cfg" ]; then
-        log_error "HAProxy config not found: docker/haproxy.cfg"
+    if [ ! -f "sutrabuild/docker/configs/haproxy.cfg" ]; then
+        log_error "HAProxy config not found: sutrabuild/docker/configs/haproxy.cfg"
         ((missing++))
     fi
     
     # Security mode prerequisites
     if [ "$SECURE_MODE" = "true" ]; then
-        if [ ! -f "scripts/generate-secrets.sh" ]; then
-            log_error "Security script not found: scripts/generate-secrets.sh"
+        if [ ! -f "sutrabuild/scripts/generate-secrets.sh" ]; then
+            log_error "Security script not found: sutrabuild/scripts/generate-secrets.sh"
             ((missing++))
         fi
         if [ ! -d ".secrets" ]; then
-            log_warning "Secrets not generated. Run: ./scripts/generate-secrets.sh"
+            log_warning "Secrets not generated. Run: ./sutrabuild/scripts/generate-secrets.sh"
             log_info "Auto-generating secrets..."
-            if bash scripts/generate-secrets.sh; then
+            if bash sutrabuild/scripts/generate-secrets.sh; then
                 log_success "Secrets generated"
             else
                 log_error "Failed to generate secrets"
@@ -308,9 +308,10 @@ cmd_build() {
     local state=$(get_system_state)
     log_info "Current state: $state"
     
-    # Clean up any partial builds
-    log_step "Cleaning up stale build artifacts..."
-    docker builder prune -f > /dev/null 2>&1 || true
+    # NOTE: Docker builder cache is preserved for fast rebuilds
+    # Run './sutra-deploy.sh clean --cache' to manually prune if needed
+    # log_step "Cleaning up stale build artifacts..."
+    # docker builder prune -f > /dev/null 2>&1 || true
     
     # CRITICAL: Build embedding service ONCE for HA replicas
     # This prevents the 3-way race condition
@@ -396,9 +397,9 @@ cmd_up() {
     
     # Fix HAProxy config if it has known issues
     log_step "Validating HAProxy configuration..."
-    if grep -q "option httpchk GET /health" docker/haproxy.cfg 2>/dev/null; then
+    if grep -q "option httpchk GET /health" sutrabuild/docker/configs/haproxy.cfg 2>/dev/null; then
         log_warning "Found deprecated HAProxy syntax - auto-fixing..."
-        sed -i.bak 's/option httpchk GET \/health HTTP\/1\.1.*/http-check send meth GET uri \/health ver HTTP\/1.1 hdr Host embedding/' docker/haproxy.cfg
+        sed -i.bak 's/option httpchk GET \/health HTTP\/1\.1.*/http-check send meth GET uri \/health ver HTTP\/1.1 hdr Host embedding/' sutrabuild/docker/configs/haproxy.cfg
         log_success "HAProxy config fixed"
     fi
     

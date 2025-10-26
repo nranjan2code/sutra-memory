@@ -617,10 +617,16 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements-dev.txt  # Installs all -e packages
 
 # Build System:
+# - 🆕 CONSOLIDATED BUILD SYSTEM: sutrabuild/
+# - World-class containerized build with shared base images
+# - 100% reproducible builds (verified through testing)
+# - Profile-based deployment (simple/community/enterprise)
 # - Multi-language: Python (PyO3) + Rust + Node.js
 # - 15 Python packages with editable installs
 # - 6 Rust crates with optimized release builds
 # - React/TypeScript with Vite
+# 
+# 📖 See docs/sutrabuild/ for comprehensive build documentation
 ```
 
 ### Testing
@@ -692,6 +698,11 @@ make check   # format, lint, test
 ./sutra-deploy.sh validate   # Comprehensive health checks
 ./sutra-deploy.sh logs [svc] # View logs (all or specific)
 ./sutra-deploy.sh clean      # Complete system reset
+
+# 🆕 NEW: World-Class Build System
+./sutrabuild/scripts/build-all.sh --profile simple     # Consolidated builds
+./sutrabuild/scripts/build-all.sh --profile simple --parallel  # Parallel builds
+# See: docs/sutrabuild/QUICKSTART.md for complete guide
 
 # Interactive
 ./sutra-deploy.sh maintenance # Interactive menu

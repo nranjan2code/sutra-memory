@@ -20,11 +20,6 @@ interface ProgressEvent {
   confidence?: number;
 }
 
-interface ChunkEvent {
-  content: string;
-  confidence: number;
-}
-
 interface CompleteEvent {
   id: string;
   conversation_id: string;
@@ -216,32 +211,32 @@ export function useMessageStream(): UseMessageStreamReturn {
       case 'user_message':
         setState((prev) => ({
           ...prev,
-          userMessage: data as UserMessage,
+          userMessage: data as unknown as UserMessage,
         }));
         break;
 
       case 'progress':
         setState((prev) => ({
           ...prev,
-          progress: data as ProgressEvent,
-          confidence: data.confidence || prev.confidence,
+          progress: data as unknown as ProgressEvent,
+          confidence: (data.confidence as number) || prev.confidence,
         }));
         break;
 
       case 'chunk':
         setState((prev) => ({
           ...prev,
-          partialContent: data.content,
-          confidence: data.confidence,
+          partialContent: data.content as string,
+          confidence: data.confidence as number,
         }));
         break;
 
       case 'complete':
         setState((prev) => ({
           ...prev,
-          finalMessage: data as CompleteEvent,
-          partialContent: data.content,
-          confidence: data.metadata.confidence,
+          finalMessage: data as unknown as CompleteEvent,
+          partialContent: (data.content as string) || prev.partialContent,
+          confidence: (data as any).metadata?.confidence || prev.confidence,
           isStreaming: false,
         }));
         break;
@@ -249,7 +244,7 @@ export function useMessageStream(): UseMessageStreamReturn {
       case 'error':
         setState((prev) => ({
           ...prev,
-          error: data.message || 'An error occurred',
+          error: (data.message as string) || 'An error occurred',
           isStreaming: false,
         }));
         break;

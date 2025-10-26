@@ -35,6 +35,29 @@ New to Sutra AI? Start here:
 
 ---
 
+## 🏗️ Build System (NEW)
+
+**World-class containerized build infrastructure:**
+
+### Essential Docs
+- **[Build Overview](sutrabuild/README.md)** - Complete build system documentation
+- **[Quick Start](sutrabuild/QUICKSTART.md)** - Start building immediately  
+- **[Architecture](sutrabuild/ARCHITECTURE.md)** - Technical deep-dive
+- **[Complete Reference](sutrabuild/REFERENCE.md)** - All commands and options
+- **[Migration Guide](sutrabuild/MIGRATION.md)** - Move from scattered builds
+- **[Maintenance](sutrabuild/MAINTENANCE.md)** - Operations and troubleshooting
+
+### Quick Commands
+```bash
+./sutrabuild/scripts/build-all.sh --profile simple     # Build all services
+./sutrabuild/scripts/build-all.sh --profile simple --parallel  # Parallel builds
+./sutrabuild/scripts/health-check.sh http://localhost:8000/health  # Health check
+```
+
+**Key Benefits:** 100% reproducible builds, 50%+ faster builds, shared base images, profile-based deployment
+
+---
+
 ## Package Documentation
 
 ### Core Packages

@@ -15,8 +15,11 @@ COPY packages/sutra-bulk-ingester/Cargo.toml ./
 COPY packages/sutra-bulk-ingester/src ./src/
 COPY packages/sutra-protocol ../sutra-protocol/
 
-# Build the Rust binary
-RUN cargo build --release
+# Build the Rust binary with BuildKit cache mounts
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    cargo build --release && \
+    cp /app/target/release/sutra-bulk-ingester /tmp/sutra-bulk-ingester
 
 # Python runtime stage
 FROM python:3.11-slim
@@ -31,7 +34,7 @@ RUN useradd -m -s /bin/bash app
 WORKDIR /app
 
 # Copy the built Rust binary
-COPY --from=rust-builder /app/target/release/sutra-bulk-ingester /usr/local/bin/
+COPY --from=rust-builder /tmp/sutra-bulk-ingester /usr/local/bin/
 
 # Copy Python plugins
 COPY packages/sutra-bulk-ingester/plugins ./plugins/

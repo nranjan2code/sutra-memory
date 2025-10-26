@@ -460,7 +460,7 @@ cmd_validate() {
     
     # Check if all containers are running
     log_info "Checking container status..."
-    local containers=("sutra-storage" "sutra-embedding-service" "sutra-hybrid" "sutra-api" "sutra-control" "sutra-client" "sutra-grid-master" "sutra-grid-events" "sutra-grid-agent-1" "sutra-grid-agent-2")
+    local containers=("sutra-storage" "sutra-user-storage" "sutra-embedding-service" "sutra-hybrid" "sutra-api" "sutra-control" "sutra-client" "sutra-grid-master" "sutra-grid-events" "sutra-grid-agent-1" "sutra-grid-agent-2")
     
     for container in "${containers[@]}"; do
         if docker ps | grep -q "$container"; then
@@ -570,7 +570,7 @@ cmd_restart() {
 cmd_status() {
     log_info "System Status:"
     echo ""
-    docker-compose -f $COMPOSE_FILE ps
+    docker-compose -f $COMPOSE_FILE --profile "$PROFILE" ps
     echo ""
     
     log_info "Service URLs:"
@@ -582,6 +582,7 @@ cmd_status() {
     echo "  • Grid Master (HTTP):   http://localhost:7001"
     echo "  • Grid Master (gRPC):   localhost:7002"
     echo "  • Storage Server:       localhost:50051"
+    echo "  • User Storage Server:  localhost:50053"
 }
 
 # ============================================================================
@@ -698,10 +699,10 @@ cmd_logs() {
     
     if [ -z "$service" ]; then
         log_info "Showing logs for all services (Ctrl+C to exit)..."
-        docker-compose -f $COMPOSE_FILE logs -f
+        docker-compose -f $COMPOSE_FILE --profile "$PROFILE" logs -f
     else
         log_info "Showing logs for $service (Ctrl+C to exit)..."
-        docker-compose -f $COMPOSE_FILE logs -f $service
+        docker-compose -f $COMPOSE_FILE --profile "$PROFILE" logs -f $service
     fi
 }
 
@@ -836,17 +837,17 @@ cmd_maintenance() {
             ;;
         2)
             log_info "Checking service health..."
-            docker-compose -f $COMPOSE_FILE ps --format json | jq -r '.[] | "\(.Service): \(.Health)"'
+            docker-compose -f $COMPOSE_FILE --profile "$PROFILE" ps --format json | jq -r '.[] | "\(.Service): \(.Health)"'
             ;;
         3)
             log_info "Restarting unhealthy services..."
-            unhealthy=$(docker-compose -f $COMPOSE_FILE ps --format json | jq -r '.[] | select(.Health == "unhealthy") | .Service')
+            unhealthy=$(docker-compose -f $COMPOSE_FILE --profile "$PROFILE" ps --format json | jq -r '.[] | select(.Health == "unhealthy") | .Service')
             if [ -z "$unhealthy" ]; then
                 log_success "All services are healthy!"
             else
                 for service in $unhealthy; do
                     log_warning "Restarting $service..."
-                    docker-compose -f $COMPOSE_FILE restart $service
+                    docker-compose -f $COMPOSE_FILE --profile "$PROFILE" restart $service
                 done
                 log_success "Services restarted!"
             fi
@@ -889,6 +890,7 @@ cmd_update() {
         echo ""
         echo "Available services:"
         echo "  storage-server    - Core storage engine"
+        echo "  user-storage-server - User management & conversations"
         echo "  sutra-api         - REST API service"
         echo "  sutra-hybrid      - Hybrid reasoning service"
         echo "  sutra-client      - Web client UI"

@@ -28,6 +28,9 @@ dependencies = [
   "pydantic-settings>=2.0.0",
   "python-multipart>=0.0.6",
   "msgpack>=1.0.0",  # For custom binary protocol
+  "argon2-cffi>=23.1.0",  # For secure password hashing
+  "pyjwt[crypto]>=2.8.0",  # For JWT token generation and verification
+  "python-jose>=3.3.0",  # Additional JWT utilities
 ]
 
 [project.optional-dependencies]

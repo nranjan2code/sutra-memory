@@ -23,6 +23,9 @@ mod vectors;
 // mod python_concurrent;
 mod reasoning_store;
 
+// 🔥 NEW: Schema definitions for conversation-first UI
+pub mod schema;
+
 // 🔥 NEW: Semantic understanding module
 pub mod semantic;
 

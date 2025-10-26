@@ -289,3 +289,66 @@ class SemanticQueryResponse(BaseModel):
     results: List[Dict] = Field(..., description="Matching concepts")
     count: int = Field(..., description="Number of results")
     execution_time_ms: float = Field(..., description="Query execution time")
+
+
+# =============================================================================
+# Authentication Models
+# =============================================================================
+
+
+class RegisterRequest(BaseModel):
+    """Request model for user registration."""
+    
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., min_length=8, description="User password (min 8 characters)")
+    organization: str = Field(..., description="Organization ID")
+    full_name: Optional[str] = Field(None, description="User's full name")
+    role: str = Field(default="user", description="User role (user, admin)")
+
+
+class LoginRequest(BaseModel):
+    """Request model for user login."""
+    
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., description="User password")
+
+
+class LoginResponse(BaseModel):
+    """Response model for successful login."""
+    
+    access_token: str = Field(..., description="JWT access token")
+    refresh_token: str = Field(..., description="JWT refresh token")
+    token_type: str = Field(default="bearer", description="Token type")
+    expires_in: int = Field(..., description="Token expiration time in seconds")
+    user: "UserResponse" = Field(..., description="User information")
+
+
+class UserResponse(BaseModel):
+    """Response model for user information."""
+    
+    user_id: str = Field(..., description="User ID")
+    email: str = Field(..., description="User email")
+    organization: str = Field(..., description="Organization ID")
+    role: str = Field(..., description="User role")
+    full_name: Optional[str] = Field(None, description="User's full name")
+    created_at: Optional[str] = Field(None, description="Account creation timestamp")
+    last_login: Optional[str] = Field(None, description="Last login timestamp")
+    
+    class Config:
+        # Allow extra fields but ignore them
+        extra = "ignore"
+
+
+class RefreshTokenRequest(BaseModel):
+    """Request model for token refresh."""
+    
+    refresh_token: str = Field(..., description="Refresh token")
+
+
+class LogoutResponse(BaseModel):
+    """Response model for logout."""
+    
+    message: str = Field(..., description="Logout confirmation message")
+    success: bool = Field(default=True, description="Logout success status")
+
+

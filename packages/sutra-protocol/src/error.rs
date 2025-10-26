@@ -28,6 +28,9 @@ pub enum ProtocolError {
     
     #[error("Client error: {0}")]
     ClientError(String),
+    
+    #[error("Validation error: {0}")]
+    ValidationError(String),
 }
 
 pub type Result<T> = std::result::Result<T, ProtocolError>;

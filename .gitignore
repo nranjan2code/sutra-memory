@@ -453,6 +453,12 @@ vectors/
 *.embeddings
 wikipedia_knowledge_production/vectors/
 
+# User storage (UI authentication & conversations)
+data/user-storage/*.dat
+data/user-storage/*.wal
+data/user-storage/*.idx
+!data/user-storage/README.md
+
 # Sutra runtime artifacts
 *.memory
 *.swarm

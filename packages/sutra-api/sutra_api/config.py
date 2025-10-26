@@ -46,9 +46,16 @@ class Settings(BaseSettings):
     workers: int = 1
 
     # Storage Configuration (Custom Binary Protocol)
-    storage_server: str = "storage-server:50051"  # Storage server address
+    storage_server: str = "storage-server:50051"  # Domain storage server address
+    user_storage_server: str = "user-storage-server:50051"  # User storage server address
     auto_save: bool = True
     save_interval_seconds: int = 300  # 5 minutes
+
+    # Authentication Configuration
+    jwt_secret_key: str = "INSECURE_DEFAULT_SECRET_CHANGE_IN_PRODUCTION"
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_hours: int = 24  # Token expires in 24 hours
+    jwt_refresh_expiration_days: int = 7  # Refresh token expires in 7 days
 
     # AI Configuration
     use_semantic_embeddings: bool = True

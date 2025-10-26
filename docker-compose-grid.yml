@@ -82,6 +82,43 @@ services:
     profiles:
       - enterprise
 
+  # User Storage (User Management, Auth, Conversations - All Editions)
+  user-storage-server:
+    build:
+      context: .
+      dockerfile: ./packages/sutra-storage/Dockerfile
+    image: sutra-storage-server:${SUTRA_VERSION:-latest}
+    container_name: sutra-user-storage
+    ports:
+      - "50053:50051"
+    volumes:
+      - user-storage-data:/data
+    environment:
+      - RUST_LOG=info
+      - STORAGE_PATH=/data
+      - STORAGE_HOST=0.0.0.0
+      - STORAGE_PORT=50051
+      - VECTOR_DIMENSION=768
+      # Edition Configuration
+      - SUTRA_EDITION=${SUTRA_EDITION:-simple}
+      - SUTRA_LICENSE_KEY=${SUTRA_LICENSE_KEY}
+      # Unified Learning Pipeline Configuration
+      - SUTRA_EMBEDDING_SERVICE_URL=${SUTRA_EMBEDDING_URL:-http://embedding-single:8888}
+      - SUTRA_EMBEDDING_TIMEOUT_SEC=30
+      - SUTRA_MIN_ASSOCIATION_CONFIDENCE=0.5
+      - SUTRA_MAX_ASSOCIATIONS_PER_CONCEPT=10
+    # Note: No hard dependency on embedding service
+    # Storage server will connect when embedding service becomes available
+    networks:
+      - sutra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "50051"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   # ============================================================================
   # GRID INFRASTRUCTURE
   # ============================================================================
@@ -208,6 +245,12 @@ services:
       - PYTHONUNBUFFERED=1
       - SUTRA_STORAGE_MODE=server
       - SUTRA_STORAGE_SERVER=storage-server:50051
+      - SUTRA_USER_STORAGE_SERVER=user-storage-server:50051
+      # JWT Configuration
+      - SUTRA_JWT_SECRET_KEY=${SUTRA_JWT_SECRET_KEY:-INSECURE_DEFAULT_SECRET_CHANGE_IN_PRODUCTION}
+      - SUTRA_JWT_ALGORITHM=HS256
+      - SUTRA_JWT_EXPIRATION_HOURS=24
+      - SUTRA_JWT_REFRESH_EXPIRATION_DAYS=7
       # Edition Configuration
       - SUTRA_EDITION=${SUTRA_EDITION:-simple}
       - SUTRA_LICENSE_KEY=${SUTRA_LICENSE_KEY}
@@ -217,6 +260,7 @@ services:
       - SUTRA_RATE_LIMIT_REASON=200
     depends_on:
       - storage-server
+      - user-storage-server
     networks:
       - sutra-network
     restart: unless-stopped
@@ -718,6 +762,8 @@ volumes:
   storage-data:
     driver: local
   grid-event-data:
+    driver: local
+  user-storage-data:
     driver: local
   agent1-data:
     driver: local

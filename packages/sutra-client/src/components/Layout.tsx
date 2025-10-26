@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AppBar, Box, Toolbar, Typography, Tooltip } from '@mui/material'
 import { Psychology as PsychologyIcon, FiberManualRecord } from '@mui/icons-material'
 import { sutraApi } from '../services/api'
 import { useAppStore } from '../services/store'
 import EditionBadge from './EditionBadge'
+import UserMenu from './UserMenu'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -16,7 +17,7 @@ export default function Layout({ children }: LayoutProps) {
   })
   const setMetrics = useAppStore((state) => state.setMetrics)
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = useCallback(async () => {
     try {
       const [healthData, metricsData] = await Promise.all([
         sutraApi.getHealth(),
@@ -31,13 +32,13 @@ export default function Layout({ children }: LayoutProps) {
       console.error('Failed to fetch metrics:', error)
       setHealth((prev) => ({ ...prev, status: 'error' }))
     }
-  }
+  }, [setMetrics])
 
   useEffect(() => {
     fetchMetrics()
     const interval = setInterval(fetchMetrics, 10000)
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchMetrics])
 
   const healthColor =
     health.status === 'healthy' ? 'success.main' : health.status === 'error' ? 'error.main' : 'warning.main'
@@ -82,6 +83,7 @@ export default function Layout({ children }: LayoutProps) {
               }}
             />
           </Tooltip>
+          <UserMenu />
         </Toolbar>
       </AppBar>
 

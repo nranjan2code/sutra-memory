@@ -44,6 +44,7 @@ from .models import (
     TemporalChainRequest,
     TemporalChainResponse,
 )
+from .routes import auth_router, conversations_router, spaces_router, search_router, graph_router
 
 # Configure logging
 logging.basicConfig(level=settings.log_level, format=settings.log_format)
@@ -97,6 +98,13 @@ app.add_middleware(
         "/search": settings.rate_limit_search,
     },
 )
+
+# Include routers
+app.include_router(auth_router)
+app.include_router(conversations_router)
+app.include_router(spaces_router)
+app.include_router(search_router)
+app.include_router(graph_router)
 
 
 # Exception handlers

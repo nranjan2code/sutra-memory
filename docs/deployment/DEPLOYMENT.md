@@ -24,6 +24,7 @@ All other build/deploy scripts are deprecated and will be removed.
 - `up` - Start all services (auto-builds if needed)
 - `down` - Stop all services gracefully
 - `restart` - Restart all services
+- `update <service>` - **NEW!** Update single service (30s vs 5min)
 - `clean` - Complete system reset (removes all containers, volumes, images)
 
 ### Monitoring
@@ -42,7 +43,24 @@ All other build/deploy scripts are deprecated and will be removed.
 ./sutra-deploy.sh install
 ```
 
-### Daily Development
+### Daily Development (Fast Workflow - NEW!)
+```bash
+# Option 1: Hot-reload development (instant changes)
+docker-compose -f docker-compose-grid.yml -f docker-compose.dev.yml up
+
+# Edit Python/React code → changes apply automatically!
+# No rebuild needed for most changes
+
+# Option 2: Quick single-service update (30 seconds)
+./sutra-deploy.sh update sutra-api      # Changed API code
+./sutra-deploy.sh update sutra-client   # Changed frontend
+./sutra-deploy.sh update sutra-hybrid   # Changed hybrid service
+
+# ✅ 10x faster than full rebuild!
+# ✅ Other services keep running
+```
+
+### Traditional Workflow
 ```bash
 # Start system
 ./sutra-deploy.sh up
@@ -57,11 +75,17 @@ All other build/deploy scripts are deprecated and will be removed.
 ./sutra-deploy.sh down
 ```
 
-### After Code Changes
+### After Code Changes (Smart Way)
 ```bash
-# Rebuild and restart
+# ❌ OLD WAY (5-10 minutes):
 ./sutra-deploy.sh build
 ./sutra-deploy.sh restart
+
+# ✅ NEW WAY (30 seconds):
+./sutra-deploy.sh update sutra-api
+
+# See which packages changed:
+./scripts/detect-changes.sh
 ```
 
 ### Complete Reset

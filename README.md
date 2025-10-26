@@ -10,9 +10,18 @@ Explainable reasoning over your private domain knowledge—without frontier LLMs
 
 ---
 
-## 🎉 What's New (2025-10-25)
+## 🎉 What's New (2025-10-26)
 
-**Production-Ready: All P0 Features Complete**
+**Production-Ready: Release Management System Complete**
+
+- ✅ **Release Management** - Professional version control and deployments
+- ✅ **Centralized Versioning** - Single VERSION file for all packages
+- ✅ **Automated Releases** - GitHub Actions builds & publishes on tag push
+- ✅ **Docker Image Tagging** - All services versioned (e.g., `sutra-api:2.0.1`)
+- ✅ **Customer Deployments** - Pin to specific versions, easy rollbacks
+- ✅ **3-Command Releases** - `version`, `release`, `deploy`
+
+**Previous Updates (2025-10-25)**
 
 - ✅ **Cross-shard 2PC Transactions** - Zero data loss at scale
 - ✅ **Embedding Service HA** - 3 replicas + HAProxy (>95% uptime)
@@ -24,7 +33,7 @@ Explainable reasoning over your private domain knowledge—without frontier LLMs
 - ✅ **Semantic Query API** - Advanced semantic filtering, temporal reasoning, causal/contradiction detection
 - ✅ **🔒 Dependency Management** - Comprehensive vulnerability scanning, SBOM generation, automated updates
 
-**[📖 Complete Documentation](docs/INDEX.md)** | **[🚀 Quick Start](#quick-start)** | **[📊 Benchmarks](#performance)**
+**[📖 Complete Documentation](docs/INDEX.md)** | **[🚀 Quick Start](#quick-start)** | **[📊 Benchmarks](#performance)** | **[📦 Release Docs](docs/release/README.md)**
 
 ---
 
@@ -248,6 +257,32 @@ cd sutra-models
 ./sutra-deploy.sh clean
 ```
 
+### 🚀 Fast Development Workflow (NEW!)
+
+**Working on a single service? Update just that one (30s vs 5min):**
+
+```bash
+# Update only API service (10x faster!)
+./sutra-deploy.sh update sutra-api
+
+# Update only frontend
+./sutra-deploy.sh update sutra-client
+
+# Update only hybrid service
+./sutra-deploy.sh update sutra-hybrid
+```
+
+**Active development with instant code changes:**
+
+```bash
+# Start dev mode with hot-reload (Python/React changes apply instantly!)
+docker-compose -f docker-compose-grid.yml -f docker-compose.dev.yml up
+
+# Edit code → Changes apply automatically (no rebuild needed!)
+```
+
+**📖 See [FAST_DEVELOPMENT.md](FAST_DEVELOPMENT.md) for complete developer guide**
+
 ### 3. Access Services
 
 ```bash
@@ -467,11 +502,26 @@ http://localhost:9000  # Navigate to Dependencies tab
 ### Essential Reading
 
 - **[Quick Start Guide](docs/guides/QUICK_START.md)** - Get running in 5 minutes
+- **[Release Management](docs/release/README.md)** - Version control & deployments ⭐ NEW
 - **[Production Deployment](docs/guides/PRODUCTION_DEPLOYMENT.md)** - Complete production setup
 - **[API Reference](docs/api/API_REFERENCE.md)** - All endpoints documented
 - **[Architecture Overview](WARP.md)** - System design and patterns
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and fixes
 - **[🔒 Dependency Management](docs/dependency-management/QUICK_START.md)** - Security & compliance
+
+### Release Management ⭐ NEW
+
+- **[Release Overview](docs/release/README.md)** - Complete release system
+- **[Release Process](docs/release/RELEASE_PROCESS.md)** - Step-by-step workflow
+- **[Quick Reference](docs/release/QUICK_REFERENCE.md)** - Command cheat sheet
+- **[Versioning Strategy](docs/release/VERSIONING_STRATEGY.md)** - When to bump versions
+
+**Commands:**
+```bash
+./sutra-deploy.sh version          # Show current version (2.0.0)
+./sutra-deploy.sh release patch    # Create release (2.0.0 → 2.0.1)
+./sutra-deploy.sh deploy v2.0.1    # Deploy specific version
+```
 
 ### Component Documentation
 

@@ -8,7 +8,8 @@
     "dev:api": "source venv/bin/activate && cd packages/sutra-api && python -m sutra_api.main",
     "dev:client": "cd packages/sutra-client && npm run dev",
     "install:client": "cd packages/sutra-client && npm install",
-    "build:client": "cd packages/sutra-client && npm run build"
+    "build:client": "cd packages/sutra-client && npm run build",
+    "comment": "NOTE: For hot-reload development, use: docker-compose -f docker-compose-grid.yml -f docker-compose.dev.yml up"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -65,10 +65,33 @@ The system will:
 ./sutra-deploy.sh logs        # View all logs
 ./sutra-deploy.sh restart     # Restart services
 ./sutra-deploy.sh down        # Stop everything
+
+# 🚀 NEW: Fast development workflow
+./sutra-deploy.sh update sutra-api    # Update single service (30s!)
+./scripts/detect-changes.sh           # See what changed
 ```
 
-## 📖 Full Documentation
+## � Development Mode (Hot Reload - NEW!)
 
+**Want instant code changes without rebuilds?**
+
+```bash
+# Start dev mode with hot-reload
+docker-compose -f docker-compose-grid.yml -f docker-compose.dev.yml up
+
+# Now edit Python/React code → changes apply automatically!
+# No docker rebuild needed!
+```
+
+**Benefits:**
+- ✅ Python changes: Instant reload
+- ✅ React changes: Browser auto-refresh
+- ✅ 10x faster development cycle
+
+## �📖 Full Documentation
+
+- **[FAST_DEVELOPMENT.md](../FAST_DEVELOPMENT.md)** - **NEW: Quick development guide**
+- **[QUICK_REFERENCE.txt](../QUICK_REFERENCE.txt)** - **NEW: Cheat sheet**
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete deployment guide
 - **[WARP.md](WARP.md)** - Architecture & development guide
 

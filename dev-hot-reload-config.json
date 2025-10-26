@@ -1,0 +1,22 @@
+# Development Hot Reload Configuration
+# Add to root package.json scripts
+
+{
+  "scripts": {
+    "dev:api": "cd packages/sutra-api && python -m uvicorn sutra_api.main:app --reload --port 8000",
+    "dev:hybrid": "cd packages/sutra-hybrid && python -m uvicorn sutra_hybrid.main:app --reload --port 8001", 
+    "dev:client": "cd packages/sutra-client && npm run dev",
+    "dev:storage": "cd packages/sutra-storage && cargo watch -x 'run --bin storage-server'",
+    
+    # Selective development modes
+    "dev:api-only": "concurrently \"npm:dev:api\"",
+    "dev:frontend-only": "concurrently \"npm:dev:client\"", 
+    "dev:backend-only": "concurrently \"npm:dev:api\" \"npm:dev:hybrid\"",
+    "dev:full": "concurrently \"npm:dev:api\" \"npm:dev:hybrid\" \"npm:dev:client\""
+  },
+  
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cargo-watch": "^8.4.0"  // For Rust hot reload
+  }
+}

@@ -1,14 +1,37 @@
 # Sutra AI Documentation Index
 
-**Complete documentation map for Sutra Models**
+**Complete technical documentation for the Sutra AI distributed reasoning system**
 
 ---
 
-## Quick Start
+## 🚀 Getting Started
 
-- [README](../README.md) - Project overview
-- [Quick Start Guide](guides/QUICK_START.md)
-- [Deployment Guide](operations/DEPLOYMENT.md)
+New to Sutra AI? Start here:
+
+1. **[Quick Start Guide](QUICKSTART.md)** - Get running in 5 minutes
+2. **[System Overview](SYSTEM_OVERVIEW.md)** - Understand the architecture
+3. **[Tutorial](TUTORIAL.md)** - Build your first knowledge graph
+
+---
+
+## � Release Management (NEW)
+
+**Professional release management for production deployments:**
+
+### Essential Docs
+- **[Release Overview](release/README.md)** - Complete release system documentation
+- **[Release Process](release/RELEASE_PROCESS.md)** - Step-by-step release workflow
+- **[Quick Reference](release/QUICK_REFERENCE.md)** - Command cheat sheet
+- **[Versioning Strategy](release/VERSIONING_STRATEGY.md)** - When to bump versions
+
+### Quick Commands
+```bash
+./sutra-deploy.sh version          # Check current version
+./sutra-deploy.sh release patch    # Create bug fix release
+./sutra-deploy.sh deploy v2.0.1    # Deploy specific version
+```
+
+**Use for:** Creating releases, deploying to customers, version management
 
 ---
 
@@ -56,6 +79,8 @@
 ## Development
 
 - [Development Guide](guides/DEVELOPMENT.md) - Setup
+- **[Fast Development Workflow](../FAST_DEVELOPMENT.md)** - **NEW: Single-service updates**
+- **[Simple Deployment Solution](../SIMPLE_DEPLOYMENT_SOLUTION.md)** - **NEW: What we built**
 - [Contributing](./CONTRIBUTING.md) - How to contribute
 - [Testing](development/testing.md) - Test procedures
 

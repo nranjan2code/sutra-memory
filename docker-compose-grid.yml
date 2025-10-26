@@ -8,7 +8,7 @@ services:
     build:
       context: .
       dockerfile: ./packages/sutra-storage/Dockerfile
-    image: sutra-storage-server:latest
+    image: sutra-storage-server:${SUTRA_VERSION:-latest}
     container_name: sutra-storage
     ports:
       - "50051:50051"
@@ -46,7 +46,7 @@ services:
     build:
       context: .
       dockerfile: ./packages/sutra-storage/Dockerfile
-    image: sutra-storage-server:latest
+    image: sutra-storage-server:${SUTRA_VERSION:-latest}
     container_name: sutra-grid-events
     ports:
       - "50052:50051"
@@ -88,7 +88,7 @@ services:
     build:
       context: .
       dockerfile: ./packages/sutra-grid-master/Dockerfile
-    image: sutra-grid-master:latest
+    image: sutra-grid-master:${SUTRA_VERSION:-latest}
     container_name: sutra-grid-master
     ports:
       - "7001:7001"  # HTTP binary distribution
@@ -121,7 +121,7 @@ services:
     build:
       context: .
       dockerfile: ./packages/sutra-grid-agent/Dockerfile
-    image: sutra-grid-agent:latest
+    image: sutra-grid-agent:${SUTRA_VERSION:-latest}
     container_name: sutra-grid-agent-1
     ports:
       - "8003:8001"
@@ -157,7 +157,7 @@ services:
     build:
       context: .
       dockerfile: ./packages/sutra-grid-agent/Dockerfile
-    image: sutra-grid-agent:latest
+    image: sutra-grid-agent:${SUTRA_VERSION:-latest}
     container_name: sutra-grid-agent-2
     ports:
       - "8004:8001"
@@ -197,7 +197,7 @@ services:
     build:
       context: .
       dockerfile: ./packages/sutra-api/Dockerfile
-    image: sutra-api:latest
+    image: sutra-api:${SUTRA_VERSION:-latest}
     container_name: sutra-api
     ports:
       - "8000:8000"
@@ -233,7 +233,7 @@ services:
     build:
       context: ./packages/sutra-embedding-service
       dockerfile: Dockerfile
-    image: sutra-embedding-service:latest
+    image: sutra-embedding-service:${SUTRA_VERSION:-latest}
     container_name: embedding-single
     ports:
       - "8888:8888"  # Direct access
@@ -400,7 +400,7 @@ services:
     build:
       context: ./packages/sutra-nlg-service
       dockerfile: Dockerfile
-    image: sutra-nlg-service:latest
+    image: sutra-nlg-service:${SUTRA_VERSION:-latest}
     container_name: nlg-single
     ports:
       - "8889:8889"  # Direct access
@@ -433,11 +433,11 @@ services:
   # ============================================================================
   
   # NLG Service Replica 1
-  nlg-1:
+  nlg-ha-1:
     build:
       context: ./packages/sutra-nlg-service
       dockerfile: Dockerfile
-    image: sutra-nlg-service:latest
+    image: sutra-nlg-service:${SUTRA_VERSION:-latest}
     container_name: nlg-1
     environment:
       - NLG_MODEL=${SUTRA_NLG_MODEL:-google/gemma-2-2b-it}
@@ -543,7 +543,7 @@ services:
     build:
       context: .
       dockerfile: ./packages/sutra-hybrid/Dockerfile
-    image: sutra-hybrid:latest
+    image: sutra-hybrid:${SUTRA_VERSION:-latest}
     container_name: sutra-hybrid
     ports:
       - "8001:8000"
@@ -621,7 +621,7 @@ services:
     build:
       context: ./packages/sutra-client
       dockerfile: Dockerfile
-    image: sutra-client:latest
+    image: sutra-client:${SUTRA_VERSION:-latest}
     container_name: sutra-client
     ports:
       - "8080:8080"
@@ -653,7 +653,7 @@ services:
     build:
       context: .
       dockerfile: ./packages/sutra-bulk-ingester/Dockerfile
-    image: sutra-bulk-ingester:latest
+    image: sutra-bulk-ingester:${SUTRA_VERSION:-latest}
     container_name: sutra-bulk-ingester
     ports:
       - "8005:8005"  # Bulk ingestion API

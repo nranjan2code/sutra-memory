@@ -1,0 +1,223 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v2.0.0, v2.1.0, etc.
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/sutra
+
+jobs:
+  # Job 1: Build and push Docker images
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service:
+          - name: storage-server
+            context: .
+            dockerfile: ./packages/sutra-storage/Dockerfile
+          - name: grid-master
+            context: .
+            dockerfile: ./packages/sutra-grid-master/Dockerfile
+          - name: grid-agent
+            context: .
+            dockerfile: ./packages/sutra-grid-agent/Dockerfile
+          - name: api
+            context: .
+            dockerfile: ./packages/sutra-api/Dockerfile
+          - name: hybrid
+            context: .
+            dockerfile: ./packages/sutra-hybrid/Dockerfile
+          - name: embedding-service
+            context: ./packages/sutra-embedding-service
+            dockerfile: ./packages/sutra-embedding-service/Dockerfile
+          - name: nlg-service
+            context: ./packages/sutra-nlg-service
+            dockerfile: ./packages/sutra-nlg-service/Dockerfile
+          - name: control
+            context: ./packages/sutra-control
+            dockerfile: ./packages/sutra-control/Dockerfile
+          - name: client
+            context: ./packages/sutra-client
+            dockerfile: ./packages/sutra-client/Dockerfile
+          - name: bulk-ingester
+            context: .
+            dockerfile: ./packages/sutra-bulk-ingester/Dockerfile
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # Job 2: Create GitHub Release
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get full history for changelog
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Extract changelog for this version from docs/CHANGELOG.md
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Create release notes
+          cat > release-notes.md << EOF
+          ## Sutra AI v${VERSION}
+          
+          ### Docker Images
+          
+          All images are available at \`ghcr.io/${{ github.repository_owner }}/sutra-*:${VERSION}\`
+          
+          Pull images:
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository_owner }}/sutra-storage-server:${VERSION}
+          docker pull ghcr.io/${{ github.repository_owner }}/sutra-api:${VERSION}
+          docker pull ghcr.io/${{ github.repository_owner }}/sutra-hybrid:${VERSION}
+          # ... and other services
+          \`\`\`
+          
+          ### Quick Start
+          
+          \`\`\`bash
+          # Clone repository
+          git clone https://github.com/${{ github.repository }}.git
+          cd sutra-models
+          
+          # Checkout this version
+          git checkout v${VERSION}
+          
+          # Deploy
+          export SUTRA_VERSION=${VERSION}
+          ./sutra-deploy.sh install
+          \`\`\`
+          
+          ### Deployment Options
+          
+          **Simple Edition (Free):**
+          \`\`\`bash
+          export SUTRA_EDITION=simple
+          export SUTRA_VERSION=${VERSION}
+          ./sutra-deploy.sh install
+          \`\`\`
+          
+          **Community Edition (\$99/mo):**
+          \`\`\`bash
+          export SUTRA_EDITION=community
+          export SUTRA_LICENSE_KEY=your-license-key
+          export SUTRA_VERSION=${VERSION}
+          ./sutra-deploy.sh install
+          \`\`\`
+          
+          **Enterprise Edition (\$999/mo):**
+          \`\`\`bash
+          export SUTRA_EDITION=enterprise
+          export SUTRA_LICENSE_KEY=your-license-key
+          export SUTRA_VERSION=${VERSION}
+          ./sutra-deploy.sh install
+          \`\`\`
+          
+          ### What's Changed
+          
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/v${VERSION}/docs/CHANGELOG.md) for detailed changes.
+          
+          ### Documentation
+          
+          - [Complete Documentation](https://github.com/${{ github.repository }}/blob/v${VERSION}/docs/INDEX.md)
+          - [Quick Start Guide](https://github.com/${{ github.repository }}/blob/v${VERSION}/docs/QUICKSTART.md)
+          - [Production Guide](https://github.com/${{ github.repository }}/blob/v${VERSION}/docs/PRODUCTION_GUIDE.md)
+          
+          ### Support
+          
+          - 📧 Email: support@sutra-ai.com
+          - 💬 GitHub Issues: https://github.com/${{ github.repository }}/issues
+          - 📚 Documentation: https://github.com/${{ github.repository }}/tree/main/docs
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Sutra AI v${{ steps.version.outputs.version }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          generate_release_notes: true  # Auto-generate from commits
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 3: Post-release validation
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    
+    steps:
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Verify images are accessible
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Try to pull a few key images to verify they're accessible
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-storage-server:${VERSION}
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:${VERSION}
+          
+          echo "✅ Images are accessible"
+
+      - name: Post validation results
+        run: |
+          echo "Release v${{ steps.version.outputs.version }} validated successfully!"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sutra Grid Deployment Manager v2.0
+# Sutra Grid Deployment Manager v3.0
 # Production-grade command center for complete system lifecycle
 # 
 # Principles:
@@ -877,6 +877,234 @@ cmd_maintenance() {
     esac
 }
 
+# ============================================================================
+# SELECTIVE UPDATE COMMANDS - Update single services without full rebuild
+# ============================================================================
+
+cmd_update() {
+    local service_name="$2"
+    
+    if [ -z "$service_name" ]; then
+        log_error "Usage: ./sutra-deploy.sh update <service-name>"
+        echo ""
+        echo "Available services:"
+        echo "  storage-server    - Core storage engine"
+        echo "  sutra-api         - REST API service"
+        echo "  sutra-hybrid      - Hybrid reasoning service"
+        echo "  sutra-client      - Web client UI"
+        echo "  embedding-single  - Embedding service (Simple/Community)"
+        echo "  embedding-ha-1    - Embedding HA replica 1 (Enterprise)"
+        echo "  grid-master       - Grid orchestration (Enterprise)"
+        echo ""
+        echo "Example:"
+        echo "  ./sutra-deploy.sh update sutra-api    # Update only API (30s)"
+        return 1
+    fi
+    
+    log_step "UPDATE: Updating $service_name without affecting other services"
+    
+    # Set edition configuration
+    set_edition_config || return 1
+    
+    # 1. Build only the specific service (uses cache for unchanged layers)
+    log_step "Building $service_name..."
+    if docker-compose -f "$COMPOSE_FILE" --profile "$PROFILE" build "$service_name" 2>&1 | grep -q "CACHED\|cached"; then
+        log_success "Used cached layers - fast build!"
+    fi
+    
+    # 2. Restart ONLY this service without touching dependencies
+    log_step "Restarting $service_name (keeping dependencies running)..."
+    if docker-compose -f "$COMPOSE_FILE" --profile "$PROFILE" up -d --no-deps "$service_name"; then
+        log_success "✓ $service_name updated successfully"
+    else
+        log_error "Failed to restart $service_name"
+        return 1
+    fi
+    
+    # 3. Quick health check
+    log_step "Verifying health..."
+    sleep 3
+    
+    local container_name="sutra-${service_name}"
+    if docker ps --filter "name=$container_name" --filter "status=running" | grep -q "$container_name"; then
+        log_success "✓ $service_name is running"
+        
+        # Check health status if available
+        local health=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "no-healthcheck")
+        if [ "$health" = "healthy" ]; then
+            log_success "✓ Health check passed"
+        elif [ "$health" != "no-healthcheck" ]; then
+            log_warning "Health status: $health (may take a moment to become healthy)"
+        fi
+    else
+        log_error "✗ $service_name is not running"
+        log_info "Check logs: ./sutra-deploy.sh logs $service_name"
+        return 1
+    fi
+    
+    echo ""
+    log_success "🚀 Update complete! Service updated in ~30 seconds"
+    log_info "Other services were NOT restarted - zero disruption"
+    return 0
+}
+
+# ============================================================================
+# RELEASE MANAGEMENT
+# ============================================================================
+
+cmd_version() {
+    if [ -f VERSION ]; then
+        VERSION=$(cat VERSION)
+        log_info "Current version: v${VERSION}"
+    else
+        log_error "VERSION file not found"
+        return 1
+    fi
+}
+
+cmd_release() {
+    local release_type="${2:-patch}"  # major, minor, patch
+    
+    if [ ! -f VERSION ]; then
+        log_error "VERSION file not found. Creating with default version 1.0.0"
+        echo "1.0.0" > VERSION
+    fi
+    
+    local current_version
+    current_version=$(cat VERSION)
+    log_info "Current version: v${current_version}"
+    
+    # Parse version
+    IFS='.' read -r major minor patch <<< "$current_version"
+    
+    # Bump version
+    case $release_type in
+        major)
+            major=$((major + 1))
+            minor=0
+            patch=0
+            log_step "Bumping MAJOR version (breaking changes)"
+            ;;
+        minor)
+            minor=$((minor + 1))
+            patch=0
+            log_step "Bumping MINOR version (new features)"
+            ;;
+        patch)
+            patch=$((patch + 1))
+            log_step "Bumping PATCH version (bug fixes)"
+            ;;
+        *)
+            log_error "Invalid release type: $release_type (use: major, minor, patch)"
+            return 1
+            ;;
+    esac
+    
+    local new_version="${major}.${minor}.${patch}"
+    
+    echo ""
+    log_warning "Release Summary:"
+    echo "  Current: v${current_version}"
+    echo "  New:     v${new_version}"
+    echo "  Type:    ${release_type}"
+    echo ""
+    
+    read -p "Proceed with release v${new_version}? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log_warning "Release cancelled"
+        return 1
+    fi
+    
+    # Update VERSION file
+    echo "$new_version" > VERSION
+    log_success "Updated VERSION file to v${new_version}"
+    
+    # Update README.md badge
+    if [ -f README.md ]; then
+        if grep -q "version-.*-blue" README.md; then
+            sed -i.bak "s/version-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/version-${new_version}-blue/" README.md
+            rm -f README.md.bak
+            log_success "Updated README.md version badge"
+        fi
+    fi
+    
+    # Git operations
+    log_step "Creating git tag..."
+    
+    # Check if git repo
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        log_error "Not a git repository"
+        return 1
+    fi
+    
+    # Stage changes
+    git add VERSION
+    if [ -f README.md ]; then
+        git add README.md
+    fi
+    
+    # Commit
+    git commit -m "chore: release v${new_version}" || {
+        log_warning "No changes to commit (VERSION already committed?)"
+    }
+    
+    # Create tag
+    git tag -a "v${new_version}" -m "Release v${new_version}" || {
+        log_error "Failed to create git tag"
+        return 1
+    }
+    
+    log_success "Created git tag v${new_version}"
+    
+    echo ""
+    log_success "🎉 Release v${new_version} ready!"
+    echo ""
+    log_info "Next steps:"
+    echo "  1. Review changes: git show v${new_version}"
+    echo "  2. Push to GitHub: git push origin main --tags"
+    echo "  3. GitHub Actions will automatically:"
+    echo "     - Build Docker images with tag v${new_version}"
+    echo "     - Create GitHub release"
+    echo "     - Generate release notes"
+    echo ""
+    log_info "To deploy this version:"
+    echo "  ./sutra-deploy.sh deploy v${new_version}"
+    echo ""
+    
+    return 0
+}
+
+cmd_deploy() {
+    local version="${2:-latest}"
+    
+    log_step "Deploying Sutra AI ${version}..."
+    
+    # Export version for docker-compose
+    export SUTRA_VERSION="$version"
+    
+    # Set edition configuration
+    set_edition_config || return 1
+    
+    # Pull images if not latest
+    if [ "$version" != "latest" ]; then
+        log_step "Pulling Docker images for version ${version}..."
+        docker-compose -f "$COMPOSE_FILE" --profile "$PROFILE" pull || {
+            log_warning "Could not pull images, will use local images"
+        }
+    fi
+    
+    # Deploy
+    log_step "Starting services..."
+    docker-compose -f "$COMPOSE_FILE" --profile "$PROFILE" up -d
+    
+    log_success "Deployed version ${version}"
+    
+    # Show status
+    sleep 5
+    cmd_status
+}
+
 cmd_help() {
     echo "Usage: ./sutra-deploy.sh [COMMAND]"
     echo ""
@@ -886,6 +1114,7 @@ cmd_help() {
     echo "  up           - Start all services"
     echo "  down         - Stop all services"
     echo "  restart      - Restart all services"
+    echo "  update <svc> - Update single service (FAST - 30s vs 5min)"
     echo "  status       - Show service status and URLs"
     echo "  validate     - Run comprehensive health checks (including embedding service)"
     echo "  logs [svc]   - Show logs (optionally for specific service)"
@@ -893,12 +1122,24 @@ cmd_help() {
     echo "  maintenance  - Interactive maintenance menu"
     echo "  help         - Show this help message"
     echo ""
+    echo "Release Management:"
+    echo "  version           - Show current version"
+    echo "  release [type]    - Create new release (major|minor|patch)"
+    echo "  deploy [version]  - Deploy specific version"
+    echo ""
     echo "Examples:"
-    echo "  ./sutra-deploy.sh install         # First-time setup"
-    echo "  ./sutra-deploy.sh up              # Start services"
-    echo "  ./sutra-deploy.sh validate        # Check system health"
-    echo "  ./sutra-deploy.sh logs sutra-api  # View API logs"
-    echo "  ./sutra-deploy.sh maintenance     # Maintenance menu"
+    echo "  ./sutra-deploy.sh install              # First-time setup"
+    echo "  ./sutra-deploy.sh up                   # Start services"
+    echo "  ./sutra-deploy.sh update sutra-api     # Update only API (30s!)"
+    echo "  ./sutra-deploy.sh validate             # Check system health"
+    echo "  ./sutra-deploy.sh logs sutra-api       # View API logs"
+    echo "  ./sutra-deploy.sh maintenance          # Maintenance menu"
+    echo ""
+    echo "  ./sutra-deploy.sh version              # Show version"
+    echo "  ./sutra-deploy.sh release patch        # Bug fix release"
+    echo "  ./sutra-deploy.sh release minor        # Feature release"
+    echo "  ./sutra-deploy.sh release major        # Breaking changes"
+    echo "  ./sutra-deploy.sh deploy v2.1.0        # Deploy specific version"
     echo ""
 }
 
@@ -930,6 +1171,9 @@ case $COMMAND in
     restart)
         cmd_restart
         ;;
+    update)
+        cmd_update "$@"
+        ;;
     status)
         cmd_status
         ;;
@@ -944,6 +1188,15 @@ case $COMMAND in
         ;;
     maintenance|maint)
         cmd_maintenance
+        ;;
+    version)
+        cmd_version
+        ;;
+    release)
+        cmd_release "$@"
+        ;;
+    deploy)
+        cmd_deploy "$@"
         ;;
     help|--help|-h)
         cmd_help

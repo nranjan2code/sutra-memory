@@ -5,7 +5,7 @@
  * using ReactFlow for rendering.
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, memo } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -91,7 +91,7 @@ function getNodeSize(type: string): { width: number; height: number } {
 }
 
 /**
- * Custom node component
+ * Custom node component - memoized for performance
  */
 interface CustomNodeData {
   content: string;
@@ -100,7 +100,7 @@ interface CustomNodeData {
   metadata?: Record<string, unknown>;
 }
 
-const CustomNode: React.FC<{ data: CustomNodeData }> = ({ data }) => {
+const CustomNode = memo<{ data: CustomNodeData }>(({ data }) => {
   const { content, type, confidence } = data;
   const color = getNodeColor(type, confidence);
   const size = getNodeSize(type);
@@ -161,7 +161,7 @@ const CustomNode: React.FC<{ data: CustomNodeData }> = ({ data }) => {
       </Box>
     </Paper>
   );
-};
+});
 
 const nodeTypes = {
   custom: CustomNode,
@@ -274,7 +274,7 @@ function layoutEdges(edges: GraphEdgeData[]): Edge[] {
   }));
 }
 
-export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
+export const KnowledgeGraph = memo<KnowledgeGraphProps>(({
   graphData,
   loading = false,
   error = null,
@@ -395,6 +395,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
       </Paper>
     </Box>
   );
-};
+});
 
 export default KnowledgeGraph;

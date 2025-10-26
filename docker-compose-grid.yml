@@ -683,6 +683,7 @@ services:
 
 
   # Sutra Client (Interactive AI Interface)
+  # Sutra Client (Conversation-First UI)
   sutra-client:
     build:
       context: ./packages/sutra-client
@@ -694,17 +695,21 @@ services:
     environment:
       # Edition Configuration (for UI display)
       - SUTRA_EDITION=${SUTRA_EDITION:-simple}
-      # Service URLs
+      # Service URLs (nginx proxies internally, not exposed to client)
       - SUTRA_API_URL=http://sutra-api:8000
-      - SUTRA_HYBRID_URL=http://sutra-hybrid:8000
+      - SUTRA_HYBRID_URL=http://sutra-hybrid:8001
     depends_on:
-      - sutra-api
-      - sutra-hybrid
+      sutra-api:
+        condition: service_healthy
+      user-storage-server:
+        condition: service_healthy
+      sutra-hybrid:
+        condition: service_healthy
     networks:
       - sutra-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 3s
       retries: 3

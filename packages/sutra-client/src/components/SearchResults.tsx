@@ -4,6 +4,7 @@
  * Displays grouped search results with highlighting and keyboard navigation.
  */
 
+import { memo, useMemo, useCallback } from 'react';
 import { GroupedSearchResults, SearchResult } from '../hooks/useSearch';
 import './SearchResults.css';
 
@@ -14,33 +15,33 @@ interface SearchResultsProps {
   onHover: (index: number) => void;
 }
 
-export default function SearchResults({
+function SearchResultsComponent({
   results,
   selectedIndex,
   onSelect,
   onHover
 }: SearchResultsProps) {
-  // Flatten results for index tracking
-  const allResults = [
+  // Flatten results for index tracking - memoize to avoid recalculation
+  const allResults = useMemo(() => [
     ...results.groups.conversations.results,
     ...results.groups.messages.results,
     ...results.groups.spaces.results
-  ];
+  ], [results.groups.conversations.results, results.groups.messages.results, results.groups.spaces.results])
 
-  // Get global index for a result
-  const getResultIndex = (result: SearchResult): number => {
+  // Get global index for a result - memoize callback
+  const getResultIndex = useCallback((result: SearchResult): number => {
     return allResults.findIndex((r) => r.id === result.id);
-  };
+  }, [allResults])
 
-  // Highlight matches in text
-  const highlightText = (text: string, score: number): JSX.Element => {
+  // Highlight matches in text - memoize callback
+  const highlightText = useCallback((_text: string, _score: number): JSX.Element => {
     // For now, simple bold rendering
     // In production, you'd want to highlight actual query matches
-    return <span>{text}</span>;
-  };
+    return <span>{_text}</span>;
+  }, [])
 
-  // Format timestamp
-  const formatTimestamp = (timestamp: string): string => {
+  // Format timestamp - memoize callback
+  const formatTimestamp = useCallback((timestamp: string): string => {
     const date = new Date(timestamp);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -54,7 +55,7 @@ export default function SearchResults({
     if (diffDays < 7) return `${diffDays}d ago`;
     
     return date.toLocaleDateString();
-  };
+  }, [])
 
   return (
     <div className="search-results">
@@ -239,3 +240,11 @@ export default function SearchResults({
     </div>
   );
 }
+
+// Export memoized version - only re-render if results or selectedIndex changes
+export default memo(SearchResultsComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.results === nextProps.results &&
+    prevProps.selectedIndex === nextProps.selectedIndex
+  )
+})

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback, useMemo } from 'react'
 import { Box, Typography } from '@mui/material'
 import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -29,10 +29,14 @@ export default function ChatInterface() {
     enabled: !!conversationId,
   })
 
-  // Scroll to bottom when messages change or streaming updates
-  useEffect(() => {
+  // Scroll to bottom when messages change or streaming updates - memoize callback
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messagesData?.messages, streamState.partialContent])
+  }, [])
+  
+  useEffect(() => {
+    scrollToBottom()
+  }, [messagesData?.messages, streamState.partialContent, scrollToBottom])
 
   // Invalidate messages when streaming completes
   useEffect(() => {
@@ -50,12 +54,12 @@ export default function ChatInterface() {
     }
   }, [streamState.error, toast])
 
-  // Handle send
-  const handleSend = (message: string) => {
+  // Handle send - memoize callback to prevent unnecessary re-renders
+  const handleSend = useCallback((message: string) => {
     if (conversationId) {
       sendStreamMessage(conversationId, message)
     }
-  }
+  }, [conversationId, sendStreamMessage])
 
   // No conversation selected
   if (!conversationId) {

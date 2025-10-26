@@ -1,6 +1,7 @@
-import { Box, List, ListItem, ListItemButton, Typography } from '@mui/material'
+import { Box, List, ListItem, ListItemButton, Typography, CircularProgress } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
+import { memo, useMemo, useCallback, useEffect, useRef } from 'react'
 import { conversationApi } from '../services/api'
 import type { Conversation } from '../types/api'
 import { ConversationSkeleton } from './LoadingSkeleton'
@@ -9,18 +10,58 @@ interface ConversationListProps {
   spaceId?: string
 }
 
-export default function ConversationList({ spaceId }: ConversationListProps) {
+const PAGE_SIZE = 50
+
+function ConversationListComponent({ spaceId }: ConversationListProps) {
   const navigate = useNavigate()
   const { conversationId } = useParams()
+  const loadMoreRef = useRef<HTMLDivElement>(null)
 
-  // Fetch conversations
-  const { data, isLoading, error } = useQuery({
+  // Fetch conversations with infinite loading
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['conversations', spaceId],
-    queryFn: () => conversationApi.listConversations(1, 50, spaceId),
+    queryFn: ({ pageParam = 1 }) =>
+      conversationApi.listConversations(pageParam, PAGE_SIZE, spaceId),
+    getNextPageParam: (lastPage, pages) => {
+      // If the last page has fewer items than PAGE_SIZE, we've reached the end
+      if (lastPage.conversations.length < PAGE_SIZE) return undefined
+      return pages.length + 1
+    },
+    initialPageParam: 1,
   })
 
-  // Group conversations by date
-  const groupByDate = (conversations: Conversation[]) => {
+  // Intersection observer for infinite scroll
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasNextPage || isFetchingNextPage) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchNextPage()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    observer.observe(loadMoreRef.current)
+    return () => observer.disconnect()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  // Flatten all pages into single conversations array - memoize to avoid recalculation
+  const conversations = useMemo(() => {
+    if (!data?.pages) return []
+    return data.pages.flatMap(page => page.conversations)
+  }, [data?.pages])
+  
+  // Group conversations by date - memoize to avoid recalculation
+  const groupByDate = useCallback((conversations: Conversation[]) => {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const yesterday = new Date(today)
@@ -51,12 +92,18 @@ export default function ConversationList({ spaceId }: ConversationListProps) {
     })
 
     return groups
-  }
+  }, [])
 
-  const truncateText = (text: string, maxLength: number = 50) => {
+  const truncateText = useCallback((text: string, maxLength: number = 50) => {
     if (text.length <= maxLength) return text
     return text.substring(0, maxLength) + '...'
-  }
+  }, [])
+  
+  // Memoize grouped conversations to avoid recalculation
+  const grouped = useMemo(() => {
+    if (conversations.length === 0) return {}
+    return groupByDate(conversations)
+  }, [conversations, groupByDate])
 
   if (isLoading) {
     return (
@@ -75,8 +122,7 @@ export default function ConversationList({ spaceId }: ConversationListProps) {
       </Box>
     )
   }
-
-  const conversations = data?.conversations || []
+  
   if (conversations.length === 0) {
     return (
       <Box sx={{ p: 2 }}>
@@ -86,8 +132,6 @@ export default function ConversationList({ spaceId }: ConversationListProps) {
       </Box>
     )
   }
-
-  const grouped = groupByDate(conversations)
 
   return (
     <Box sx={{ overflow: 'auto', height: '100%' }}>
@@ -174,6 +218,24 @@ export default function ConversationList({ spaceId }: ConversationListProps) {
           </Box>
         )
       })}
+      
+      {/* Infinite scroll trigger */}
+      {hasNextPage && (
+        <Box ref={loadMoreRef} sx={{ p: 2, textAlign: 'center' }}>
+          {isFetchingNextPage ? (
+            <CircularProgress size={24} />
+          ) : (
+            <Typography variant="caption" color="text.secondary">
+              Loading more...
+            </Typography>
+          )}
+        </Box>
+      )}
     </Box>
   )
 }
+
+// Export memoized version - only re-render if spaceId changes
+export default memo(ConversationListComponent, (prevProps, nextProps) => {
+  return prevProps.spaceId === nextProps.spaceId
+})

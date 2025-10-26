@@ -1,5 +1,6 @@
 import { Box, Typography, Avatar, Paper } from '@mui/material'
 import { Person, SmartToy } from '@mui/icons-material'
+import { memo, useMemo } from 'react'
 import type { Message as MessageType } from '../types/api'
 import ReasoningPathView from './ReasoningPathView'
 
@@ -8,12 +9,13 @@ interface MessageProps {
   conversationId?: string
 }
 
-export default function Message({ message, conversationId }: MessageProps) {
+// Memoized Message component to prevent unnecessary re-renders
+function MessageComponent({ message, conversationId }: MessageProps) {
   const isUser = message.type === 'user'
   
-  // Format timestamp
-  const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp)
+  // Format timestamp - memoize to avoid recalculation
+  const formattedTime = useMemo(() => {
+    const date = new Date(message.timestamp)
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
     const diffMins = Math.floor(diffMs / 60000)
@@ -30,7 +32,7 @@ export default function Message({ message, conversationId }: MessageProps) {
       day: 'numeric',
       year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
     })
-  }
+  }, [message.timestamp])
 
   return (
     <Box
@@ -113,7 +115,7 @@ export default function Message({ message, conversationId }: MessageProps) {
             fontSize: '0.75rem',
           }}
         >
-          {formatTime(message.timestamp)}
+          {formattedTime}
         </Typography>
 
         {/* Reasoning Path Visualization for assistant messages */}
@@ -130,3 +132,13 @@ export default function Message({ message, conversationId }: MessageProps) {
     </Box>
   )
 }
+
+// Export memoized version - only re-render if message or conversationId changes
+export default memo(MessageComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.content === nextProps.message.content &&
+    prevProps.message.timestamp === nextProps.message.timestamp &&
+    prevProps.conversationId === nextProps.conversationId
+  )
+})

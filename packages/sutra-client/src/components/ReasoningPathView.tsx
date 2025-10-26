@@ -5,7 +5,7 @@
  * Shows the knowledge graph with highlighted paths and confidence scores.
  */
 
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import {
   Box,
   Card,
@@ -30,10 +30,11 @@ import {
   CheckCircle,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
-import KnowledgeGraph from './KnowledgeGraph';
 import { graphApi } from '../services/api';
 import { MessageGraphResponse } from '../types/api';
 
+// Lazy load KnowledgeGraph for better initial bundle size
+const KnowledgeGraph = lazy(() => import('./KnowledgeGraph'))
 interface ReasoningPathViewProps {
   messageId: string;
   conversationId: string;
@@ -206,11 +207,23 @@ export const ReasoningPathView: React.FC<ReasoningPathViewProps> = ({
 
               {/* Knowledge graph */}
               <Box mt={2}>
-                <KnowledgeGraph
-                  graphData={graphData.graph}
-                  onNodeClick={handleNodeClick}
-                  height={500}
-                />
+                <Suspense fallback={
+                  <Box
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    height={500}
+                    sx={{ backgroundColor: 'background.default', borderRadius: 2 }}
+                  >
+                    <CircularProgress />
+                  </Box>
+                }>
+                  <KnowledgeGraph
+                    graphData={graphData.graph}
+                    onNodeClick={handleNodeClick}
+                    height={500}
+                  />
+                </Suspense>
               </Box>
 
               {/* Selected node detail */}

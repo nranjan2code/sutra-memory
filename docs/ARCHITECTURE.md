@@ -52,23 +52,47 @@ Sutra AI now includes a **world-class ML Foundation** (`sutra-ml-base`) that pro
 - **Reliability**: Shared foundation with battle-tested components
 - **Performance**: Edition-aware resource management and caching
 
-## 🚨 CRITICAL PRODUCTION REQUIREMENTS
+### 🚨 CRITICAL PRODUCTION REQUIREMENTS
 
-### Embedding System (MANDATORY)
+### Embedding System (MANDATORY - v2.0+)
 
-**⚠️ WARNING:** The system CANNOT function without proper embedding configuration. All production deployments MUST ensure:
+**⚠️ WARNING:** The system CANNOT function without proper embedding configuration.
 
-1. **Ollama Service**: Must be accessible at `SUTRA_OLLAMA_URL` with `granite-embedding:30m` model loaded
-2. **TCP Protocol**: ALL services MUST use `sutra-storage-client-tcp` package - NEVER direct storage access
-3. **Message Format**: Unit variants (`GetStats`, `Flush`, `HealthCheck`) send string, not `{variant: {}}`
-4. **Vector Serialization**: Always convert numpy arrays to Python lists before TCP transport
-5. **Error Handling**: Implement retry logic for TCP connection failures
+**Official Embedding Provider**:
+
+```yaml
+REQUIRED:
+  - Service: sutra-embedding-service  
+  - Model: nomic-ai/nomic-embed-text-v1.5
+  - Dimensions: 768 (FIXED)
+  - URL: SUTRA_EMBEDDING_SERVICE_URL=http://sutra-embedding-service:8888
+  - NO external dependencies
+  - NO fallback providers
+
+DEPRECATED (v1.x):
+  - Ollama integration ❌ (removed October 2025)
+  - granite-embedding ❌ (384-d caused dimension mismatch bugs)
+  - sentence-transformers fallback ❌
+  - spaCy embeddings ❌
+  - TF-IDF fallback ❌
+```
+
+**See**: `docs/EMBEDDING_ARCHITECTURE.md` for complete architecture documentation.
+
+### TCP Protocol Requirements
+
+**ALL services MUST use `sutra-storage-client-tcp` package** - NEVER direct storage access:
+
+1. **Message Format**: Unit variants (`GetStats`, `Flush`, `HealthCheck`) send string, not `{variant: {}}`
+2. **Vector Serialization**: Always convert numpy arrays to Python lists before TCP transport
+3. **Error Handling**: Implement retry logic for TCP connection failures
 
 **Common Failure Modes:**
-- "No embedding processor available" → Ollama not accessible or model not loaded
+- "No embedding processor available" → Embedding service not accessible or model not loaded
 - "can not serialize 'numpy.ndarray' object" → Missing array-to-list conversion
 - "wrong msgpack marker" → Incorrect message format for unit variants
 - "Connection closed" → TCP client using wrong protocol
+- "Dimension mismatch: expected 768, got 384" → Old data from deprecated granite-embedding (requires clean rebuild)
 
 ---
 
@@ -267,8 +291,8 @@ TCP Storage Client (sutra-storage-client-tcp)
     ↓
 Storage Server Learning Pipeline (Single Source of Truth)
     ├─ 🔴 STEP 1: Embedding Generation
-    │   ├─ HTTP request → Ollama (granite-embedding:30m, 768 dims)
-    │   ├─ ⚠️ FAILS if Ollama not accessible → "No embedding processor available"
+    │   ├─ HTTP request → sutra-embedding-service (nomic-embed-text-v1.5, 768 dims)
+    │   ├─ ⚠️ FAILS if embedding service not accessible → "No embedding processor available"
     │   └─ Embedding stored with concept
     ├─ 🔴 STEP 2: Association Extraction  
     │   ├─ Rust-based NLP pattern matching

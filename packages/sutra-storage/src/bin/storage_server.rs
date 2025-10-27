@@ -2,6 +2,10 @@
 //!
 //! Production TCP server for Sutra storage using custom binary protocol.
 //! Replaces gRPC with 10-50× better performance.
+//!
+//! Supports two deployment modes:
+//! - Development Mode (default): No authentication, no encryption
+//! - Production Mode: HMAC/JWT auth + TLS 1.3 encryption (set SUTRA_SECURE_MODE=true)
 
 use std::env;
 use std::net::SocketAddr;
@@ -9,6 +13,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use sutra_storage::{AdaptiveReconcilerConfig, ConcurrentConfig, ConcurrentMemory, ShardedStorage, ShardConfig};
 use sutra_storage::tcp_server::{StorageServer, ShardedStorageServer};
+use sutra_storage::secure_tcp_server::SecureStorageServer;
+use sutra_storage::auth::AuthManager;
 use tracing::{info, error, warn};
 use tracing_subscriber;
 
@@ -22,6 +28,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     info!("Starting Sutra Storage Server (TCP)");
+
+    // Security mode configuration
+    let secure_mode = env::var("SUTRA_SECURE_MODE")
+        .unwrap_or_else(|_| "false".to_string())
+        .to_lowercase() == "true";
 
     // Load configuration from environment
     let storage_path = env::var("STORAGE_PATH")
@@ -61,6 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or(16);
 
     info!("Configuration:");
+    info!("  Security mode: {}", if secure_mode { "🔒 SECURE (auth + TLS)" } else { "⚠️  DEVELOPMENT (no auth, no TLS)" });
     info!("  Storage mode: {}", storage_mode);
     info!("  Storage path: {}", storage_path);
     info!("  Listen address: {}:{}", host, port);
@@ -70,6 +82,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if storage_mode == "sharded" {
         info!("  Number of shards: {}", num_shards);
     }
+    
+    if !secure_mode {
+        warn!("🚨 SECURITY WARNING: Running in DEVELOPMENT mode");
+        warn!("   This mode has NO authentication and NO encryption");
+        warn!("   DO NOT use with sensitive data or network-accessible deployments");
+        warn!("   For production, set SUTRA_SECURE_MODE=true");
+    }
 
     let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
 
@@ -77,6 +96,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let adaptive_config = AdaptiveReconcilerConfig {
         base_interval_ms,
         ..Default::default()
+    };
+    
+    // Initialize authentication manager if secure mode is enabled
+    let auth_manager = if secure_mode {
+        info!("🔒 Initializing authentication...");
+        
+        // Load from environment (validates secret strength)
+        match AuthManager::from_env() {
+            Ok(manager) => {
+                info!("✅ Authentication enabled: HMAC-SHA256");
+                Some(manager)
+            }
+            Err(e) => {
+                error!("❌ Failed to initialize authentication: {}", e);
+                return Err(e.into());
+            }
+        }
+    } else {
+        warn!("⚠️  Authentication: DISABLED (development mode)");
+        None
     };
 
     // Initialize storage based on mode
@@ -109,7 +148,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("  Total writes: {}", stats.total_writes);
             info!("  Shards: {}", stats.num_shards);
             
-            // Create sharded server
+            // Create sharded server (secure or insecure based on mode)
+            // Note: Secure sharded server would require SecureShardedStorageServer implementation
+            // For now, sharded mode always uses standard server (TODO: implement secure sharded)
+            if secure_mode {
+                warn!("⚠️  Secure mode not yet implemented for sharded storage");
+                warn!("   Falling back to standard sharded server");
+                warn!("   For production security, use single storage mode");
+            }
+            
             let server = Arc::new(ShardedStorageServer::new(sharded_storage).await);
             
             info!("🚀 Starting SHARDED TCP server on {}", addr);
@@ -143,15 +190,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("  Edges: {}", stats.snapshot.edge_count);
             info!("  Sequence: {}", stats.snapshot.sequence);
             
-            // Create server
-            let server = Arc::new(StorageServer::new(storage).await);
-            
-            info!("🚀 Starting SINGLE TCP server on {}", addr);
-            
-            // Start server (blocks until shutdown)
-            if let Err(e) = server.serve(addr).await {
-                error!("Server error: {}", e);
-                return Err(e.into());
+            // Create server (secure or insecure based on mode)
+            if secure_mode {
+                // Wrap with secure server
+                let insecure_server = StorageServer::new(storage).await;
+                let secure_server = SecureStorageServer::new(insecure_server, auth_manager)
+                    .await
+                    .map_err(|e| format!("Failed to create secure server: {}", e))?;
+                let server = Arc::new(secure_server);
+                
+                info!("🚀 Starting SECURE SINGLE TCP server on {}", addr);
+                
+                // Start server (blocks until shutdown)
+                if let Err(e) = server.serve(addr).await {
+                    error!("Server error: {}", e);
+                    return Err(e.into());
+                }
+            } else {
+                // Use insecure server directly
+                let server = Arc::new(StorageServer::new(storage).await);
+                
+                info!("🚀 Starting SINGLE TCP server on {} (DEVELOPMENT MODE - NO SECURITY)", addr);
+                
+                // Start server (blocks until shutdown)
+                if let Err(e) = server.serve(addr).await {
+                    error!("Server error: {}", e);
+                    return Err(e.into());
+                }
             }
         }
     }

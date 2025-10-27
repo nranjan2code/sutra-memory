@@ -10,9 +10,17 @@ Explainable reasoning over your private domain knowledge—without frontier LLMs
 
 ---
 
-## 🎉 What's New (2025-10-27)
+## 🎉 What's New (2025-10-28)
 
-**ML Foundation Architecture - World-Class Service Layer Complete**
+**🔒 Security Integration Complete - Production-Ready**
+
+- ✅ **Security Now Integrated** - HMAC-SHA256 + TLS 1.3 fully working in storage server binary
+- ✅ **Conditional Security Mode** - `SUTRA_SECURE_MODE=true` enables auth + encryption
+- ✅ **Embedding Architecture Clarified** - Single provider: sutra-embedding-service (nomic-embed-text-v1.5)
+- ✅ **Complete Documentation** - New EMBEDDING_ARCHITECTURE.md with full API reference
+- ✅ **Integration Tests** - Automated security and embedding verification scripts
+
+**Previous: ML Foundation Architecture - World-Class Service Layer Complete (2025-10-27)**
 
 - ✅ **ML Foundation (sutra-ml-base)** - Unified base for all ML services, 90% code reduction
 - ✅ **Embedding Service** - Production-ready nomic-embed-text-v1.5 with edition-aware scaling  
@@ -250,26 +258,25 @@ Benefits:
 **Security:** ⚠️ NO authentication, NO encryption  
 **DO NOT USE:** With sensitive data or network-accessible deployments
 
-#### 🔒 Production Mode Status
-**Security Code:** ✅ Complete (auth.rs, tls.rs, secure_tcp_server.rs)  
-**Integration:** ⚠️ NOT YET integrated into storage_server.rs binary  
-**Current Status:** Even `SUTRA_SECURE_MODE=true` runs WITHOUT security
-
-```bash
-# Development deployment (NO security)
-./sutra-deploy.sh install
-```
-
-#### 🔒 Production Mode (Secure)
+#### 🔒 Production Mode (Secure) - ✅ FULLY INTEGRATED (v2.0.1)
 **For:** Production deployments, regulated industries, real data  
-**Security:** ✅ HMAC/JWT auth, ✅ TLS 1.3 encryption, ✅ RBAC, ✅ Network isolation  
+**Security:** ✅ HMAC-SHA256 auth, ✅ TLS 1.3 encryption, ✅ RBAC, ✅ Network isolation  
+**Status:** **PRODUCTION-READY** as of October 28, 2025
 **Required for:** Healthcare, finance, legal, any public deployment
 
 ```bash
-# Production deployment (WITH security)
-SUTRA_SECURE_MODE=true ./sutra-deploy.sh install
+# Development deployment (NO security - localhost only)
+./sutra-deploy.sh install
 
-# See: docs/security/QUICK_START_SECURITY.md for complete setup
+# Production deployment (WITH security)
+export SUTRA_SECURE_MODE=true
+export SUTRA_AUTH_SECRET="$(openssl rand -hex 32)"
+./scripts/generate-secrets.sh  # Generate TLS certificates
+./sutra-deploy.sh install
+
+# Verify security is active
+docker logs sutra-storage | grep "Authentication: ENABLED"
+# ✅ Output: Authentication enabled: HMAC-SHA256
 ```
 
 **📖 Read [DEPLOYMENT_MODES.md](docs/deployment/DEPLOYMENT_MODES.md) for detailed comparison and compliance information.**

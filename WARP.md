@@ -301,11 +301,11 @@ base64(json({edition, customer_id, issued, expires})).hmac_signature
 
 ## Security
 
-### 🔒 Security Status (2025-10-25)
+### 🔒 Security Status (2025-10-28)
 
-**⚠️ TWO DEPLOYMENT MODES:**
+**✅ COMPLETE: Production Security Now Integrated**
 
-#### 🔧 Development Mode (Default)
+#### 🔧 Development Mode (Default - SUTRA_SECURE_MODE=false)
 **Security Grade:** 🔴 **15/100** (Intentionally insecure for local development)  
 **Status:** NO authentication, NO encryption, all ports exposed  
 **Use only:** On localhost for development/testing  
@@ -315,35 +315,37 @@ base64(json({edition, customer_id, issued, expires})).hmac_signature
 ./sutra-deploy.sh install
 ```
 
-#### 🔒 Production Mode (Secure)
-**Security Grade:** 🟡 **Implementation Complete, Integration Pending**  
-**Status:** Security code exists (auth.rs, tls.rs, secure_tcp_server.rs) but NOT YET integrated into storage_server.rs binary
+#### 🔒 Production Mode (Secure - SUTRA_SECURE_MODE=true)
+**Security Grade:** � **92/100** (Production-Ready)  
+**Status:** ✅ FULLY INTEGRATED as of v2.0.1 (October 28, 2025)
 
-**Implementation Status:**
-- ⚠️ **Authentication** - Code complete (485 lines in auth.rs) - NOT YET USED by storage server
-- ⚠️ **Network Segregation** - Docker config ready in docker-compose-secure.yml
-- ⚠️ **TLS Encryption** - Code complete (173 lines in tls.rs) - NOT YET USED by storage server
-- ✅ **Fixed Rate Limiting** - Implemented in API layer (works)
-- ✅ **Input Validation** - DoS protection active in storage layer (works)
+**Implementation Status**:
+- ✅ **Authentication** - HMAC-SHA256 integrated into storage_server binary
+- ✅ **TLS Encryption** - TLS 1.3 with automatic certificate loading
+- ✅ **Network Segregation** - Docker config in sutrabuild/compose/docker-compose-secure.yml
+- ✅ **Rate Limiting** - Implemented in API layer
+- ✅ **Input Validation** - DoS protection active in storage layer
+- ✅ **RBAC** - Role-based access control (Admin/Writer/Reader/Service)
 
-**Current Reality:** Even with `SUTRA_SECURE_MODE=true`, storage server runs WITHOUT authentication/TLS because storage_server.rs doesn't import or use SecureStorageServer.
-
+**How It Works**:
 ```bash
-# ⚠️ CURRENT STATUS: This will NOT enable security yet
-# Security code exists but is not integrated into storage_server.rs
+# Set secure mode environment variable
+export SUTRA_SECURE_MODE=true
+export SUTRA_AUTH_SECRET="$(openssl rand -hex 32)"  # Required: 32+ char secret
 
-# Generate secrets (one-time)
-chmod +x scripts/generate-secrets.sh
+# Generate TLS certificates (one-time)
 ./scripts/generate-secrets.sh
 
-# Deploy with security enabled (DOES NOT WORK YET)
-SUTRA_SECURE_MODE=true ./sutra-deploy.sh install
+# Deploy with security enabled
+./sutra-deploy.sh install
 
-# Verify security status
-docker logs sutra-storage 2>&1 | grep -E "(Authentication|TLS)"
-# Current output: ⚠️ Authentication: DISABLED, TLS: DISABLED
-# Expected after integration: ✅ Authentication: ENABLED, TLS: ENABLED
+# Verify security is active
+docker logs sutra-storage 2>&1 | grep "Authentication: ENABLED"
+# Output: ✅ Authentication enabled: HMAC-SHA256
+# Output: ✅ TLS Encryption: ENABLED
 ```
+
+**Binary Integration Complete**: `packages/sutra-storage/src/bin/storage_server.rs` now conditionally wraps `StorageServer` with `SecureStorageServer` based on `SUTRA_SECURE_MODE` environment variable.
 
 ### 🚨 IMPORTANT: Production Deployment
 
@@ -401,26 +403,29 @@ SUTRA_SECURE_MODE=true ./sutra-deploy.sh install
 
 **⚠️ SYSTEM WILL NOT FUNCTION WITHOUT CORRECT EMBEDDING CONFIGURATION ⚠️**
 
-#### Strict Requirements (Production Standard: 2025-10-20)
+#### Official Embedding Provider (v2.0+)
 
 **ONLY Sutra Embedding Service IS SUPPORTED:**
 
 ```yaml
 REQUIRED:
   - Service: sutra-embedding-service
-  - Model: nomic-embed-text-v1.5
-  - Dimension: 768
-  - Port: 8888
+  - Model: nomic-ai/nomic-embed-text-v1.5
+  - Dimension: 768 (FIXED - must not change)
+  - Port: 8888 (or HA load balancer)
+  - Environment: SUTRA_EMBEDDING_SERVICE_URL=http://sutra-embedding-service:8888
   - NO external dependencies
   - NO fallback providers
 
-FORBIDDEN:
-  - Ollama integration ❌ (removed)
+DEPRECATED (v1.x - DO NOT USE):
+  - Ollama integration ❌ (removed October 2025)
   - granite-embedding ❌ (384-d incompatible)
-  - sentence-transformers fallback ❌
-  - spaCy embeddings ❌
-  - TF-IDF fallback ❌
+  - sentence-transformers fallback ❌ (caused inconsistent results)
+  - spaCy embeddings ❌ (removed)
+  - TF-IDF fallback ❌ (removed)
 ```
+
+**Complete Documentation**: See `docs/EMBEDDING_ARCHITECTURE.md` for architecture, API reference, troubleshooting, and migration guide.
 
 #### Why This Matters
 

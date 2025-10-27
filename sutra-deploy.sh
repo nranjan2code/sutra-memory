@@ -408,7 +408,8 @@ cmd_up() {
     log_info "Using profile: ${PROFILE}"
     log_debug "Command: docker-compose -f $COMPOSE_FILE --profile $PROFILE up -d"
     
-    if docker-compose -f "$COMPOSE_FILE" --profile "$PROFILE" up -d 2>&1 | tee /tmp/sutra-up.log | grep -qE "(Started|Creating|recreated|up-to-date)"; then
+    # Run docker-compose up and capture output
+    if docker-compose -f "$COMPOSE_FILE" --profile "$PROFILE" up -d > /tmp/sutra-up.log 2>&1; then
         log_success "Services started for ${EDITION} edition"
     else
         log_error "Failed to start services"

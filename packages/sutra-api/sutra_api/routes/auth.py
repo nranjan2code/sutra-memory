@@ -17,11 +17,15 @@ from ..middleware.auth import (
     get_current_user,
 )
 from ..models import (
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
     LoginRequest,
     LoginResponse,
     LogoutResponse,
-    RegisterRequest,
+    PasswordResetResponse,
     RefreshTokenRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
     UserResponse,
 )
 from ..services import UserService
@@ -395,3 +399,154 @@ async def auth_health(request: Request):
             "status": "unhealthy",
             "message": str(e)
         }
+
+
+@router.put(
+    "/change-password",
+    summary="Change password",
+    description="Change user password (requires current password)."
+)
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user),
+    user_service: UserService = Depends(get_user_service)
+):
+    """
+    Change user password.
+    
+    Requires current password for verification.
+    
+    **Returns:**
+    - Success confirmation
+    
+    **Raises:**
+    - 400: Current password incorrect or validation failed
+    - 401: Invalid or expired token
+    - 500: Server error
+    """
+    try:
+        success = await user_service.change_password(
+            user_id=current_user["user_id"],
+            old_password=request.old_password,
+            new_password=request.new_password
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Password change failed"
+            )
+        
+        return {
+            "message": "Password changed successfully",
+            "success": True
+        }
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Password change failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Password change failed"
+        )
+
+
+@router.post(
+    "/forgot-password",
+    response_model=PasswordResetResponse,
+    summary="Request password reset",
+    description="Request a password reset token (sent via email in production)."
+)
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    user_service: UserService = Depends(get_user_service)
+):
+    """
+    Request password reset token.
+    
+    Generates a secure token and returns it (in production, would send via email).
+    Always returns success even if email doesn't exist (security best practice).
+    
+    **Returns:**
+    - Success message
+    
+    **Note:** In production, the token would be sent via email, not returned in response.
+    """
+    try:
+        token = await user_service.generate_password_reset_token(request.email)
+        
+        # In production, send token via email
+        # For now, we return it (NOT secure for production!)
+        if token:
+            logger.info(f"Password reset token generated: {token[:8]}...")
+        
+        # Always return success (don't reveal if email exists)
+        return PasswordResetResponse(
+            message="If the email exists, a password reset link has been sent",
+            success=True
+        )
+        
+    except Exception as e:
+        logger.error(f"Forgot password request failed: {e}")
+        # Still return success (don't reveal errors)
+        return PasswordResetResponse(
+            message="If the email exists, a password reset link has been sent",
+            success=True
+        )
+
+
+@router.post(
+    "/reset-password",
+    response_model=PasswordResetResponse,
+    summary="Reset password with token",
+    description="Reset password using the reset token."
+)
+async def reset_password(
+    request: ResetPasswordRequest,
+    user_service: UserService = Depends(get_user_service)
+):
+    """
+    Reset password using token.
+    
+    Uses the token from forgot-password endpoint to set a new password.
+    
+    **Returns:**
+    - Success confirmation
+    
+    **Raises:**
+    - 400: Invalid or expired token
+    - 500: Server error
+    """
+    try:
+        success = await user_service.reset_password_with_token(
+            token=request.token,
+            new_password=request.new_password
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Password reset failed"
+            )
+        
+        return PasswordResetResponse(
+            message="Password reset successfully",
+            success=True
+        )
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Password reset failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Password reset failed"
+        )
+

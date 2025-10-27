@@ -278,7 +278,7 @@ services:
   # Single Embedding Service (Simple & Community Editions)
   embedding-single:
     build:
-      context: ../../packages/sutra-embedding-service
+      context: ./packages/sutra-embedding-service
       dockerfile: Dockerfile
     image: sutra-embedding-service:${SUTRA_VERSION:-latest}
     container_name: embedding-single
@@ -292,7 +292,7 @@ services:
       - BATCH_SIZE=32
       - INSTANCE_ID=embedding-single
     volumes:
-      - ../../packages/sutra-embedding-service/models:/models:ro
+      - ./packages/sutra-embedding-service/models:/models:ro
     networks:
       - sutra-network
     restart: unless-stopped
@@ -329,7 +329,7 @@ services:
       - EVENT_STORAGE=grid-event-storage:50051
       - INSTANCE_ID=embedding-1
     volumes:
-      - ../../packages/sutra-embedding-service/models:/models:ro
+      - ./packages/sutra-embedding-service/models:/models:ro
     networks:
       - sutra-network
     restart: unless-stopped
@@ -361,7 +361,7 @@ services:
       - EVENT_STORAGE=grid-event-storage:50051
       - INSTANCE_ID=embedding-2
     volumes:
-      - ../../packages/sutra-embedding-service/models:/models:ro
+      - ./packages/sutra-embedding-service/models:/models:ro
     networks:
       - sutra-network
     restart: unless-stopped
@@ -393,7 +393,7 @@ services:
       - EVENT_STORAGE=grid-event-storage:50051
       - INSTANCE_ID=embedding-3
     volumes:
-      - ../../packages/sutra-embedding-service/models:/models:ro
+      - ./packages/sutra-embedding-service/models:/models:ro
     networks:
       - sutra-network
     restart: unless-stopped
@@ -445,7 +445,7 @@ services:
   # NLG Service (Simple/Community Edition)
   nlg-single:
     build:
-      context: ../../packages/sutra-nlg-service
+      context: ./packages/sutra-nlg-service
       dockerfile: Dockerfile
     image: sutra-nlg-service:${SUTRA_VERSION:-latest}
     container_name: nlg-single
@@ -459,7 +459,7 @@ services:
       - PORT=8889
       - HF_TOKEN=${HF_TOKEN}
     volumes:
-      - ../../packages/sutra-nlg-service/models:/app/models:ro
+      - ./packages/sutra-nlg-service/models:/app/models:ro
     networks:
       - sutra-network
     restart: unless-stopped
@@ -486,7 +486,7 @@ services:
   # NLG Service Replica 1
   nlg-ha-1:
     build:
-      context: ../../packages/sutra-nlg-service
+      context: ./packages/sutra-nlg-service
       dockerfile: Dockerfile
     image: sutra-nlg-service:${SUTRA_VERSION:-latest}
     container_name: nlg-1
@@ -498,7 +498,7 @@ services:
       - PORT=8889
       - HF_TOKEN=${HF_TOKEN}
     volumes:
-      - ../../packages/sutra-nlg-service/models:/app/models:ro
+      - ./packages/sutra-nlg-service/models:/app/models:ro
     networks:
       - sutra-network
     restart: unless-stopped
@@ -529,7 +529,7 @@ services:
       - PORT=8889
       - HF_TOKEN=${HF_TOKEN}
     volumes:
-      - ../../packages/sutra-nlg-service/models:/app/models:ro
+      - ./packages/sutra-nlg-service/models:/app/models:ro
     networks:
       - sutra-network
     restart: unless-stopped
@@ -560,7 +560,7 @@ services:
       - PORT=8889
       - HF_TOKEN=${HF_TOKEN}
     volumes:
-      - ../../packages/sutra-nlg-service/models:/app/models:ro
+      - ./packages/sutra-nlg-service/models:/app/models:ro
     networks:
       - sutra-network
     restart: unless-stopped
@@ -686,7 +686,7 @@ services:
   # Sutra Client (Conversation-First UI)
   sutra-client:
     build:
-      context: ../../packages/sutra-client
+      context: ./packages/sutra-client
       dockerfile: Dockerfile
     image: sutra-client:${SUTRA_VERSION:-latest}
     container_name: sutra-client

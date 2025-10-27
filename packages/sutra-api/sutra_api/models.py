@@ -352,3 +352,53 @@ class LogoutResponse(BaseModel):
     success: bool = Field(default=True, description="Logout success status")
 
 
+class UpdateUserRequest(BaseModel):
+    """Request model for updating user profile."""
+    
+    email: Optional[str] = Field(None, description="New email address")
+    full_name: Optional[str] = Field(None, description="New full name")
+    organization: Optional[str] = Field(None, description="New organization")
+
+
+class ChangePasswordRequest(BaseModel):
+    """Request model for changing password."""
+    
+    old_password: str = Field(..., description="Current password")
+    new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Request model for forgot password."""
+    
+    email: str = Field(..., description="User email address")
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request model for password reset."""
+    
+    token: str = Field(..., description="Password reset token")
+    new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+
+
+class PasswordResetResponse(BaseModel):
+    """Response model for password reset request."""
+    
+    message: str = Field(..., description="Response message")
+    success: bool = Field(default=True, description="Request success status")
+
+
+class UserListResponse(BaseModel):
+    """Response model for user list."""
+    
+    users: list = Field(..., description="List of users")
+    total: int = Field(..., description="Total number of users")
+
+
+class DeleteUserResponse(BaseModel):
+    """Response model for user deletion."""
+    
+    message: str = Field(..., description="Deletion confirmation message")
+    success: bool = Field(default=True, description="Deletion success status")
+    user_id: str = Field(..., description="Deleted user ID")
+
+

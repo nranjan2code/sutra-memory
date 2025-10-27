@@ -123,11 +123,13 @@ export const authApi = {
   /**
    * Register a new user
    */
-  async register(email: string, password: string, organization: string) {
+  async register(email: string, password: string, organization: string, fullName?: string, role?: string) {
     const { data } = await api.post('/auth/register', {
       email,
       password,
       organization,
+      full_name: fullName,
+      role: role || 'user',
     })
     return data
   },

@@ -228,17 +228,18 @@ class NLGService:
         cached_response = self.cache.get(request)
         if cached_response:
             logger.debug("Returning cached generation response")
-            self.monitor.record_metric('nlg_cache_hits', 1)
+            # Cache hit - no need to track this as a request since it's cached
             return cached_response
         
-        self.monitor.record_metric('nlg_cache_misses', 1)
+        # Cache miss - will be recorded as part of the full request
         
         try:
             self.active_generations += 1
             start_time = time.time()
             
-            # Call ML-Base service
+            # Call ML-Base service - use default NLG model
             result = await self.ml_client.generate(
+                model_id="nlg-dialogpt-small",  # Use available NLG model
                 prompt=request.prompt,
                 max_tokens=request.max_tokens,
                 temperature=request.temperature,
@@ -249,25 +250,34 @@ class NLGService:
             generation_time = time.time() - start_time
             
             response = GenerationResponse(
-                text=result['generated_text'],
-                tokens_used=result['tokens_used'],
+                text=result['text'],
+                tokens_used=result['tokens_generated'],
                 generation_time=generation_time,
-                model_used=result['model_name']
+                model_used=result['model_used']
             )
             
-            # Cache the result
-            self.cache.set(request, response)
+            # Cache the result (temporarily disabled for debugging)
+            # self.cache.set(request, response)
             
-            self.monitor.record_metric('nlg_generations_success', 1)
-            self.monitor.record_metric('nlg_generation_time', generation_time)
-            self.monitor.record_metric('nlg_tokens_generated', response.tokens_used)
+            # Record successful request metrics
+            self.monitor.record_request(
+                processing_time=generation_time, 
+                model_id="nlg-dialogpt-small", 
+                success=True
+            )
             
             logger.info(f"Generated {response.tokens_used} tokens in {generation_time:.3f}s using {response.model_used}")
             
             return response
             
         except Exception as e:
-            self.monitor.record_metric('nlg_generations_error', 1)
+            # Record failed request metrics  
+            generation_time = time.time() - start_time
+            self.monitor.record_request(
+                processing_time=generation_time,
+                model_id="nlg-dialogpt-small", 
+                success=False
+            )
             logger.error(f"Generation failed: {e}")
             raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
             
@@ -275,7 +285,7 @@ class NLGService:
             self.active_generations -= 1
     
     async def generate_stream(self, request: GenerationRequest):
-        """Stream text generation"""
+        """Stream text generation (simulated - ML-Base doesn't support streaming yet)"""
         if self.active_generations >= self.max_concurrent:
             yield json.dumps({'error': f'Too many concurrent generations. Limit: {self.max_concurrent}'}) + '\n'
             return
@@ -284,21 +294,43 @@ class NLGService:
             self.active_generations += 1
             start_time = time.time()
             
-            async for chunk in self.ml_client.generate_stream(
+            # ML-Base doesn't support streaming yet, so simulate it by chunking the response
+            result = await self.ml_client.generate(
+                model_id="nlg-dialogpt-small",
                 prompt=request.prompt,
                 max_tokens=request.max_tokens,
                 temperature=request.temperature,
                 top_p=request.top_p,
                 stop_sequences=request.stop_sequences
-            ):
+            )
+            
+            # Simulate streaming by sending the full response as chunks
+            text = result['text']
+            words = text.split()
+            
+            for i, word in enumerate(words):
+                chunk = {
+                    'text': word + (' ' if i < len(words) - 1 else ''),
+                    'is_final': i == len(words) - 1,
+                    'tokens_so_far': i + 1
+                }
                 yield json.dumps(chunk) + '\n'
+                await asyncio.sleep(0.05)  # Small delay to simulate streaming
             
             generation_time = time.time() - start_time
-            self.monitor.record_metric('nlg_streaming_success', 1)
-            self.monitor.record_metric('nlg_streaming_time', generation_time)
+            self.monitor.record_request(
+                processing_time=generation_time,
+                model_id="nlg-dialogpt-small", 
+                success=True
+            )
             
         except Exception as e:
-            self.monitor.record_metric('nlg_streaming_error', 1)
+            generation_time = time.time() - start_time
+            self.monitor.record_request(
+                processing_time=generation_time,
+                model_id="nlg-dialogpt-small", 
+                success=False
+            )
             logger.error(f"Streaming generation failed: {e}")
             yield json.dumps({'error': f'Streaming failed: {str(e)}'}) + '\n'
             
@@ -436,13 +468,13 @@ async def health_check(service: NLGService = Depends(get_nlg_service)):
     """Health check endpoint"""
     try:
         # Check ML-Base service health
-        ml_health = await service.ml_client.health_check()
+        ml_health = await service.ml_client.health()
         
         return {
             'healthy': True,
             'service': 'nlg-service-v2',
             'version': '2.0.0',
-            'ml_base_healthy': ml_health.get('healthy', False),
+            'ml_base_healthy': ml_health.get('status') == 'healthy',
             'active_generations': service.active_generations,
             'timestamp': datetime.now().isoformat()
         }

@@ -19,7 +19,7 @@ RUN npm run build && \
 FROM python:3.11-slim AS python-builder
 
 RUN pip install --no-cache-dir --prefix=/install --no-compile \
-    fastapi uvicorn aiofiles requests grpcio httpx toml pydantic
+    fastapi 'uvicorn[standard]' aiofiles requests grpcio httpx toml pydantic
 
 # Final stage
 FROM python:3.11-slim

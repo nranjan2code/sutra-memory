@@ -1,65 +1,76 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
-import { useState } from 'react';
-
-// Components
-import Sidebar from './components/Sidebar';
-import Dashboard from './pages/Dashboard';
-import ConceptBrowser from './pages/ConceptBrowser';
-import GraphExplorer from './pages/GraphExplorer';
-import SearchPage from './pages/SearchPage';
-import PathFinder from './pages/PathFinder';
-
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#6366f1',
-    },
-    secondary: {
-      main: '#f59e0b',
-    },
-    background: {
-      default: '#0f172a',
-      paper: '#1e293b',
-    },
-  },
-  typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-  },
-});
+import { useState, useEffect } from 'react';
+import { Text } from '@sutra/ui-framework';
+import Header from '@components/layout/Header';
+import Sidebar from '@components/layout/Sidebar';
+import Inspector from '@components/layout/Inspector';
+import GraphCanvas from '@components/graph/GraphCanvas';
+import BottomSheet from '@components/layout/BottomSheet';
+import { useDeviceDetection } from '@hooks/useDeviceDetection';
+import { useGraphData } from '@hooks/useGraphData';
+import type { Node as GraphNode } from '@types/graph';
+import './App.css';
 
 function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { deviceType, isMobile } = useDeviceDetection();
+  const { nodes, edges, loading, error } = useGraphData();
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
+
+  useEffect(() => {
+    // Update sidebar visibility based on device type
+    setSidebarOpen(!isMobile);
+  }, [isMobile]);
+
+  if (error) {
+    return (
+      <div className="error-container">
+        <Text variant="h4" color="primary">
+          Error Loading Graph
+        </Text>
+        <Text variant="body1" color="secondary">
+          {error}
+        </Text>
+      </div>
+    );
+  }
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Router>
-        <Box sx={{ display: 'flex', height: '100vh' }}>
-          <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-          <Box
-            component="main"
-            sx={{
-              flexGrow: 1,
-              p: 3,
-              overflow: 'auto',
-              ml: sidebarOpen ? 0 : '-240px',
-              transition: 'margin 0.3s',
-            }}
-          >
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/concepts" element={<ConceptBrowser />} />
-              <Route path="/graph" element={<GraphExplorer />} />
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="/pathfinder" element={<PathFinder />} />
-            </Routes>
-          </Box>
-        </Box>
-      </Router>
-    </ThemeProvider>
+    <div className="app-container">
+      <Header
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        nodeCount={nodes.length}
+        edgeCount={edges.length}
+      />
+
+      <div className="app-layout">
+        {sidebarOpen && !isMobile && (
+          <Sidebar nodes={nodes} onSelectNode={setSelectedNode} />
+        )}
+
+        <main className="app-main">
+          <GraphCanvas
+            nodes={nodes}
+            edges={edges}
+            selectedNode={selectedNode}
+            onSelectNode={setSelectedNode}
+            deviceType={deviceType}
+            loading={loading}
+          />
+        </main>
+
+        {selectedNode && !isMobile && (
+          <Inspector node={selectedNode} onClose={() => setSelectedNode(null)} />
+        )}
+      </div>
+
+      {isMobile && (
+        <BottomSheet
+          node={selectedNode}
+          onClose={() => setSelectedNode(null)}
+          isOpen={selectedNode !== null}
+        />
+      )}
+    </div>
   );
 }
 

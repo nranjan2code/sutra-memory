@@ -67,11 +67,19 @@
   ],
   "author": "Sutra AI",
   "license": "MIT",
+  "dependencies": {
+    "react-window": "^1.8.10",
+    "d3": "^7.9.0",
+    "three": "^0.160.0"
+  },
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@types/react-window": "^1.8.8",
+    "@types/d3": "^7.4.3",
+    "@types/three": "^0.160.0",
     "@storybook/addon-a11y": "^10.0.0",
     "@storybook/addon-essentials": "^8.6.14",
     "@storybook/addon-interactions": "^8.6.14",

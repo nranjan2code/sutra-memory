@@ -1,4 +1,13 @@
-fastapi==0.108.0
-uvicorn[standard]==0.25.0
-pydantic==2.5.3
-python-multipart==0.0.6
+# Sutra Explorer Backend Dependencies
+
+# Core Framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic==2.9.2
+pydantic-settings==2.6.0
+
+# Storage Client (uses workspace package)
+# Installed via: pip install -e ../sutra-storage-client-tcp
+
+# Optional: Development tools
+python-dotenv==1.0.1

@@ -81,7 +81,7 @@ export const sutraApi = {
    * Learn new facts
    */
   async learn(text: string): Promise<LearnResponse> {
-    const { data } = await api.post('/learn', { text })
+    const { data } = await api.post('/learn', { content: text })
     return data
   },
 

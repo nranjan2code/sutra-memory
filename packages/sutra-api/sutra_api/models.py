@@ -402,3 +402,268 @@ class DeleteUserResponse(BaseModel):
     user_id: str = Field(..., description="Deleted user ID")
 
 
+# Conversation Models
+class CreateConversationRequest(BaseModel):
+    """Request model for creating a new conversation."""
+    
+    title: Optional[str] = Field(None, description="Conversation title")
+    description: Optional[str] = Field(None, description="Conversation description")
+    space_id: Optional[str] = Field(None, description="Space to create conversation in")
+    metadata: Optional[Dict[str, str]] = Field(None, description="Additional metadata")
+
+
+class MessageResponse(BaseModel):
+    """Response model for a conversation message."""
+    
+    id: str = Field(..., description="Message ID")
+    conversation_id: str = Field(..., description="Conversation ID")
+    role: str = Field(..., description="Message role (user, assistant, system)")
+    content: str = Field(..., description="Message content")
+    created_at: str = Field(..., description="Message creation timestamp")
+    metadata: Optional[Dict[str, str]] = Field(None, description="Message metadata")
+
+
+class ConversationResponse(BaseModel):
+    """Response model for conversation details."""
+    
+    id: str = Field(..., description="Conversation ID")
+    title: Optional[str] = Field(None, description="Conversation title")
+    description: Optional[str] = Field(None, description="Conversation description")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+    message_count: int = Field(default=0, description="Number of messages")
+    space_id: Optional[str] = Field(None, description="Space ID if in a space")
+    metadata: Optional[Dict[str, str]] = Field(None, description="Conversation metadata")
+
+
+class SendMessageRequest(BaseModel):
+    """Request model for sending a message in a conversation."""
+    
+    content: str = Field(..., description="Message content")
+    role: Optional[str] = Field(default="user", description="Message role")
+    stream: Optional[bool] = Field(default=False, description="Stream response")
+    metadata: Optional[Dict[str, str]] = Field(None, description="Message metadata")
+
+
+class SendMessageResponse(BaseModel):
+    """Response model for sending a message."""
+    
+    user_message: MessageResponse = Field(..., description="The user message")
+    assistant_message: MessageResponse = Field(..., description="The assistant response")
+    conversation_id: str = Field(..., description="Conversation ID")
+
+
+class UpdateConversationRequest(BaseModel):
+    """Request model for updating a conversation."""
+    
+    title: Optional[str] = Field(None, description="Updated title")
+    description: Optional[str] = Field(None, description="Updated description")
+    metadata: Optional[Dict[str, str]] = Field(None, description="Updated metadata")
+
+
+class ListConversationsRequest(BaseModel):
+    """Request model for listing conversations."""
+    
+    space_id: Optional[str] = Field(None, description="Filter by space ID")
+    limit: Optional[int] = Field(default=50, description="Maximum number of conversations")
+    offset: Optional[int] = Field(default=0, description="Pagination offset")
+
+
+class ListConversationsResponse(BaseModel):
+    """Response model for listing conversations."""
+    
+    conversations: List[ConversationResponse] = Field(..., description="List of conversations")
+    total: int = Field(..., description="Total number of conversations")
+    limit: int = Field(..., description="Requested limit")
+    offset: int = Field(..., description="Requested offset")
+
+
+class LoadMessagesRequest(BaseModel):
+    """Request model for loading conversation messages."""
+    
+    limit: Optional[int] = Field(default=50, description="Maximum number of messages")
+    before: Optional[str] = Field(None, description="Load messages before this message ID")
+    after: Optional[str] = Field(None, description="Load messages after this message ID")
+
+
+class LoadMessagesResponse(BaseModel):
+    """Response model for loading conversation messages."""
+    
+    messages: List[MessageResponse] = Field(..., description="List of messages")
+    conversation_id: str = Field(..., description="Conversation ID")
+    total: int = Field(..., description="Total number of messages in conversation")
+    has_more: bool = Field(..., description="Whether more messages are available")
+
+
+# Space Models
+class CreateSpaceRequest(BaseModel):
+    """Request model for creating a new space."""
+    
+    name: str = Field(..., description="Space name")
+    description: Optional[str] = Field(None, description="Space description")
+    visibility: Optional[str] = Field(default="private", description="Space visibility (public, private)")
+    metadata: Optional[Dict[str, str]] = Field(None, description="Space metadata")
+
+
+class UpdateSpaceRequest(BaseModel):
+    """Request model for updating a space."""
+    
+    name: Optional[str] = Field(None, description="Updated name")
+    description: Optional[str] = Field(None, description="Updated description")
+    visibility: Optional[str] = Field(None, description="Updated visibility")
+    metadata: Optional[Dict[str, str]] = Field(None, description="Updated metadata")
+
+
+class AddMemberRequest(BaseModel):
+    """Request model for adding a member to a space."""
+    
+    user_id: str = Field(..., description="User ID to add")
+    role: Optional[str] = Field(default="member", description="Member role (admin, member, viewer)")
+
+
+class UpdateMemberRoleRequest(BaseModel):
+    """Request model for updating a member's role in a space."""
+    
+    role: str = Field(..., description="New member role")
+
+
+class RemoveMemberRequest(BaseModel):
+    """Request model for removing a member from a space."""
+    
+    user_id: str = Field(..., description="User ID to remove")
+
+
+class SpaceMemberResponse(BaseModel):
+    """Response model for space member details."""
+    
+    user_id: str = Field(..., description="User ID")
+    role: str = Field(..., description="Member role")
+    joined_at: str = Field(..., description="Join timestamp")
+    username: Optional[str] = Field(None, description="Username")
+    email: Optional[str] = Field(None, description="User email")
+
+
+class SpaceResponse(BaseModel):
+    """Response model for space details."""
+    
+    id: str = Field(..., description="Space ID")
+    name: str = Field(..., description="Space name")
+    description: Optional[str] = Field(None, description="Space description")
+    visibility: str = Field(..., description="Space visibility")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+    member_count: int = Field(default=0, description="Number of members")
+    owner_id: str = Field(..., description="Space owner ID")
+    metadata: Optional[Dict[str, str]] = Field(None, description="Space metadata")
+
+
+class SpaceListResponse(BaseModel):
+    """Response model for listing spaces."""
+    
+    spaces: List[SpaceResponse] = Field(..., description="List of spaces")
+    total: int = Field(..., description="Total number of spaces")
+    limit: int = Field(..., description="Requested limit")
+    offset: int = Field(..., description="Requested offset")
+
+
+class SpaceMemberListResponse(BaseModel):
+    """Response model for listing space members."""
+    
+    members: List[SpaceMemberResponse] = Field(..., description="List of members")
+    space_id: str = Field(..., description="Space ID")
+    total: int = Field(..., description="Total number of members")
+
+
+class SpaceActionResponse(BaseModel):
+    """Response model for space actions."""
+    
+    success: bool = Field(..., description="Action success status")
+    message: str = Field(..., description="Action message")
+    space_id: str = Field(..., description="Space ID")
+
+
+# Graph Models
+class GraphNode(BaseModel):
+    """Response model for graph node."""
+    
+    id: str = Field(..., description="Node ID")
+    label: str = Field(..., description="Node label")
+    type: Optional[str] = Field(None, description="Node type")
+    properties: Optional[Dict[str, str]] = Field(None, description="Node properties")
+
+
+class GraphEdge(BaseModel):
+    """Response model for graph edge."""
+    
+    source: str = Field(..., description="Source node ID")
+    target: str = Field(..., description="Target node ID")
+    label: Optional[str] = Field(None, description="Edge label")
+    type: Optional[str] = Field(None, description="Edge type")
+    weight: Optional[float] = Field(None, description="Edge weight")
+
+
+class GraphData(BaseModel):
+    """Response model for graph data."""
+    
+    nodes: List[GraphNode] = Field(..., description="Graph nodes")
+    edges: List[GraphEdge] = Field(..., description="Graph edges")
+
+
+class MessageGraphRequest(BaseModel):
+    """Request model for message graph."""
+    
+    conversation_id: str = Field(..., description="Conversation ID")
+    max_nodes: Optional[int] = Field(default=50, description="Maximum nodes")
+    include_context: Optional[bool] = Field(default=True, description="Include context")
+
+
+class MessageGraphResponse(BaseModel):
+    """Response model for message graph."""
+    
+    graph: GraphData = Field(..., description="Graph data")
+    conversation_id: str = Field(..., description="Conversation ID")
+    node_count: int = Field(..., description="Number of nodes")
+    edge_count: int = Field(..., description="Number of edges")
+
+
+class ConceptGraphRequest(BaseModel):
+    """Request model for concept graph."""
+    
+    concept_ids: List[str] = Field(..., description="Concept IDs to include")
+    max_depth: Optional[int] = Field(default=2, description="Maximum depth")
+    include_associations: Optional[bool] = Field(default=True, description="Include associations")
+
+
+class ConceptGraphResponse(BaseModel):
+    """Response model for concept graph."""
+    
+    graph: GraphData = Field(..., description="Graph data")
+    concept_count: int = Field(..., description="Number of concepts")
+    association_count: int = Field(..., description="Number of associations")
+
+
+class QueryGraphRequest(BaseModel):
+    """Request model for query graph."""
+    
+    query: str = Field(..., description="Graph query")
+    max_nodes: Optional[int] = Field(default=100, description="Maximum nodes")
+    filters: Optional[Dict[str, str]] = Field(None, description="Graph filters")
+
+
+class QueryGraphResponse(BaseModel):
+    """Response model for query graph."""
+    
+    graph: GraphData = Field(..., description="Graph data")
+    query: str = Field(..., description="Original query")
+    execution_time_ms: float = Field(..., description="Execution time in milliseconds")
+
+
+class GraphStatisticsResponse(BaseModel):
+    """Response model for graph statistics."""
+    
+    total_nodes: int = Field(..., description="Total number of nodes")
+    total_edges: int = Field(..., description="Total number of edges")
+    node_types: Dict[str, int] = Field(..., description="Node types and counts")
+    edge_types: Dict[str, int] = Field(..., description="Edge types and counts")
+
+

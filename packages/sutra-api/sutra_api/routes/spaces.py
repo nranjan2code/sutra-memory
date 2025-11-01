@@ -9,7 +9,7 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..services.space_service import SpaceService
-from ..models.space import (
+from ..models import (
     CreateSpaceRequest,
     UpdateSpaceRequest,
     AddMemberRequest,

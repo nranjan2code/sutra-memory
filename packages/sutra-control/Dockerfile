@@ -6,7 +6,7 @@ COPY packages/sutra-control/package*.json ./
 COPY packages/sutra-control/tsconfig*.json ./
 COPY packages/sutra-control/vite.config.ts ./
 
-RUN npm ci --silent && \
+RUN npm install --silent && \
     npm cache clean --force && \
     rm -rf ~/.npm
 

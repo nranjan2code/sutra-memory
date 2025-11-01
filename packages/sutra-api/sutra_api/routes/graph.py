@@ -10,7 +10,7 @@ import logging
 
 from ..middleware.auth import get_current_active_user
 from ..dependencies import get_user_storage_client, get_graph_service
-from ..models.graph import (
+from ..models import (
     MessageGraphRequest,
     MessageGraphResponse,
     ConceptGraphRequest,

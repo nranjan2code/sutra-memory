@@ -8,7 +8,7 @@ COPY packages/sutra-client/package*.json ./
 COPY packages/sutra-client/tsconfig*.json ./
 COPY packages/sutra-client/vite.config.ts ./
 
-RUN npm ci --silent && \
+RUN npm install --silent && \
     npm cache clean --force && \
     rm -rf ~/.npm
 

@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 import json
 
 from ..services.conversation_service import ConversationService
-from ..models.conversation import (
+from ..models import (
     CreateConversationRequest,
     ConversationResponse,
     SendMessageRequest,

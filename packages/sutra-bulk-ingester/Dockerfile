@@ -1,7 +1,7 @@
 # OPTIMIZED Bulk Ingester - Target: 250MB (down from 265MB) 
 # Rust binary + minimal Python runtime for plugins
 
-ARG RUST_VERSION=1.82
+ARG RUST_VERSION=1.83
 ARG PYTHON_VERSION=3.11
 
 # ============================================================================

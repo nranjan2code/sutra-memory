@@ -458,7 +458,7 @@ $$
 **Concurrent transactions**: Independent transactions proceed in parallel.
 
 **Measured** (16 shards):
-- Same-shard: 57K writes/sec per shard
+- Same-shard: Full throughput per shard
 - Cross-shard: 54K writes/sec per shard (5% overhead)
 
 ### 8.3 Lock Contention

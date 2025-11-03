@@ -10,7 +10,7 @@ Sutra AI is a production-grade, domain-specific explainable AI platform designed
 - **Explainability First**: Every answer includes complete reasoning paths with confidence scores
 - **Real-Time Learning**: Add knowledge without retraining or downtime
 - **Audit Trail Compliance**: Write-Ahead Log (WAL) ensures regulatory traceability
-- **Performance**: 57K writes/sec, <0.01ms reads, 10M+ concept scale
+- **Scale**: 10M+ concept support with horizontal sharding
 - **Production-Ready**: TLS 1.3, RBAC, HA embedding services, 2PC transactions
 
 ---
@@ -98,12 +98,12 @@ Sutra AI is a production-grade, domain-specific explainable AI platform designed
 
 ### 1.2 System Characteristics
 
-| Characteristic | Value | Notes |
-|---------------|-------|-------|
-| **Write Throughput** | 57,412 ops/sec | Limited only by malloc() speed |
-| **Read Latency** | <0.01ms | Zero-copy memory-mapped access |
-| **Startup Time** | <50ms | Persistent HNSW with USearch mmap |
-| **Memory Overhead** | ~0.1KB/concept | Excluding 768-d embeddings (3KB each) |
+| Characteristic | Implementation | Notes |
+|---------------|----------------|-------|
+| **Write Architecture** | Lock-free append-only log | Optimized for continuous learning |
+| **Read Architecture** | Immutable snapshots | Memory-mapped access patterns |
+| **Startup** | Persistent HNSW | Fast loading with USearch mmap |
+| **Memory Design** | Efficient structures | Optimized for scale (excl. embeddings) |
 | **Scale Target** | 10M+ concepts | Sharded across 16 nodes (Enterprise) |
 | **Crash Recovery** | RPO=0, RTO<1s | Write-Ahead Log with automatic replay |
 | **Query Depth** | 5-10 hops typical | Configurable max_depth parameter |
@@ -234,9 +234,9 @@ impl WriteLog {
 }
 ```
 
-**Performance Characteristics:**
-- **Latency**: <20μs (microseconds) per write
-- **Throughput**: 57,412 writes/sec measured
+**Design Characteristics:**
+- **Latency**: Optimized for low-latency writes
+- **Architecture**: Lock-free for high concurrency
 - **Scalability**: Linear with CPU cores (no contention)
 
 #### 3.1.3 Read Plane (Immutable Snapshots)
@@ -1628,10 +1628,10 @@ Dataset: 1,000,000 concepts
 ## Appendix C: Future Roadmap
 
 **Version 2.1 (Q1 2026):**
-- [ ] GraphQL API support
 - [ ] WebAssembly embedding service
 - [ ] Advanced semantic filters (temporal chains, causal reasoning)
 - [ ] Multi-tenant isolation (namespace support)
+- [ ] Enhanced TCP protocol features
 
 **Version 3.0 (Q2 2026):**
 - [ ] Distributed transactions across 50+ nodes

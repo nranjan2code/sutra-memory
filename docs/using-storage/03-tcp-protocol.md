@@ -456,7 +456,7 @@ class ProtocolClient:
 
 | Workload | Operations/sec | Notes |
 |----------|---------------|-------|
-| Concept learning | 57,000 | With embeddings + associations |
+| Concept learning | Optimized | With embeddings + associations |
 | Concept queries | 180,000 | Cache-optimized reads |
 | Vector search | 12,000 | k=10, ef_search=50 |
 | Association creation | 95,000 | Simple relationships |

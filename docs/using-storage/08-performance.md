@@ -9,7 +9,7 @@ This guide covers optimization strategies, benchmarking, and troubleshooting tec
 | Operation | Target Latency | Target Throughput | Notes |
 |-----------|----------------|-------------------|-------|
 | Concept Read | <0.01ms | 10M ops/sec | Memory-mapped access |
-| Concept Write | <1ms | 57K ops/sec | With WAL durability |
+| Concept Write | Low latency | Optimized | With WAL durability |
 | Vector Search (k=10) | <1ms | 12K ops/sec | HNSW index |
 | Association Query | <0.01ms | 5M ops/sec | Fixed-size records |
 | Batch Learning (100) | <50ms | 2K batches/sec | Unified pipeline |

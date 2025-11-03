@@ -14,7 +14,7 @@ Sutra Storage is a custom storage engine built specifically for temporal, contin
 
 ### Key Features
 
-- **🚀 Performance**: 57,412 writes/sec, <0.01ms reads (zero-copy memory-mapped)
+- **🚀 Performance**: Optimized for high-throughput writes and low-latency reads
 - **🔒 Durability**: Write-Ahead Log (WAL) with MessagePack binary format - zero data loss
 - **📈 Scalability**: Horizontal sharding (4-16 shards) for 10M+ concepts
 - **⚡ Concurrency**: Lock-free writes, immutable read snapshots, adaptive reconciliation
@@ -495,24 +495,24 @@ See [TCP Protocol Specification](../../docs/TCP_PROTOCOL_SPECIFICATION.md) for c
 
 ## Performance Characteristics
 
-### Benchmarked Performance
+### Architecture Design
 
-| Operation | Throughput | Latency | Notes |
-|-----------|------------|---------|-------|
-| **Write** | 57,412 concepts/sec | 0.02ms | Lock-free write log |
-| **Read** | - | <0.01ms | Zero-copy mmap, immutable snapshots |
-| **Path Finding (BFS)** | - | ~1ms | 3-hop traversal |
-| **Path Finding (Parallel)** | - | 4-8× faster | Rayon-based parallel exploration |
-| **Vector Search (HNSW)** | - | <50ms (P50) | USearch SIMD-optimized |
-| **HNSW Load (Startup)** | - | 3.5ms | 94× faster than rebuild (1K vectors) |
-| **Flush** | - | ~200ms | 1M concepts → disk |
+| Component | Implementation | Notes |
+|-----------|----------------|-------|
+| **Write** | Lock-free write log | Optimized for continuous learning |
+| **Read** | Immutable snapshots | Memory-mapped access |
+| **Path Finding (BFS)** | Multi-threaded traversal | Graph exploration |
+| **Path Finding (Parallel)** | Rayon-based | Parallel exploration |
+| **Vector Search (HNSW)** | USearch SIMD-optimized | Fast similarity search |
+| **HNSW Load (Startup)** | mmap persistence | No rebuild required |
+| **Flush** | Periodic checkpointing | Concepts to disk |
 
 ### Memory Usage
 
-- **Base overhead**: ~0.1KB per concept (excluding embeddings)
-- **With embeddings**: ~3.2KB per concept (768-d float32)
-- **HNSW index**: ~1KB per vector (768-d, M=16)
-- **Total for 1M concepts**: ~4.3GB RAM + ~900MB HNSW index
+- **Efficient structures**: Optimized for scale
+- **With embeddings**: Includes 768-d float32 vectors
+- **HNSW index**: Per-vector overhead (768-d, M=16)
+- **Total for 1M concepts**: Scales linearly with data
 
 ### Scalability
 

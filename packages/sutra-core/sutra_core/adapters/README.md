@@ -135,7 +135,7 @@ Based on testing with the existing parallel extraction system:
 - **Small files** (<1MB): ~1-5 seconds
 - **Medium files** (1-10MB): ~10-60 seconds with parallel processing
 - **Large files** (10MB+): Scales linearly with parallel processing
-- **Memory usage**: ~0.1KB per concept created
+- **Memory usage**: Efficient storage design
 - **Throughput**: Typically 50-200 KB/s depending on text complexity
 
 ## Integration with Sutra Architecture
@@ -145,7 +145,7 @@ The adapters work seamlessly with existing Sutra components:
 1. **AdaptiveLearner**: Uses adaptive reinforcement based on concept difficulty
 2. **AssociationExtractor**: Leverages pattern-based and co-occurrence extraction
 3. **ParallelAssociationExtractor**: Automatically used for better performance
-4. **ConcurrentStorage**: All concepts and associations stored in lock-free Rust backend (57K writes/sec)
+4. **ConcurrentStorage**: All concepts and associations stored in Rust backend
 5. **ReasoningEngine**: Can immediately query learned knowledge via vector index
 
 ## Extending with New Adapters
@@ -171,7 +171,7 @@ class DatabaseAdapter(MassLearningAdapter):
 
 ## Planned Adapters
 
-- **DatabaseAdapter**: SQL/NoSQL database ingestion
+- **DatabaseAdapter**: External database ingestion (source systems only - Sutra uses TCP protocol, not SQL)
 - **StreamAdapter**: Real-time data streams (Kafka, RabbitMQ)
 - **DocumentAdapter**: PDF, DOCX, and other document formats
 - **APIAdapter**: Web APIs and RSS feeds

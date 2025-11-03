@@ -141,7 +141,7 @@ This directory contains rigorous mathematical specifications for all core algori
 
 | Operation | Latency | Throughput | Complexity |
 |-----------|---------|------------|------------|
-| Write (buffered) | <0.02ms | 57K writes/sec | $O(1)$ |
+| Write (buffered) | Low latency | Optimized | $O(1)$ |
 | Read (mmap) | <0.01ms | 100K reads/sec | $O(1)$ |
 | Vector search | <50ms (P50) | 20 queries/sec | $O(d \log N)$ |
 | Pathfinding | ~1ms (3-hop) | 1K paths/sec | $O(k \cdot d)$ |

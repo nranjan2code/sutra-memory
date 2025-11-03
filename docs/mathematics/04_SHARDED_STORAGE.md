@@ -379,7 +379,7 @@ $$
 **Linear scaling**: Doubling shards doubles throughput!
 
 **Measured** (with 16 shards):
-- Single shard: 57K writes/sec
+- Single shard: Optimized throughput
 - 16 shards: 912K writes/sec (16× linear scaling ✓)
 
 ### 8.3 Storage Capacity
@@ -517,8 +517,10 @@ where $\bar{\lambda}$ = mean write rate, $\sigma_{\lambda}$ = standard deviation
 
 **Write throughput**:
 $$
-\Lambda = 16 \times 57K = 912K \text{ writes/sec}
+\Lambda_{\text{total}} = N_{\text{shards}} \times \Lambda_{\text{single}}
 $$
+
+With optimized write throughput and 16 shards, the system achieves high aggregate throughput.
 
 **Vector search latency**:
 $$

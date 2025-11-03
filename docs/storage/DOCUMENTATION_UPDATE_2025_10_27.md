@@ -165,7 +165,7 @@ All benchmark claims are from actual measurements:
 
 | Metric | Verified | Source |
 |--------|----------|--------|
-| **57K writes/sec** | ✅ | `concurrent_memory.rs` benchmarks |
+| **Optimized writes** | ✅ | `concurrent_memory.rs` benchmarks |
 | **<0.01ms reads** | ✅ | Zero-copy mmap measurements |
 | **50ms HNSW load** | ✅ | `hnsw_container.rs` startup logs |
 | **2ms vector search** | ✅ | USearch ef_search=40 benchmarks |

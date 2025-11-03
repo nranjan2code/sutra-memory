@@ -495,7 +495,7 @@ pub async fn auto_scale_shards(&self) -> Result<()> {
 
 ### Throughput
 
-**Single-node baseline:** 57K writes/sec
+**Single-node baseline:** Optimized architecture
 
 **Sharded (30 nodes):**
 - Per-node: 57K writes/sec

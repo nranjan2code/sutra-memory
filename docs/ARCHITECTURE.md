@@ -112,7 +112,7 @@ Sutra AI is a **domain-specific reasoning engine** that provides explainable ans
 
 **Core Innovation:** Small embedding models (500MB vs 100GB+ LLMs) + graph-based reasoning + multi-path consensus = Explainable AI with complete audit trails at 1000× lower cost.
 
-**Performance:** 57,412 writes/sec, <0.01ms reads, ~$0.0001 per query (vs $0.01-$0.10 for LLM APIs).
+**Performance:** Optimized for high throughput writes and low latency reads, with cost-effective queries compared to LLM APIs.
 
 **Target Users:** Regulated industries (healthcare, finance, legal, government) requiring explainable AI with audit trails.
 
@@ -179,7 +179,7 @@ Sutra AI is a **domain-specific reasoning engine** that provides explainable ans
 **Purpose:** High-performance, burst-tolerant storage for temporal knowledge graphs.
 
 **Key Features:**
-- **57,412 writes/sec** (25,000× faster than JSON baseline)
+- **Optimized writes** (faster than JSON baseline)
 - **<0.01ms read latency** (zero-copy memory-mapped files)
 - **🔥 AI-Native Adaptive Reconciliation** (NEW 2025-10-24) - Self-optimizing with 80% CPU savings
 - Lock-free write log with background reconciliation (1-100ms dynamic intervals)
@@ -309,7 +309,7 @@ Storage Server Learning Pipeline (Single Source of Truth)
     │   ├─ Typed relationships (semantic, causal, temporal, hierarchical)
     │   └─ Confidence scoring and filtering
     ├─ 🔴 STEP 3: Atomic Storage
-    │   ├─ Lock-free write log (append-only, 57K writes/sec)
+    │   ├─ Lock-free write log (append-only, optimized)
     │   ├─ HNSW vector indexing for semantic search
     │   ├─ **AI-Native Adaptive Reconciler** (1-100ms dynamic intervals, EMA prediction)
     │   ├─ WAL durability (zero data loss)
@@ -359,13 +359,13 @@ Consensus Answer + Confidence + Reasoning Paths
 ### Storage (Production Benchmarked)
 | Operation       | Latency  | Throughput    | Notes                          |
 |-----------------|----------|---------------|--------------------------------|
-| Write (learn)   | 0.02ms   | **57,412/sec**| Lock-free log, batched         |
+| Write (learn)   | Low latency | **Optimized** | Lock-free log, batched         |
 | Read (query)    | <0.01ms  | Millions/sec  | Zero-copy, immutable snapshot  |
 | Path finding    | ~1ms     | —             | 3-hop BFS traversal            |
 | Reconciliation  | 1-2ms    | 10K/batch     | Background, 10ms interval      |
 | Disk flush      | ~100ms   | —             | Manual or auto at 50K concepts |
 
-**Improvement:** 25,000× faster writes, 22,500× faster reads compared to old JSON-based storage.
+**Improvement:** Significantly faster writes and reads compared to old JSON-based storage.
 
 ### Memory
 - **Concept**: ~0.1KB (excluding embeddings)
@@ -484,7 +484,7 @@ pub struct AdaptiveReconcilerStats {
 ✅ **Multi-strategy reasoning** — Compare graph-only vs semantic-enhanced  
 ✅ **Audit trails** — Full compliance tracking  
 ✅ **REST API** — Production-ready HTTP interface  
-✅ **Performance** — 57K writes/sec, <0.01ms reads, 100% accuracy  
+✅ **Performance** — Optimized writes, low-latency reads, 100% accuracy  
 
 ---
 
@@ -602,7 +602,7 @@ Built on published research (no proprietary techniques):
 **Version:** 2.0.0  
 **Stability:** Production-ready for internal use  
 **API:** Stable endpoints, subject to minor changes  
-**Performance:** 57,412 writes/sec, <0.01ms reads (verified)  
+**Performance:** Optimized architecture for continuous learning workloads  
 **Test Coverage:** 100% pass rate on core components  
 **Last Tested:** 2025-10-16  
 

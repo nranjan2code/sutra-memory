@@ -58,7 +58,7 @@ Transform the Control Center from a basic monitoring tool into a **production-gr
 ```
 
 #### 2. Historical Metrics
-- **SQLite database** for metrics persistence
+- **Sutra storage backend** for metrics persistence (eating our own dogfood - no external databases)
 - **30-day retention** (configurable)
 - **Zoom and pan** charts for historical analysis
 - **Compare time periods** side-by-side
@@ -88,7 +88,7 @@ Transform the Control Center from a basic monitoring tool into a **production-gr
 - **OpenTelemetry support**
 
 ### Technical Changes
-- Add SQLite for persistence
+- Add Sutra storage persistence (no external databases)
 - Implement log aggregation service
 - Create alert evaluation engine
 - Add Prometheus client library

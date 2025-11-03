@@ -46,7 +46,7 @@
 │  │ - Concepts: 0-33%│ │ - Concepts:33-66%│ │ - Concepts:66-100│  │
 │  │ - Local WAL      │ │ - Local WAL      │ │ - Local WAL      │  │
 │  │ - BFS Engine     │ │ - BFS Engine     │ │ - BFS Engine     │  │
-│  │ - 57K writes/sec │ │ - 57K writes/sec │ │ - 57K writes/sec │  │
+│  │ - Optimized    │ │ - Optimized    │ │ - Optimized    │  │
 │  │                  │ │                  │ │                  │  │
 │  │ Shard 1 (Replica)│ │ Shard 2 (Replica)│ │ Shard 0 (Replica)│  │
 │  │ Shard 2 (Replica)│ │ Shard 0 (Replica)│ │ Shard 1 (Replica)│  │
@@ -484,7 +484,7 @@ fn distributed_bfs(start: ConceptId, end: ConceptId, max_depth: usize) -> Vec<Co
 
 ### Single Node Baseline
 - **Capacity:** 10GB (fits in RAM)
-- **Throughput:** 57K writes/sec, <0.01ms reads
+- **Architecture:** Optimized write/read performance
 - **Limitations:** Cannot scale beyond single machine
 
 ### 3-Node Grid (100GB)

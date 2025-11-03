@@ -58,7 +58,7 @@ Build the **control plane foundation** for Sutra Grid:
 **Technology Stack:**
 - **gRPC Server**: Agent communication (Rust + Tonic)
 - **REST API**: UI/CLI access (Axum or Actix-web)
-- **State Store**: In-memory (HashMap) + optional SQLite persistence
+- **State Store**: In-memory (HashMap) + Sutra storage persistence (eating our own dogfood)
 
 **API Surface:**
 

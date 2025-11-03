@@ -152,7 +152,7 @@ Unlike general LLMs, Sutra:
 - **Query**: <0.01ms (zero-copy mmap)
 - **Startup**: 3.5ms for 1M vectors
 - **Scale**: 10M+ concepts across 16 shards
-- **Memory**: ~0.1KB per concept
+- **Memory**: Efficient per-concept storage
 
 → [Performance Details](architecture/runtime.md)
 

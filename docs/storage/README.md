@@ -109,7 +109,7 @@
 
 ### Key Features
 
-✅ **57K writes/sec** - Lock-free concurrent writes  
+✅ **High-throughput writes** - Lock-free concurrent writes  
 ✅ **<0.01ms reads** - Zero-copy memory-mapped access  
 ✅ **Zero data loss** - WAL-based durability  
 ✅ **100× faster startup** - Persistent HNSW with USearch  
@@ -163,7 +163,7 @@ storage-server:
 
 | Operation | Latency | Throughput |
 |-----------|---------|------------|
-| **Write concept** | ~10μs | 57,412/sec |
+| **Write concept** | Low latency | Optimized |
 | **Read concept** | <0.01ms | ~100K/sec |
 | **Vector search (k=10)** | 2ms | 500 queries/sec |
 | **Graph traversal (3-hop)** | 1-2ms | 500-1000/sec |

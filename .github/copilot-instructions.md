@@ -9,8 +9,8 @@ Sutra AI is a **12-service distributed system** that provides explainable reason
 ### Core Components
 
 **Storage Layer (Rust):**
-- `sutra-storage` - High-performance graph storage (57K writes/sec, <0.01ms reads)
-- Binary TCP protocol with Write-Ahead Log (WAL) for durability
+- `sutra-storage` - High-performance graph storage with Write-Ahead Log (WAL) for durability
+- Binary TCP protocol for low-latency communication
 - USearch HNSW vector indexing with persistent mmap (94x faster startup)
 - Cross-shard 2PC transactions, adaptive reconciliation
 
@@ -123,7 +123,7 @@ SUTRA_EDITION=simple|community|enterprise
 ```
 
 ### TCP Binary Protocol (Not gRPC)
-Custom MessagePack-based protocol for 10-50x lower latency:
+Custom MessagePack-based protocol for low latency:
 ```rust
 // packages/sutra-protocol/src/messages.rs
 #[derive(Serialize, Deserialize)]
@@ -133,6 +133,8 @@ pub enum StorageRequest {
     GetConcept { concept_id: ConceptId },
 }
 ```
+
+**Architectural Policy:** Sutra will NEVER support SQL, Cypher, or GraphQL (see `docs/architecture/NO_SQL_POLICY.md`).
 
 ## Integration Points
 
@@ -278,12 +280,10 @@ MAJOR.MINOR.PATCH
 - **Don't skip release docs:** See `docs/release/` for complete release workflow
 - **Don't use removed scripts:** Use `sutra` command as single entry point, not external scripts
 
-## Performance Expectations
+## Scale Targets
 
-- **Learning:** 57K concepts/sec  
-- **Query:** <0.01ms (zero-copy mmap)
-- **Startup:** 3.5ms for 1M vectors (persistent HNSW)
-- **Memory:** ~0.1KB per concept (excluding embeddings)
+- **Startup:** Fast loading with persistent HNSW indexes
 - **Target scale:** 10M+ concepts across 16 shards
+- **Architecture:** Optimized for continuous learning workloads
 
 When working on this codebase, prioritize explainability, audit trails, and domain-specific accuracy over general AI capabilities. Every reasoning path should be traceable for compliance requirements.

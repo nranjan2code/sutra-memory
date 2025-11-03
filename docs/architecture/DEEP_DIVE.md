@@ -161,7 +161,7 @@ async fn reconciliation_loop(&mut self) {
 ```
 
 **Performance Characteristics:**
-- **Writes:** 57,412 ops/sec (measured) - limited only by malloc speed
+- **Writes:** Optimized throughput - limited primarily by system memory allocation
 - **Reads:** <0.01ms (zero-copy memory-mapped access)
 - **Latency:** 10ms average (reconciliation interval)
 - **Throughput:** 25,000× faster than baseline JSON storage
@@ -1002,7 +1002,7 @@ result = engine.reason("What is the tallest mountain?")
 4. **Vector Dimension:** ALWAYS 768 (mismatch causes wrong results)
 
 ### Performance Characteristics
-- **Learning:** 0.02ms per concept (57,412 concepts/sec)
+- **Learning:** Optimized per concept
 - **Query:** <0.01ms with zero-copy memory-mapped access
 - **Path Finding:** ~1ms for 3-hop BFS traversal
 - **Memory:** ~0.1KB per concept (excluding embeddings)

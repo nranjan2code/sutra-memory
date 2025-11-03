@@ -103,6 +103,26 @@ They need explainable reasoning over THEIR proprietary data.**
 
 ### The Sutra Solution
 
+**Query Approach Comparison:**
+
+```cypher
+# Traditional graph databases (Neo4j Cypher)
+# Requires knowing exact schema and relationships
+MATCH (d:Drug)-[:CONTRAINDICATED_WITH]->(c:Condition)
+WHERE c.name = 'pregnancy'
+RETURN d.name
+```
+
+```python
+# Sutra: Natural language over TCP binary protocol
+# No schema knowledge required
+response = storage.query("Which drugs are contraindicated during pregnancy?")
+```
+
+**Architectural Decision:** Sutra uses TCP binary protocol + natural language reasoning. We will NEVER support SQL/Cypher/GraphQL - see [No SQL Policy](docs/architecture/NO_SQL_POLICY.md).
+
+### Core Capabilities
+
 🎯 **Domain-Specific Reasoning Engine**
 
 ✅ **Your Knowledge, Our Reasoning** - Learns from your domain data (protocols, cases, procedures)  
@@ -207,7 +227,7 @@ Answer with complete FDA-auditable trail
 │  └─ Edition-aware scaling + monitoring                 │
 │                                                         │
 │  Core Infrastructure (TCP Binary Protocol)              │
-│  ├─ Storage Server (Rust - 57K writes/sec) :50051     │
+│  ├─ Storage Server (Rust)                  :50051     │
 │  ├─ Grid Master (Orchestration)            :7001-7002  │
 │  └─ Event Storage (Self-monitoring)        :50052     │
 │                                                         │
@@ -576,39 +596,37 @@ See: **[docs/security/PRODUCTION_SECURITY_SETUP.md](docs/security/PRODUCTION_SEC
 
 ---
 
-## Performance
+## Architecture Highlights
 
-### Production Benchmarks (Verified)
+### Core Design Principles
 
-| Operation | Performance | Details |
-|-----------|-------------|---------|
-| **Learning** | 57,412 concepts/sec | 0.02ms per concept |
-| **Query** | <0.01ms | Zero-copy mmap reads |
-| **Path Finding** | ~1ms | 3-hop BFS traversal |
-| **Vector Search** | <50ms (P50) | HNSW with USearch |
-| **Startup** | 3.5ms | 1M vectors from disk (94× faster) |
-| **Memory** | ~0.1KB/concept | Excluding embeddings |
+| Feature | Implementation | Details |
+|---------|----------------|---------||
+| **Learning** | Lock-free write log | Optimized for continuous updates |
+| **Query** | Immutable snapshots | Memory-mapped access patterns |
+| **Path Finding** | Multi-threaded BFS | Graph traversal optimization |
+| **Vector Search** | HNSW with USearch | Persistent index support |
+| **Startup** | Persistent indexes | Fast loading from disk |
+| **Memory** | Efficient structures | Optimized for scale |
 
 ### Recent Optimizations (2025-10-24)
 
 **P0.1: AI-Native Adaptive Reconciliation**
-- 80% CPU reduction during idle
-- 10× lower latency under load (1-5ms vs 10ms)
-- Self-optimizing intervals (1-100ms dynamic range)
+- Reduced CPU usage during idle periods
+- Lower latency under load
+- Self-optimizing intervals with dynamic adaptation
 - Zero configuration required
 
 **P1.5: HNSW Persistent Index (USearch)**
-- 94× faster startup (3.5ms vs 5.5min for 1M vectors)
-- 24% smaller index files
+- Faster startup with persistent indexes
+- Smaller index files
 - SIMD-optimized search
 - True mmap persistence (no rebuild)
 
 **P1.2: Parallel Pathfinding**
-- 4-8× speedup on multi-path queries
+- Improved multi-path query performance
 - Rayon work-stealing parallelization
 - Optimal for MPPA consensus reasoning
-
-**[Detailed Benchmarks →](docs/performance/BENCHMARKS.md)**
 
 ---
 
@@ -693,8 +711,7 @@ http://localhost:9000  # Navigate to Dependencies tab
 ### Operations & Security
 
 - **[🔒 Production Security](docs/security/PRODUCTION_SECURITY_SETUP.md)** - Complete security setup
-- **[🚨 Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and fixes
-- **[� Performance Benchmarks](docs/performance/BENCHMARKS.md)** - Detailed performance data
+- **[📢 Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and fixes
 - **[🔐 Dependency Management](docs/dependency-management/QUICK_START.md)** - Security & compliance
 
 ### Development
@@ -716,7 +733,7 @@ http://localhost:9000  # Navigate to Dependencies tab
 ```
 sutra-models/
 ├── packages/
-│   ├── sutra-storage/          # Rust storage (57K writes/sec)
+│   ├── sutra-storage/          # Rust storage engine
 │   ├── sutra-core/            # Graph reasoning engine
 │   ├── sutra-hybrid/          # Semantic embeddings + NLG
 │   ├── sutra-api/             # REST API (FastAPI)

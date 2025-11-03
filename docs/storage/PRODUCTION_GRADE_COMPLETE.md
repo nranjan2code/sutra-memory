@@ -349,7 +349,7 @@ cargo test --lib --release
 
 ### Write Performance ✅
 
-- **Throughput**: 57,412 concepts/sec (lock-free WriteLog)
+- **Throughput**: Lock-free WriteLog architecture
 - **Latency**: <0.02ms (non-blocking append)
 - **Durability**: WAL-first architecture (zero data loss)
 
@@ -378,7 +378,7 @@ cargo test --lib --release
 ### Before (Grade: A-, 90/100)
 
 **Strengths**:
-- High write throughput (57K ops/sec)
+- High write throughput (optimized concurrent operations)
 - Zero-copy reads (<0.01ms)
 - Comprehensive test coverage
 - Self-monitoring architecture

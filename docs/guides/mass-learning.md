@@ -375,7 +375,7 @@ print(f"\n✅ Completed: {progress.concepts_created} concepts created")
 
 ### Planned Adapters
 
-1. **DatabaseAdapter** - SQL/NoSQL database ingestion
+1. **DatabaseAdapter** - External database ingestion (source systems only)
 2. **StreamAdapter** - Real-time data streams (Kafka, RabbitMQ)  
 3. **DocumentAdapter** - PDF, DOCX, and other document formats
 4. **APIAdapter** - Web APIs and RSS feeds

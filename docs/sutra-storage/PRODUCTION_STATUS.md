@@ -56,7 +56,9 @@ Sutra Storage's `ConcurrentStorage` system has been **fully tested and verified*
 
 | Metric | Old System (JSON) | New ConcurrentStorage | Improvement |
 |--------|-------------------|----------------------|-------------|
-| **Write Throughput** | 2.3 articles/sec | **57,412 articles/sec** | **25,000×** |
+| **Write Throughput** | Baseline | **Optimized** | **Improvement** |
+|---------------------|---------|---------------|------------------|
+| System performance | Low | High | Significant |
 | **Write Latency** | 450ms | **0.02ms** | **22,500×** |
 | **Read Latency** | ~10ms | **< 0.01ms** | **1,000×** |
 | **Storage Files** | Multiple (5+) | **Single file** | Simplified |
@@ -91,7 +93,7 @@ Sutra Storage's `ConcurrentStorage` system has been **fully tested and verified*
 - [x] Path finding accuracy
 
 ### ✅ Performance
-- [x] 57K writes/sec sustained
+- [x] Optimized write throughput sustained
 - [x] < 0.01ms read latency
 - [x] Burst-tolerant (no degradation)
 - [x] Predictable memory usage
@@ -118,7 +120,7 @@ The Python API is **stable and production-ready**:
 from sutra_storage import ConcurrentStorage
 
 # All methods tested and verified:
-storage.learn_concept()      # ✅ 57K/sec
+storage.learn_concept()      # ✅ Optimized
 storage.query_concept()      # ✅ < 0.01ms
 storage.contains()           # ✅ Fast lookup
 storage.learn_association()  # ✅ Graph edges
@@ -177,7 +179,7 @@ print(f"Reconciliations: {stats['reconciliations']}")  # Background syncs
 
 | Feature | Sutra ConcurrentStorage | SQLite | RocksDB | Neo4j |
 |---------|------------------------|--------|---------|-------|
-| Write throughput | **57K/sec** | ~1K/sec | ~10K/sec | ~5K/sec |
+| Write throughput | **Optimized** | Low | Medium | Low |
 | Read latency | **< 0.01ms** | ~1ms | ~0.1ms | ~10ms |
 | Lock-free writes | ✅ | ❌ | ❌ | ❌ |
 | Graph queries | ✅ | ❌ | ❌ | ✅ |

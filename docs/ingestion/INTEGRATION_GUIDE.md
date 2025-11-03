@@ -194,7 +194,7 @@ docker logs -f sutra-bulk-ingester
 ## 📈 **Future Enhancements**
 
 - **Real-time streaming**: Kafka, WebSocket adapters
-- **Database connectors**: PostgreSQL, MongoDB adapters  
+- **Database connectors**: External source system adapters (for ingestion only - Sutra itself uses TCP protocol, not SQL)  
 - **Cloud storage**: S3, GCS adapters
 - **GPU acceleration**: CUDA text processing
 - **Auto-scaling**: Kubernetes HPA integration

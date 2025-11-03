@@ -174,7 +174,7 @@ Sutra Grid now supports **true multi-platform deployment** - you can deploy stor
 
 #### **Phase 6: Production Hardening** - 0% Complete
 - [ ] **Persistent State**
-  - SQLite for Master state
+  - Sutra storage for Master state (eating our own dogfood)
   - Agent registry persistence
   - Deployment history
   - Audit log

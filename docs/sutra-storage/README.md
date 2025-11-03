@@ -4,7 +4,7 @@
 
 Sutra Storage is a **production-ready**, high-performance storage engine designed for **continuous learning AI systems** with unpredictable burst patterns. It achieves zero-interference concurrent reads and writes through a novel dual-plane architecture.
 
-**Status:** ✅ **Production-Ready** (100% test pass rate, 25,000× faster than baseline)
+**Status:** ✅ **Production-Ready** (100% test pass rate, optimized architecture)
 
 ### Key Innovation
 
@@ -196,7 +196,7 @@ Versioned: Monotonic sequence numbers
 ## Key Features
 
 ### ✅ Production-Ready (Tested & Verified)
-- Lock-free write log (crossbeam channel) - **57K writes/sec**
+- Lock-free write log (crossbeam channel) - **Optimized throughput**
 - Immutable read snapshots (arc-swap) - **zero-copy access**
 - Background reconciliation (10ms loop) - **automatic**
 - Single-file memory-mapped storage (`storage.dat`) - **512 MB for 1K concepts**
@@ -250,7 +250,7 @@ storage = ConcurrentStorage(
     memory_threshold=50000        # Flush at 50K concepts (or manual)
 )
 
-# Learn concept (57K/sec throughput, 0.02ms latency)
+# Learn concept (optimized throughput and latency)
 embedding = np.random.random(768).astype(np.float32)
 seq = storage.learn_concept(
     concept_id="a1b2c3d4e5f67890",  # 16-char hex ID
@@ -368,7 +368,7 @@ Old System (JSON-based):
   Files:      Multiple (concepts.json, associations.json, etc.)
 
 New ConcurrentStorage:
-  Throughput: 57,412 articles/sec  (25,000× faster)
+  Throughput: Optimized for continuous learning
   Latency:    0.02ms per article   (22,500× faster)
   Files:      Single (storage.dat)
   
@@ -456,7 +456,7 @@ println!("Staleness: {}μs", now() - stats.snapshot.timestamp);
 ### High Write Latency
 - Check `dropped` counter → queue overflow
 - Increase `queue_capacity` or `reconcile_interval_ms`
-- **Current performance**: 57K writes/sec with 0 drops
+- **Current performance**: Optimized with zero drops
 
 ### High Read Latency
 - Check `pending` count → reconciler behind

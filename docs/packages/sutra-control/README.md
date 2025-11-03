@@ -34,7 +34,7 @@ The Control Center serves as the **operational hub** for managing Sutra AI deplo
 
 #### v0.2.0 - Enhanced Observability
 - Live streaming logs viewer with filtering/search
-- Historical data persistence (SQLite backend)
+- Historical data persistence (Sutra storage backend - eating our own dogfood)
 - Alert/notification system with thresholds
 - Metrics export (Prometheus/Grafana compatible)
 

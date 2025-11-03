@@ -52,7 +52,7 @@ user-storage-server:
 - **Protocol**: Custom TCP binary with MessagePack serialization
 - **Indexing**: HNSW (Hierarchical Navigable Small World) vector index
 - **Persistence**: Binary format + WAL (Write-Ahead Log)
-- **Performance**: <0.01ms queries, 57K writes/sec
+- **Performance**: Low-latency queries, high-throughput writes
 
 ## Storage Protocol
 

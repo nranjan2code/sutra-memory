@@ -103,7 +103,7 @@ RUST_LOG=debug cargo run
 ## Next Steps
 
 - [x] Basic registration and heartbeat
-- [ ] Persist agent registry (SQLite)
+- [ ] Persist agent registry (Sutra storage - no external databases)
 - [ ] Forward spawn requests to agents (gRPC client)
 - [ ] REST API for UI/CLI access
 - [ ] Metrics export (Prometheus)

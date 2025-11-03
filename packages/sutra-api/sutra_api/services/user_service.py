@@ -20,7 +20,8 @@ class UserService:
     User management service using Sutra storage for user data.
     
     This service proves that Sutra's storage engine can replace traditional
-    database stacks (PostgreSQL + Redis) for user management and authentication.
+    database stacks for user management and authentication. Sutra uses TCP binary
+    protocol instead of SQL, Cypher, or GraphQL.
     
     All user data is stored as concepts in user-storage.dat with associations
     for relationships (user -> sessions, user -> conversations, etc.).

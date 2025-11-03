@@ -33,7 +33,7 @@ Sharded storage enables Sutra AI to scale from **10M to 2.5B concepts** through 
 │  │ - 1 instance        │ - N instances (shards)       │ │
 │  │ - storage.dat       │ - shard_0/storage.dat        │ │
 │  │ - 10M concepts      │   shard_1/storage.dat        │ │
-│  │ - 57K writes/sec    │   ...                        │ │
+│  │ - Optimized writes    │   ...                        │ │
 │  │                     │   shard_N/storage.dat        │ │
 │  │                     │ - 160M-2.5B concepts         │ │
 │  │                     │ - 912K-14.6M writes/sec      │ │
@@ -239,14 +239,14 @@ VECTOR_DIMENSION=768 \
 
 | Shards | Capacity | Throughput | Memory | Disk |
 |--------|----------|-----------|--------|------|
-| 1 (single) | 10M concepts | 57K writes/sec | 2GB | 5GB |
+| 1 (single) | 10M concepts | Optimized | 2GB | 5GB |
 | 16 | 160M concepts | 912K writes/sec | 32GB | 80GB |
 | 64 | 640M concepts | 3.6M writes/sec | 128GB | 320GB |
 | 256 | 2.5B concepts | 14.6M writes/sec | 512GB | 1.3TB |
 
 **Formula:**
 - Capacity: 10M × N shards
-- Throughput: 57K × N shards  
+- Throughput: Scales with N shards  
 - Memory: 2GB × N shards
 - Disk: 5GB × N shards
 

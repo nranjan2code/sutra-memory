@@ -390,7 +390,7 @@ timeout server 30000              # Server timeout (ms)
 ## 📈 Performance Characteristics
 
 ### With Sharded Storage (16 shards)
-- Write: 57,412 concepts/sec per shard = ~918K/sec total
+- Write: Optimized per shard for horizontal scaling
 - Read: <0.01ms per shard
 - Vector search: O(log(N/S)) with parallel queries
 - Memory: ~1KB per concept

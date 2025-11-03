@@ -670,14 +670,14 @@ if estimated_lag_ms > 100 {
 
 **Write Performance:**
 ```
-Benchmark: 57,412 concepts/sec
+**Architecture:** Optimized for continuous learning
   - Lock-free WriteLog append: ~10μs per write
   - No blocking on readers or other writers
   - Backpressure handling: <1% dropped at max load
   
 Comparison:
   - 25,000× faster than JSON file storage
-  - 500× faster than SQLite with transactions
+  - Optimized for concurrent transactional workloads
   - 50× faster than PostgreSQL with fsync
 ```
 

@@ -93,7 +93,9 @@ Sutra: *queries knowledge graph*
 Result: agent-prod-1 (crashed 14:23), agent-prod-5 (crashed 16:45)
 ```
 
-No SQL to write. No custom query language. Just natural language.
+**No SQL. No custom query languages. Just natural language reasoning and TCP binary protocol.**
+
+Sutra will never support traditional SQL, Cypher, or GraphQL. Our approach:
 
 ### 3. **Zero External Dependencies**
 
@@ -248,23 +250,25 @@ Query: "Show me the timeline of agent-prod-1"
 
 ## Benefits vs Traditional Databases
 
-### Traditional (PostgreSQL/MongoDB)
+### Traditional Databases
 
 | Aspect | Traditional DB |
 |--------|---------------|
 | **Schema** | Rigid, migrations needed |
-| **Queries** | SQL/custom query language |
+| **Queries** | SQL/Cypher/GraphQL |
 | **History** | Separate audit table |
 | **Reasoning** | Application logic |
 | **Scalability** | Sharding, replication |
 | **Dependencies** | External database |
 
-### Sutra Storage
+### Sutra Storage (Our Approach)
+
+**Architectural Decision:** Sutra will NEVER support SQL, Cypher, or GraphQL. We use TCP binary protocol + natural language reasoning instead.
 
 | Aspect | Sutra Storage |
 |--------|--------------|
 | **Schema** | Flexible graph |
-| **Queries** | Natural language |
+| **Queries** | TCP binary protocol + natural language |
 | **History** | Built-in temporal |
 | **Reasoning** | Knowledge graph |
 | **Scalability** | Built for this |
@@ -439,13 +443,12 @@ def get_agents():
 ✅ **Audit trails** → Automatic from events  
 
 ❌ **Not using**:
-- SQLite
 - PostgreSQL
 - MongoDB
 - Redis
-- Prometheus
+- Prometheus (for persistence)
 - Elasticsearch
-- Any external database
+- Any external database (no SQL/Cypher/GraphQL)
 
 ---
 

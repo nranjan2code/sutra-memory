@@ -92,7 +92,7 @@ The Sutra AI user management system uses a **dual-storage architecture** that se
 - **Type**: Vector-only storage (no semantic analysis)
 - **Embedding**: Required for all concepts (`generate_embedding: true`)
 - **Search**: Pure vector similarity search
-- **Performance**: <0.01ms query time, 57K writes/sec
+- **Performance**: Low-latency queries, high-throughput writes
 
 ### Data Structures
 
@@ -159,7 +159,7 @@ options = {
 ## Performance Characteristics
 
 - **Vector Search**: <0.01ms per query
-- **Concept Storage**: 57K writes/second  
+- **Concept Storage**: High-throughput writes  
 - **Embedding Generation**: ~500ms per concept
 - **JWT Token TTL**: 24 hours (access), 7 days (refresh)
 - **Session TTL**: 7 days default

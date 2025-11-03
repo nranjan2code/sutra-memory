@@ -17,7 +17,7 @@ The Sutra Storage Engine is a high-performance, distributed knowledge graph desi
 ├─────────────────────────────────────────────────────────────────┤
 │  Storage:                                                       │
 │  • Binary format: SUTRADAT v2 (mmap + WAL)                    │
-│  • Performance: <0.01ms reads, 57K writes/sec                 │
+│  • Performance: Optimized reads and writes                 │
 │  • Persistence: Write-Ahead Log with crash recovery           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Interface:                                                     │
@@ -154,7 +154,7 @@ The unified learning process that:
 - Knowledge bases requiring fine-grained access control
 
 ❌ **Not Ideal For:**
-- Simple document storage (use PostgreSQL)
+- Simple document storage (use traditional databases for non-graph workloads)
 - General-purpose chat applications (use existing LLMs)
 - Applications needing pre-trained world knowledge
 - Simple key-value storage needs

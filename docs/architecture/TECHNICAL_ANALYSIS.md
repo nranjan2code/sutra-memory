@@ -184,7 +184,7 @@ class MultiPathAggregator:
 
 **Competitive Position:**
 - LLMs: Black box, no reasoning paths ❌
-- Neo4j + Cypher: Paths but no consensus ⚠️
+- Neo4j graph queries: Paths but no consensus reasoning ⚠️
 - Knowledge graphs: Reasoning but not multi-path ⚠️
 - **Sutra: Multi-path + consensus + explainability** ✅ (unique)
 
@@ -387,7 +387,7 @@ Query → Single Storage Server → PathFinder → MPPA → Result
 **Competitive Analysis:**
 - Neo4j: Distributed queries (Fabric) ✅
 - Dgraph: Distributed by design ✅
-- GraphQL engines: Federation ✅
+- API gateways: Federation ✅
 - **Sutra: Single-node queries** ❌
 
 ---
@@ -594,9 +594,9 @@ pub enum ConceptType {
 ```
 
 **Use Cases:**
-- SQL-like queries over graph ("Find employees in Engineering with salary > 100K")
-- Join graph data with relational data
-- BI/analytics over knowledge graphs
+- Semantic queries via TCP protocol ("Find employees in Engineering with high confidence")
+- Graph reasoning with structured metadata
+- Analytics over knowledge graphs via natural language
 
 ---
 

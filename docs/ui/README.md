@@ -9,7 +9,7 @@ REMEMBER THERE IS NO NEED FOR BACKWARD COMPATIBILITY 0 USERS EXIST
 
 ## 📚 Documentation Overview
 
-This directory contains comprehensive documentation for the conversation-first UI revamp of Sutra AI. The UI proves that Sutra's storage engine (`storage.dat`) can replace classical database stacks (PostgreSQL, Redis, Elasticsearch) for user management, authentication, and conversation history.
+This directory contains comprehensive documentation for the conversation-first UI revamp of Sutra AI. The UI proves that Sutra's storage engine (`storage.dat`) with its TCP binary protocol can replace classical database stacks for user management, authentication, and conversation history - without needing SQL, Cypher, or GraphQL query languages.
 
 ---
 
@@ -32,7 +32,7 @@ This directory contains comprehensive documentation for the conversation-first U
 - Multi-tenancy strategy
 - API design
 - Performance considerations
-- What we're proving (replaces PostgreSQL/Redis/Elasticsearch)
+- What we're proving (replaces traditional DB stacks without SQL)
 
 **When to Read:** Before starting implementation, for architectural understanding
 

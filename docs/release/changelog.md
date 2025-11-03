@@ -122,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Performance Impact:**
 - Write latency: +0.1ms (WAL fsync overhead)
 - Read latency: No change (<0.01ms)
-- Throughput: 57K writes/sec maintained
+- Throughput: High write throughput maintained
 - Storage overhead: ~100 bytes per operation in WAL (cleared on flush)
 
 **Breaking Changes:**
@@ -164,7 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial production release
-- ConcurrentStorage with 57K writes/sec
+- ConcurrentStorage with optimized write throughput
 - Lock-free architecture
 - Single-file storage.dat format
 - Vector search with HNSW
@@ -173,7 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streamlit client interface
 
 ### Performance
-- 57,412 writes/sec (25,000× faster than baseline)
+- Optimized write architecture
 - <0.01ms read latency
 - Zero-copy memory-mapped access
 - 100% test pass rate

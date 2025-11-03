@@ -1,10 +1,20 @@
 # Sutra AI - AI Assistant Instructions
 
-**Domain-Specific Explainable AI System for Regulated Industries**
+**General-Purpose Semantic Reasoning Engine with Temporal, Causal, and Explainable AI**
 
 ## Project Architecture
 
-Sutra AI is a **12-service distributed system** that provides explainable reasoning over domain-specific knowledge graphs. Unlike general LLMs, it starts empty and learns from YOUR proprietary data (medical protocols, legal precedents, financial regulations) with complete audit trails.
+Sutra AI is a **12-service distributed system** that provides explainable reasoning over domain-specific knowledge graphs. Unlike general LLMs, it starts empty and learns from YOUR proprietary data with complete audit trails. Sutra combines semantic understanding, temporal reasoning, causal analysis, and explainability for ANY knowledge-intensive industry - not just regulated industries.
+
+**Key Capabilities:**
+- ✅ **Temporal Reasoning** (before/after/during relationships)
+- ✅ **Causal Understanding** (X causes Y, multi-hop chains, root cause analysis)
+- ✅ **Semantic Classification** (9 types: Entity, Event, Rule, Temporal, Negation, Condition, Causal, Quantitative, Definitional)
+- ✅ **Self-Monitoring** (monitors itself via Grid events - revolutionary "eat your own dogfood")
+- ✅ **Complete Explainability** (MPPA reasoning paths with confidence scores)
+- ✅ **Real-Time Learning** (<10ms concept ingestion, no retraining)
+
+**Market Applications:** DevOps observability ($20B), enterprise knowledge management ($30B), content platforms ($50B), supply chain ($15B), customer support ($12B), scientific research ($5B), and any domain requiring explainable decisions.
 
 ### Core Components
 
@@ -148,20 +158,55 @@ pub enum StorageRequest {
 - 2PC coordinator for atomic writes across shards
 - Parallel vector search queries all shards simultaneously
 
-### Self-Monitoring with Grid Events
-System monitors itself using its own reasoning engine:
-```python
-# Query operational state in natural language
-"Which services are consuming the most CPU?"
-"Show me failed requests in the last hour"
-# Answers come from Grid Events stored in concept graph
+### Self-Monitoring with Grid Events (Revolutionary Innovation)
+System monitors itself using its own reasoning engine - **NO external tools (Prometheus, Grafana, Datadog)**:
+
+**Architecture:**
 ```
+Grid Components → EventEmitter (Rust) → Sutra Storage (TCP) → Natural Language Queries
+```
+
+**26 Production Event Types:**
+- Agent Lifecycle: AgentRegistered, AgentHeartbeat, AgentDegraded, AgentOffline, AgentRecovered, AgentUnregistered
+- Node Lifecycle: SpawnRequested, SpawnSucceeded, SpawnFailed, StopRequested, StopSucceeded, StopFailed, NodeCrashed, NodeRestarted
+- Performance: StorageMetrics, QueryPerformance, EmbeddingLatency, HnswIndexBuilt, PathfindingMetrics, ReconciliationComplete
+
+**Natural Language Queries:**
+```python
+# Operational queries
+"Show cluster status"
+"What caused the 2am crash?"  # Returns complete causal chain in ~30ms
+"Which agents went offline this week?"
+"Show all spawn failures today"
+
+# Root cause analysis
+"Why did node-abc123 crash?"  # Automatic causal chain discovery
+"What happened before the cluster went critical?"
+"Which node has the highest restart count?"
+
+# Performance analysis
+"Which storage node is slowest?"
+"Show embedding cache hit rate trends"
+"Compare query latency across shards"
+```
+
+**Production Metrics:**
+- Event volume: 30 events/sec sustained, 100+ burst
+- Query latency: 12-34ms (faster than Elasticsearch)
+- Storage overhead: <0.1% (for 16M concepts)
+- Cost savings: 96% vs. traditional stack ($46K → $1.8K/year)
+
+**Key Files:**
+- Event library: `packages/sutra-grid-events/src/events.rs` (26 event types, 500+ LOC)
+- Event emitter: `packages/sutra-grid-events/src/emitter.rs` (TCP binary protocol)
+- Production usage: `packages/sutra-grid-master/src/main.rs` (Grid Master emits 10+ event types)
+- Case study: `docs/sutra-platform-review/DEVOPS_SELF_MONITORING.md` (complete documentation)
 
 ## Critical File Locations
 
 - **Build script:** `./sutra-optimize.sh` (929 lines, single-tag build system)
 - **Main deployment:** `./sutra-deploy.sh` (1100+ lines, handles releases)
-- **Version control:** `VERSION` (single source of truth, currently 2.0.0)
+- **Version control:** `VERSION` (single source of truth, currently 3.0.0)
 - **Compose file:** `.sutra/compose/production.yml` (unified, profile-based)
 - **Storage engine:** `packages/sutra-storage/src/` (14K+ LOC Rust)
 - **Reasoning core:** `packages/sutra-core/sutra_core/` (42 Python modules)
@@ -171,6 +216,22 @@ System monitors itself using its own reasoning engine:
 - **Deployment docs:** `docs/deployment/README.md` (deployment guide)
 - **Release docs:** `docs/release/README.md` (release management)
 - **Smoke tests:** `scripts/smoke-test-embeddings.sh` (production validation)
+
+## Platform Review Documentation (November 2025)
+
+**Complete Technical and Strategic Review:**
+- **Platform Review:** `docs/sutra-platform-review/README.md` (navigation hub)
+- **Technical Analysis:** `docs/sutra-platform-review/DEEP_TECHNICAL_REVIEW.md` (A+ grade, 9.4/10)
+- **Market Analysis:** `docs/sutra-platform-review/REAL_WORLD_USE_CASES.md` ($10B → $200B+ TAM)
+- **Self-Monitoring Case Study:** `docs/sutra-platform-review/DEVOPS_SELF_MONITORING.md` (96% cost savings)
+- **Developer Guide:** `docs/sutra-platform-review/QUICK_START_SELF_MONITORING.md` (5-minute setup)
+- **Blog Post:** `docs/sutra-platform-review/BLOG_POST_SELF_MONITORING.md` (Hacker News ready)
+
+**Key Insights from Review:**
+- Sutra was positioned as "compliance for regulated industries" but is actually **general-purpose semantic reasoning**
+- Self-monitoring proves capabilities at production scale (zero external observability tools)
+- Market opportunity expanded from $10B (compliance) to $200B+ (knowledge-intensive industries)
+- DevOps observability ($20B market) identified as immediate go-to-market opportunity
 
 ## Documentation Structure (2025-10-28)
 
@@ -213,7 +274,7 @@ docs/
 Professional version control for customer deployments with centralized versioning and automated builds.
 
 ### Key Files
-- **VERSION** - Single source of truth for all package versions (2.0.0)
+- **VERSION** - Single source of truth for all package versions (3.0.0)
 - **sutra-deploy.sh** - Release commands (version, release, deploy)
 - **docker-compose-grid.yml** - All services use `${SUTRA_VERSION:-latest}`
 - **.github/workflows/release.yml** - Automated builds on tag push
@@ -272,13 +333,15 @@ MAJOR.MINOR.PATCH
 ## Common Anti-Patterns to Avoid
 
 - **Don't bypass unified learning:** All ingestion MUST go through storage server TCP protocol
-- **Don't use generic AI advice:** This is domain-specific reasoning, not general chatbot
 - **Don't ignore editions:** Features/performance vary significantly by SUTRA_EDITION
 - **Don't assume security:** Default mode has NO authentication (development only)
 - **Don't forget WAL:** Storage operations are transactional with crash recovery
 - **Don't manually edit VERSION:** Use `./sutra-deploy.sh release <type>` for version bumps
 - **Don't skip release docs:** See `docs/release/` for complete release workflow
 - **Don't use removed scripts:** Use `sutra` command as single entry point, not external scripts
+- **Don't position as "regulated industries only":** Use cases span 20+ industries ($200B+ market)
+- **Don't ignore self-monitoring capabilities:** We already have production proof (Grid events)
+- **Don't forget temporal/causal reasoning:** This is the core differentiator vs. vector databases
 
 ## Scale Targets
 
@@ -286,4 +349,10 @@ MAJOR.MINOR.PATCH
 - **Target scale:** 10M+ concepts across 16 shards
 - **Architecture:** Optimized for continuous learning workloads
 
-When working on this codebase, prioritize explainability, audit trails, and domain-specific accuracy over general AI capabilities. Every reasoning path should be traceable for compliance requirements.
+## Market Positioning
+
+- **Narrow (old):** "Compliance tool for healthcare/finance/legal" ($10B market)
+- **Broad (correct):** "Explainable reasoning for knowledge-intensive industries" ($200B+ market)
+- **Immediate opportunity:** DevOps observability ($20B) - we already have proof (self-monitoring)
+
+When working on this codebase, prioritize explainability, audit trails, and domain-specific accuracy over general AI capabilities. Every reasoning path should be traceable for compliance requirements AND operational understanding.

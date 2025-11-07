@@ -1,0 +1,76 @@
+{
+  "summary": {
+    "companies_targeted": 5,
+    "companies_processed": 5,
+    "concepts_created": 15,
+    "concepts_failed": 0,
+    "total_time_seconds": 103.599453,
+    "concepts_per_second": 0.14478840925926512,
+    "success_rate": 100.0,
+    "estimated_concepts": 15,
+    "achievement_rate": 100.0
+  },
+  "detailed_results": [
+    {
+      "company": "MSFT",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "8151d7a8f5764c73",
+        "3a62e7e39f711aeb",
+        "3d8060a9523fc882"
+      ],
+      "errors": []
+    },
+    {
+      "company": "AAPL",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "c3198761ee3175b6",
+        "e5cac85aad155210",
+        "6d1b9949d9b1b938"
+      ],
+      "errors": []
+    },
+    {
+      "company": "GOOGL",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "d01387241cc33468",
+        "5182c4383f10eeda",
+        "30af78d867bba1b3"
+      ],
+      "errors": []
+    },
+    {
+      "company": "AMZN",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "592f3818cdb1f436",
+        "30aebc5f467f203a",
+        "93458a90de5abb47"
+      ],
+      "errors": []
+    },
+    {
+      "company": "NVDA",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "19af65804ecaee83",
+        "d50d16de01323734",
+        "fdb2abd04ff5ddf5"
+      ],
+      "errors": []
+    }
+  ],
+  "performance_metrics": {
+    "avg_concepts_per_company": 3.0,
+    "processing_throughput": 2.895768185185302,
+    "error_rate": 0.0
+  },
+  "errors": []
+}

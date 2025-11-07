@@ -1,0 +1,131 @@
+{
+  "summary": {
+    "companies_targeted": 10,
+    "companies_processed": 10,
+    "concepts_created": 30,
+    "concepts_failed": 0,
+    "total_time_seconds": 216.083803,
+    "concepts_per_second": 0.13883502411330664,
+    "success_rate": 100.0,
+    "estimated_concepts": 30,
+    "achievement_rate": 100.0
+  },
+  "detailed_results": [
+    {
+      "company": "AAPL",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "38e7987f332d7f53",
+        "86ad130a7cd70728",
+        "a94641feee1d9a38"
+      ],
+      "errors": []
+    },
+    {
+      "company": "MSFT",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "6b479dd5050ee824",
+        "4ccf432bceab6b46",
+        "91d99b92478a5e05"
+      ],
+      "errors": []
+    },
+    {
+      "company": "AMZN",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "100ba77959c45b82",
+        "43f583996948dadd",
+        "0c79b48592bea2c4"
+      ],
+      "errors": []
+    },
+    {
+      "company": "GOOGL",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "5eb14bf3b574dbdf",
+        "7c5f3b4a2a7a05a6",
+        "e0b1788483dda860"
+      ],
+      "errors": []
+    },
+    {
+      "company": "TSLA",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "5ca9df7a3557323c",
+        "b33b929cbb40596a",
+        "ef30cd48c45bc625"
+      ],
+      "errors": []
+    },
+    {
+      "company": "NVDA",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "0e3fe1e02299ae3b",
+        "6aac5f828d6e02e5",
+        "25f49019d266fb1d"
+      ],
+      "errors": []
+    },
+    {
+      "company": "TSM",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "b6543b1c4736b67c",
+        "60c11e397840bee0",
+        "8cbcb8deb79d71d6"
+      ],
+      "errors": []
+    },
+    {
+      "company": "META",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "5f38780685b76452",
+        "6c66691f44dc9209",
+        "2f8d896f53a4edef"
+      ],
+      "errors": []
+    },
+    {
+      "company": "V",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "75b5be76e3e496cc",
+        "2442cff1417dcf87",
+        "7866fa706187baf8"
+      ],
+      "errors": []
+    },
+    {
+      "company": "JPM",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "ab2b3b6d5739c9dc",
+        "74afb342e2528335",
+        "931613346e0ea1c0"
+      ],
+      "errors": []
+    }
+  ],
+  "performance_metrics": {
+    "avg_concepts_per_company": 3.0,
+    "processing_throughput": 2.7767004822661328,
+    "error_rate": 0.0
+  },
+  "errors": []
+}

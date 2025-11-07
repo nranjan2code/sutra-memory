@@ -1,0 +1,54 @@
+{
+  "summary": {
+    "companies_targeted": 3,
+    "companies_processed": 3,
+    "concepts_created": 9,
+    "concepts_failed": 0,
+    "total_time_seconds": 64.101909,
+    "concepts_per_second": 0.14040143484650355,
+    "success_rate": 100.0,
+    "estimated_concepts": 9,
+    "achievement_rate": 100.0
+  },
+  "detailed_results": [
+    {
+      "company": "MSFT",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "2f383052b45ef28c",
+        "779c36e544017177",
+        "383978ace2938c4e"
+      ],
+      "errors": []
+    },
+    {
+      "company": "AAPL",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "d3f9983fc9cdf012",
+        "ccbe61ca067d9501",
+        "8cdb8a0fd0de7e56"
+      ],
+      "errors": []
+    },
+    {
+      "company": "GOOGL",
+      "success_count": 3,
+      "failure_count": 0,
+      "concept_ids": [
+        "38083872d38a3953",
+        "bf5a214580574cca",
+        "e48f82073cf6f262"
+      ],
+      "errors": []
+    }
+  ],
+  "performance_metrics": {
+    "avg_concepts_per_company": 3.0,
+    "processing_throughput": 2.808028696930071,
+    "error_rate": 0.0
+  },
+  "errors": []
+}

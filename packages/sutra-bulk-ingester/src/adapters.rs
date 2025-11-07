@@ -81,6 +81,9 @@ pub struct AdapterInfo {
     pub config_schema: JsonValue,  // JSON Schema for validation
 }
 
+// Google Sheets adapter for financial data
+pub mod google_sheets;
+
 // Built-in Rust adapters for performance-critical sources
 pub mod builtin {
     use super::*;

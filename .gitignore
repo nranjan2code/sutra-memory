@@ -430,11 +430,43 @@ secrets/
 
 # Test outputs
 test_outputs/
-test_results/
 .coverage.*
 htmlcov/
 coverage.xml
 .pytest_cache/
+
+# Playwright E2E testing artifacts (root level only)
+/playwright-report/
+/playwright-report.json
+/test-results/
+/screenshots/
+
+# Playwright test artifacts (anywhere)
+**/.playwright/
+**/playwright-report/
+**/test-results/
+
+# Playwright debug files
+cookies*.txt
+*.trace
+*.har
+.last-run.json
+
+# Video recordings from tests
+*.webm
+
+# Root-level test screenshots (not docs images)
+/*-test-*.png
+/*-debug*.png
+/e2e-*.png
+/manual-test-*.png
+/after-*.png
+/before-*.png
+/registration-*.png
+/login-*.png
+/navigation-*.png
+/ui-discovery-*.png
+/web-*.png
 
 # Debug outputs
 debug/

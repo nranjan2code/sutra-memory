@@ -6,6 +6,7 @@ Sutra's storage engine as the backend (dogfooding storage.dat for auth).
 """
 
 import logging
+import secrets
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 
@@ -77,16 +78,22 @@ class UserService:
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters")
         
-        # Check if user already exists using VECTOR SEARCH ONLY
+        # Check if user already exists using semantic search
         try:
             import json
             
-            dummy_vector = [0.0] * 768
-            vector_results = self.storage.vector_search(dummy_vector, k=50)
+            semantic_filter = {
+                "required_terms": [email],
+                "has_causal_relation": False,
+            }
             
-            # Check for existing user with same email (clean code, no backward compatibility)
-            for concept_id, similarity in vector_results:
-                concept = self.storage.query_concept(concept_id)
+            semantic_results = self.storage.query_by_semantic(
+                semantic_filter=semantic_filter,
+                max_results=10
+            )
+            
+            # Check for existing user with same email
+            for concept in semantic_results:
                 if concept and concept.get("content"):
                     try:
                         data = json.loads(concept["content"])
@@ -175,11 +182,26 @@ class UserService:
             
             logger.info(f"Vector search login: {email}")
             
-            # Use vector search to find all concepts
-            dummy_vector = [0.0] * 768
-            vector_results = self.storage.vector_search(dummy_vector, k=50)
+            # Generate proper embedding for the email to find user
+            try:
+                import requests
+                embedding_url = "http://sutra-works-embedding-single:8888/embed"
+                response = requests.post(embedding_url, json={"text": f"user {email}"}, timeout=5)
+                if response.status_code == 200:
+                    user_vector = response.json()["embedding"]
+                else:
+                    # Fallback: search through more concepts with dummy vector
+                    user_vector = [0.0] * 768
+                    logger.warning(f"Failed to get embedding for user {email}, using fallback")
+            except Exception as e:
+                # Fallback: use dummy vector but search more broadly
+                user_vector = [0.0] * 768
+                logger.warning(f"Embedding service unavailable for user {email}: {e}")
             
-            # Find user with matching email (clean code, no backward compatibility)
+            # Search with generated or fallback vector
+            vector_results = self.storage.vector_search(user_vector, k=100)  # Increased k for better coverage
+            
+            # Find user with matching email
             user_data = None
             user_concept_id = None
             
@@ -192,7 +214,7 @@ class UserService:
                             data.get("email") == email):
                             user_data = data
                             user_concept_id = concept_id
-                            logger.info(f"User found: {email}")
+                            logger.info(f"User found: {email} with similarity {similarity:.3f}")
                             break
                     except json.JSONDecodeError:
                         continue
@@ -312,28 +334,38 @@ class UserService:
         try:
             import json
             
-            # Search for session using ONLY vector search - no semantic search
+            # Simple approach: search through many concepts looking for sessions
             session_info = None
             
-            logger.info(f"Using vector search for session lookup: {session_id[:8]}")
-            dummy_vector = [0.0] * 768  # Use zero vector to get all concepts
-            vector_results = self.storage.vector_search(dummy_vector, k=50)
+            logger.info(f"Searching for session: {session_id[:8]}")
+            
+            # Use a broad vector search to get many concepts
+            dummy_vector = [0.0] * 768
+            vector_results = self.storage.vector_search(dummy_vector, k=200)  # Get many concepts
+            
+            logger.info(f"Searching through {len(vector_results)} concepts for session")
             
             # Find the session with the exact matching session_id
+            sessions_found = 0
             for concept_id, similarity in vector_results:
                 concept = self.storage.query_concept(concept_id)
                 if concept and concept.get("content"):
                     try:
-                        session_data = json.loads(concept["content"])
-                        if (session_data.get("type") == "session" and 
-                            session_data.get("session_id") == session_id):
-                            session_info = session_data
-                            break
+                        data = json.loads(concept["content"])
+                        if data.get("type") == "session":
+                            sessions_found += 1
+                            logger.debug(f"Found session {sessions_found}: {data.get('session_id', 'no-id')[:8]}")
+                            if data.get("session_id") == session_id:
+                                session_info = data
+                                logger.info(f"✅ Found matching session: {session_id[:8]}")
+                                break
                     except json.JSONDecodeError:
                         continue
             
+            logger.info(f"Total sessions found in search: {sessions_found}")
+            
             if not session_info:
-                logger.debug(f"Session not found: {session_id[:8]}")
+                logger.warning(f"Session not found: {session_id[:8]}")
                 return None
             
             # Check if active
@@ -376,23 +408,48 @@ class UserService:
             Dict with user info or None if not found
         """
         try:
+            import json
+            
+            logger.info(f"Getting user by ID: {user_id}")
             user = self.storage.query_concept(user_id)
             
             if not user:
+                logger.warning(f"User concept not found: {user_id}")
                 return None
             
-            metadata = user.get("metadata", {})
+            logger.info(f"User concept found: {user}")
             
-            return {
+            # User data is stored in content as JSON
+            content = user.get("content")
+            if not content:
+                logger.warning(f"No content in user concept: {user_id}")
+                return None
+                
+            try:
+                user_data = json.loads(content)
+                logger.info(f"Parsed user data: {user_data}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON in user concept {user_id}: {e}")
+                return None
+            
+            # Verify this is a user concept
+            if user_data.get("type") != "user":
+                logger.warning(f"Concept {user_id} is not a user: {user_data.get('type')}")
+                return None
+            
+            result = {
                 "user_id": user_id,
-                "email": metadata.get("email"),
-                "organization": metadata.get("organization"),
-                "role": metadata.get("role"),
-                "full_name": metadata.get("full_name"),
-                "active": metadata.get("active"),
-                "created_at": metadata.get("created_at"),
-                "last_login": metadata.get("last_login"),
+                "email": user_data.get("email"),
+                "organization": user_data.get("organization"),
+                "role": user_data.get("role"),
+                "full_name": user_data.get("full_name"),
+                "active": user_data.get("active"),
+                "created_at": user_data.get("created_at"),
+                "last_login": user_data.get("last_login"),
             }
+            
+            logger.info(f"Returning user result: {result}")
+            return result
             
         except Exception as e:
             logger.error(f"Failed to get user {user_id}: {e}")

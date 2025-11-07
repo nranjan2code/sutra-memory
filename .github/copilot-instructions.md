@@ -86,8 +86,14 @@ sutra deploy                       # Deploy current version
 
 ### Development Testing
 ```bash
-# Full integration test
+# Python unit tests
 PYTHONPATH=packages/sutra-core python -m pytest tests/ -v
+
+# E2E tests (web-based UI automation)
+npm run test:e2e              # Run continuous learning tests (3 tests)
+npm run test:e2e:ui           # Interactive UI mode
+npm run test:e2e:debug        # Debug mode
+npm run test:e2e:report       # View HTML report
 
 # Production smoke test (validates embeddings)
 sutra test smoke
@@ -216,6 +222,9 @@ Grid Components → EventEmitter (Rust) → Sutra Storage (TCP) → Natural Lang
 - **Build docs:** `docs/build/README.md` (build system guide)
 - **Deployment docs:** `docs/deployment/README.md` (deployment guide)
 - **Release docs:** `docs/release/README.md` (release management)
+- **E2E tests:** `tests/e2e/` (3 continuous learning tests, web-based)
+- **Test docs:** `tests/e2e/README.md` (complete test documentation)
+- **Page objects:** `e2e/page-objects.ts` (LoginPage, ChatPage)
 - **Smoke tests:** `scripts/smoke-test-embeddings.sh` (production validation)
 
 ## Platform Review Documentation (November 2025)

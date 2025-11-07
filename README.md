@@ -877,16 +877,31 @@ cargo build --release
 # Start services
 sutra deploy
 
-# Run tests
+# E2E tests (web-based UI automation - 3 comprehensive tests)
+npm run test:e2e              # Run continuous learning tests (~3.3 minutes)
+npm run test:e2e:ui           # Interactive UI mode for debugging
+npm run test:e2e:debug        # Debug mode with breakpoints
+npm run test:e2e:report       # View HTML test report
+
+# Python unit tests
 PYTHONPATH=packages/sutra-core python -m pytest tests/ -v
 
-# Rust tests (includes WAL crash recovery)
+# Rust tests (includes WAL crash recovery, 2PC transactions)
 cd packages/sutra-storage
 cargo test
 
-# Production smoke test
-sutra test smoke  # Test embedding service
+# Production validation
+sutra test smoke              # Embedding service validation
+sutra test integration        # Docker deployment validation
+sutra validate                # Image verification
 ```
+
+**E2E Test Suite** (`tests/e2e/continuous-learning-fixed.spec.ts`):
+1. **Real-Time Stock Feeds** (~1.7m) - 14 updates, 11 queries, multi-phase learning
+2. **High-Frequency Updates** (~50s) - 10 rapid updates, parallel processing
+3. **Temporal Reasoning** (~43s) - Price trends, causality, news correlation
+
+**[📖 Complete Test Documentation](tests/e2e/README.md)**
 
 ### Code Quality
 

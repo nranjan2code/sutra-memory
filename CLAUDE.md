@@ -34,6 +34,13 @@ sutra validate                      # Verify all essential images exist
 ### Testing
 
 ```bash
+# E2E tests (web-based UI automation - 3 continuous learning tests)
+npm run test:e2e                # Run continuous learning tests (~3.3 minutes)
+npm run test:e2e:all            # Run all browser tests (chromium, firefox, webkit)
+npm run test:e2e:ui             # Interactive UI mode
+npm run test:e2e:debug          # Debug mode with breakpoints
+npm run test:e2e:report         # View HTML report
+
 # Unit tests (Python)
 PYTHONPATH=packages/sutra-core python -m pytest tests/ -v
 

@@ -500,7 +500,10 @@ class CreateSpaceRequest(BaseModel):
     """Request model for creating a new space."""
     
     name: str = Field(..., description="Space name")
+    domain_storage: str = Field("default", description="Domain storage name for this space")
     description: Optional[str] = Field(None, description="Space description")
+    icon: Optional[str] = Field(None, description="Space icon emoji")
+    color: Optional[str] = Field(None, description="Space color")
     visibility: Optional[str] = Field(default="private", description="Space visibility (public, private)")
     metadata: Optional[Dict[str, str]] = Field(None, description="Space metadata")
 

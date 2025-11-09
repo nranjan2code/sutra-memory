@@ -24,7 +24,15 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EDITION="${SUTRA_EDITION:-simple}"
-VERSION="${SUTRA_VERSION:-latest}"
+
+# Read VERSION from file if it exists, otherwise use SUTRA_VERSION or default to latest
+if [ -f "$SCRIPT_DIR/VERSION" ]; then
+    FILE_VERSION=$(cat "$SCRIPT_DIR/VERSION" | tr -d '\n' | tr -d ' ')
+    VERSION="${SUTRA_VERSION:-$FILE_VERSION}"
+else
+    VERSION="${SUTRA_VERSION:-latest}"
+fi
+
 NO_CACHE="${NO_CACHE:-false}"
 PARALLEL="${PARALLEL:-false}"
 PUSH_IMAGES="${PUSH_IMAGES:-false}"
@@ -115,14 +123,14 @@ show_size_comparison() {
     printf "%-15s %-15s %-12s\n" "SERVICE" "SIZE" "TARGET"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
-    local deploy_tag="${SUTRA_IMAGE_TAG:-latest}"
     local total_size_mb=0
     
     # Show ML base first (foundation for ML services)
-    local ml_base_size=$(get_image_size "sutra-works-ml-base:$deploy_tag")
+    local ml_base_size=$(get_image_size "sutra-works-ml-base:$VERSION")
     printf "%-15s %-15s %-12s\n" "ml-base" "$ml_base_size" "~800MB"
     
     # Extract size in MB for total calculation
+    local total_size_mb=0
     if [[ "$ml_base_size" =~ ([0-9]+(\.[0-9]+)?)([GMK]B) ]]; then
         local size_num="${BASH_REMATCH[1]}"
         local size_unit="${BASH_REMATCH[3]}"
@@ -134,6 +142,11 @@ show_size_comparison() {
     
     # Core services
     local services=(ml-base-service embedding nlg hybrid control api bulk-ingester storage client)
+    
+    # Add haproxy for community and enterprise
+    if [ "$EDITION" = "community" ] || [ "$EDITION" = "enterprise" ]; then
+        services+=(haproxy)
+    fi
     
     # Add grid services for enterprise
     if [ "$EDITION" = "enterprise" ]; then
@@ -150,7 +163,7 @@ show_size_comparison() {
             *) local image_name="sutra-works-$service" ;;
         esac
         
-        local size=$(get_image_size "$image_name:$deploy_tag")
+        local size=$(get_image_size "$image_name:$VERSION")
         
         # Get target from edition
         local targets
@@ -213,6 +226,12 @@ build_service() {
         return $?
     fi
     
+    # HAPROXY: Load balancer for ML services
+    if [ "$service" = "haproxy" ]; then
+        build_haproxy
+        return $?
+    fi
+    
     # Standard Dockerfile (now consolidated - single Dockerfile per service)
     local dockerfile="packages/sutra-$service/Dockerfile"
     
@@ -228,21 +247,24 @@ build_service() {
         build_cmd="$build_cmd --no-cache"
     fi
     
-    # Map service name to image name
+    # Map service name to image name and use dual tagging
     local image_name="sutra-works-$service"
-    local deploy_tag="${SUTRA_IMAGE_TAG:-latest}"
 
-    # Build directly to deployment tag (no intermediate tag needed)
-    build_cmd="$build_cmd -f $dockerfile -t $image_name:$deploy_tag ."
+    # Build with both version tag and latest tag for compatibility  
+    build_cmd="$build_cmd -f $dockerfile -t $image_name:$VERSION"
+    if [ "$VERSION" != "latest" ]; then
+        build_cmd="$build_cmd -t $image_name:latest"
+    fi
+    build_cmd="$build_cmd ."
     
     log_info "Running: $build_cmd"
     
     # Execute build
     if eval "$build_cmd"; then
-        log_success "Built $image_name:$deploy_tag"
+        log_success "Built $image_name:$VERSION"
         
         # Show size
-        local size=$(get_image_size "$image_name:$deploy_tag")
+        local size=$(get_image_size "$image_name:$VERSION")
         log_info "Size: $size"
         
         return 0
@@ -287,19 +309,22 @@ build_ml_service() {
     build_cmd="$build_cmd --build-arg SERVICE_PORT=$service_port"
     build_cmd="$build_cmd -f $dockerfile"
     
-    # Build directly to deployment tag (no intermediate tag needed)
-    local deploy_tag="${SUTRA_IMAGE_TAG:-latest}"
-    build_cmd="$build_cmd -t sutra-works-$service-service:$deploy_tag ."
+    # Build with both version tag and latest tag for compatibility
+    build_cmd="$build_cmd -t sutra-works-$service-service:$VERSION"
+    if [ "$VERSION" != "latest" ]; then
+        build_cmd="$build_cmd -t sutra-works-$service-service:latest"
+    fi
+    build_cmd="$build_cmd ."
     
     log_info "Running: $build_cmd"
     
     # Execute build
     if eval "$build_cmd"; then
-        log_success "Built sutra-$service-service:$deploy_tag"
+        log_success "Built sutra-$service-service:$VERSION"
         
         # Show size
         local size
-        size=$(get_image_size "sutra-works-$service-service:$deploy_tag")
+        size=$(get_image_size "sutra-works-$service-service:$VERSION")
         log_info "Size: $size"
         
         return 0
@@ -331,20 +356,22 @@ build_ml_base() {
     build_cmd="$build_cmd --build-arg SUTRA_VERSION=$VERSION"
     build_cmd="$build_cmd -f $dockerfile"
     
-    # Build to deployment tag (foundation image, not the service)
-    local deploy_tag="${SUTRA_IMAGE_TAG:-latest}"
-    build_cmd="$build_cmd -t sutra-works-ml-base:$deploy_tag"
+    # Build with both version tag and latest tag for compatibility
+    build_cmd="$build_cmd -t sutra-works-ml-base:$VERSION"
+    if [ "$VERSION" != "latest" ]; then
+        build_cmd="$build_cmd -t sutra-works-ml-base:latest"
+    fi
     build_cmd="$build_cmd packages/sutra-ml-base/"
     
     log_info "Running: $build_cmd"
     
     # Execute build
     if eval "$build_cmd"; then
-        log_success "Built sutra-ml-base:$deploy_tag (foundation)"
+        log_success "Built sutra-ml-base:$VERSION (foundation)"
 
         # Show size
         local size
-        size=$(get_image_size "sutra-works-ml-base:$deploy_tag")
+        size=$(get_image_size "sutra-works-ml-base:$VERSION")
         log_info "Size: $size"
         
         return 0
@@ -377,20 +404,22 @@ build_ml_base_service() {
     build_cmd="$build_cmd --build-arg SUTRA_EDITION=$EDITION"
     build_cmd="$build_cmd -f $dockerfile"
 
-    # Build to deployment tag (same as compose expects)
-    local deploy_tag="${SUTRA_IMAGE_TAG:-latest}"
-    build_cmd="$build_cmd -t sutra-works-ml-base-service:$deploy_tag"
+    # Build with both version tag and latest tag for compatibility
+    build_cmd="$build_cmd -t sutra-works-ml-base-service:$VERSION"
+    if [ "$VERSION" != "latest" ]; then
+        build_cmd="$build_cmd -t sutra-works-ml-base-service:latest"
+    fi
     build_cmd="$build_cmd ."
 
     log_info "Running: $build_cmd"
 
     # Execute build
     if eval "$build_cmd"; then
-        log_success "Built sutra-ml-base-service:$deploy_tag (service)"
+        log_success "Built sutra-ml-base-service:$VERSION (service)"
 
         # Show size
         local size
-        size=$(get_image_size "sutra-works-ml-base-service:$deploy_tag")
+        size=$(get_image_size "sutra-works-ml-base-service:$VERSION")
         log_info "Size: $size"
 
         return 0
@@ -427,19 +456,22 @@ build_storage_service() {
     build_cmd="$build_cmd --build-arg SUTRA_VERSION=$VERSION"
     build_cmd="$build_cmd -f $dockerfile"
     
-    # Build directly to deployment tag (no intermediate tag needed)
-    local deploy_tag="${SUTRA_IMAGE_TAG:-latest}"
-    build_cmd="$build_cmd -t sutra-works-storage-server:$deploy_tag ."
+    # Build with both version tag and latest tag for compatibility
+    build_cmd="$build_cmd -t sutra-works-storage-server:$VERSION"
+    if [ "$VERSION" != "latest" ]; then
+        build_cmd="$build_cmd -t sutra-works-storage-server:latest"
+    fi
+    build_cmd="$build_cmd ."
     
     log_info "Running: $build_cmd"
     
     # Execute build
     if eval "$build_cmd"; then
-        log_success "Built sutra-storage-server:$deploy_tag"
+        log_success "Built sutra-storage-server:$VERSION"
         
         # Show size
         local size
-        size=$(get_image_size "sutra-works-storage-server:$deploy_tag")
+        size=$(get_image_size "sutra-works-storage-server:$VERSION")
         log_info "Size: $size"
         
         return 0
@@ -476,19 +508,22 @@ build_grid_service() {
     build_cmd="$build_cmd --build-arg SUTRA_VERSION=$VERSION"
     build_cmd="$build_cmd -f $dockerfile"
     
-    # Build directly to deployment tag
-    local deploy_tag="${SUTRA_IMAGE_TAG:-latest}"
-    build_cmd="$build_cmd -t sutra-works-$service:$deploy_tag ."
+    # Build with both version tag and latest tag for compatibility
+    build_cmd="$build_cmd -t sutra-works-$service:$VERSION"
+    if [ "$VERSION" != "latest" ]; then
+        build_cmd="$build_cmd -t sutra-works-$service:latest"
+    fi
+    build_cmd="$build_cmd ."
     
     log_info "Running: $build_cmd"
     
     # Execute build
     if eval "$build_cmd"; then
-        log_success "Built sutra-$service:$deploy_tag"
+        log_success "Built sutra-$service:$VERSION"
         
         # Show size
         local size
-        size=$(get_image_size "sutra-works-$service:$deploy_tag")
+        size=$(get_image_size "sutra-works-$service:$VERSION")
         log_info "Size: $size"
         
         return 0
@@ -520,24 +555,71 @@ build_nginx_proxy() {
         build_cmd="$build_cmd --no-cache"
     fi
     
-    # Build directly to deployment tag
-    local deploy_tag="${SUTRA_IMAGE_TAG:-latest}"
-    build_cmd="$build_cmd -f $dockerfile -t sutra-works-nginx-proxy:$deploy_tag $context"
+    # Build with both version tag and latest tag for compatibility
+    build_cmd="$build_cmd -f $dockerfile -t sutra-works-nginx-proxy:$VERSION"
+    if [ "$VERSION" != "latest" ]; then
+        build_cmd="$build_cmd -t sutra-works-nginx-proxy:latest"
+    fi
+    build_cmd="$build_cmd $context"
     
     log_info "Running: $build_cmd"
     
     # Execute build
     if eval "$build_cmd"; then
-        log_success "Built sutra-works-nginx-proxy:$deploy_tag"
+        log_success "Built sutra-works-nginx-proxy:$VERSION"
         
         # Show size
         local size
-        size=$(get_image_size "sutra-works-nginx-proxy:$deploy_tag")
+        size=$(get_image_size "sutra-works-nginx-proxy:$VERSION")
         log_info "Size: $size"
         
         return 0
     else
         log_error "Failed to build nginx-proxy"
+        return 1
+    fi
+}
+
+# Build HAProxy load balancer (for community/enterprise editions)
+build_haproxy() {
+    log_info "Building HAProxy load balancer (ML-Base load balancing)"
+    
+    local dockerfile="haproxy/Dockerfile"
+    local context="haproxy"
+    
+    # Check if Dockerfile exists
+    if [ ! -f "$dockerfile" ]; then
+        log_error "HAProxy Dockerfile not found: $dockerfile"
+        return 1
+    fi
+    
+    # Build command
+    local build_cmd="docker build"
+    if [ "$NO_CACHE" = "true" ]; then
+        build_cmd="$build_cmd --no-cache"
+    fi
+    
+    # Build with both version tag and latest tag for compatibility
+    build_cmd="$build_cmd -f $dockerfile -t sutra-works-haproxy:$VERSION"
+    if [ "$VERSION" != "latest" ]; then
+        build_cmd="$build_cmd -t sutra-works-haproxy:latest"
+    fi
+    build_cmd="$build_cmd $context"
+    
+    log_info "Running: $build_cmd"
+    
+    # Execute build
+    if eval "$build_cmd"; then
+        log_success "Built sutra-works-haproxy:$VERSION"
+        
+        # Show size
+        local size
+        size=$(get_image_size "sutra-works-haproxy:$VERSION")
+        log_info "Size: $size"
+        
+        return 0
+    else
+        log_error "Failed to build HAProxy"
         return 1
     fi
 }
@@ -564,6 +646,12 @@ build_all_services() {
 
     # Step 2: Core services for all editions
     local services=(embedding nlg hybrid control api bulk-ingester storage client nginx-proxy)
+    
+    # Add community/enterprise services
+    if [ "$EDITION" = "community" ] || [ "$EDITION" = "enterprise" ]; then
+        log_info "Community/Enterprise edition detected - adding HAProxy load balancer"
+        services+=(haproxy)
+    fi
     
     # Add grid services for enterprise edition
     if [ "$EDITION" = "enterprise" ]; then
@@ -657,7 +745,15 @@ deploy_optimized() {
     fi
     
     log_info "Setting up production-grade environment for optimized deployment..."
-    export SUTRA_VERSION="${SUTRA_VERSION:-latest}"  # Use latest tag by default
+    
+    # Read VERSION from file if it exists for deployment
+    if [ -f "$SCRIPT_DIR/VERSION" ]; then
+        FILE_VERSION=$(cat "$SCRIPT_DIR/VERSION" | tr -d '\n' | tr -d ' ')
+        export SUTRA_VERSION="${SUTRA_VERSION:-$FILE_VERSION}"
+    else
+        export SUTRA_VERSION="${SUTRA_VERSION:-latest}"
+    fi
+    
     export SUTRA_EDITION="${SUTRA_EDITION:-community}"  # Default to community for Phase 0+1+2
     export SUTRA_SECURE_MODE="${SUTRA_SECURE_MODE:-false}"
     export HF_TOKEN="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"

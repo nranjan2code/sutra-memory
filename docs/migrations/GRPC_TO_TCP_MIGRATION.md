@@ -1,12 +1,24 @@
 # Migration Guide: gRPC to TCP Binary Protocol
 
-**Status:** Required for v4.0.0  
-**Timeline:** gRPC support will be removed in v4.0.0 (Q2 2026)  
-**Effort:** Low (1-2 hours for most deployments)
+**Status:** ✅ COMPLETED in v3.0.1 (gRPC removed)  
+**Date:** November 9, 2025  
+**Note:** This document is kept for historical reference only
 
-## Overview
+---
 
-Sutra AI is migrating from gRPC to a custom TCP Binary Protocol for inter-service communication. The new protocol provides:
+## ⚠️ IMPORTANT: gRPC Has Been Removed
+
+As of **v3.0.1** (November 9, 2025), gRPC support has been completely removed from Sutra AI. Only TCP Binary Protocol is supported.
+
+**If you're on v3.0.0 or earlier and still using gRPC, you must migrate before upgrading to v3.0.1+**
+
+See [CLEAN_ARCHITECTURE_IMPLEMENTATION.md](../architecture/CLEAN_ARCHITECTURE_IMPLEMENTATION.md) for details.
+
+---
+
+## Historical Overview (Pre-v3.0.1)
+
+Sutra AI migrated from gRPC to a custom TCP Binary Protocol. The new protocol provided:
 
 - **10-50x better performance** (MessagePack vs Protobuf)
 - **3-4x less bandwidth** usage
@@ -18,25 +30,25 @@ Sutra AI is migrating from gRPC to a custom TCP Binary Protocol for inter-servic
 
 ### 1. Python Services (API, Hybrid, Custom)
 
-**Before (gRPC - DEPRECATED):**
+**Before (gRPC - REMOVED in v3.0.1):**
 ```python
+# ❌ NO LONGER AVAILABLE
 from sutra_core.storage import GrpcStorageAdapter
 
-# Old gRPC adapter
 storage = GrpcStorageAdapter(
-    server_address="localhost:50051",  # gRPC port
+    server_address="localhost:50051",
     vector_dimension=768,
 )
 ```
 
-**After (TCP Binary Protocol - RECOMMENDED):**
+**After (TCP Binary Protocol - ONLY OPTION):**
 ```python
-from sutra_storage_client import TcpStorageClient
+from sutra_core.storage import TcpStorageAdapter
 
-# New TCP client
-storage = TcpStorageClient(
-    server_address="localhost:7000",  # TCP port (default)
-    timeout_ms=5000,
+# TCP adapter (production)
+storage = TcpStorageAdapter(
+    server_address="localhost:50051",  # TCP port
+    vector_dimension=768,
 )
 ```
 

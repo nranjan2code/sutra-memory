@@ -97,7 +97,6 @@ USER sutra
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
-    SUTRA_STORAGE_MODE=server \
     SUTRA_STORAGE_SERVER=storage-server:50051
 
 # Minimal health check

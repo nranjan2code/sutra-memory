@@ -32,7 +32,6 @@ class ReasoningEngineConfig:
 
     # Storage configuration
     storage_path: str = "./knowledge"
-    use_rust_storage: bool = True
 
     # Cache configuration
     enable_caching: bool = True
@@ -114,7 +113,6 @@ class ReasoningEngineConfig:
         """Convert configuration to dictionary."""
         return {
             "storage_path": self.storage_path,
-            "use_rust_storage": self.use_rust_storage,
             "enable_caching": self.enable_caching,
             "max_cache_size": self.max_cache_size,
             "cache_ttl_seconds": self.cache_ttl_seconds,
@@ -148,20 +146,18 @@ class ReasoningEngineConfigBuilder:
         self._config = ReasoningEngineConfig()
 
     def with_storage_path(
-        self, path: str, use_rust: bool = True
+        self, path: str
     ) -> "ReasoningEngineConfigBuilder":
         """
         Set storage configuration.
 
         Args:
-            path: Path to storage directory
-            use_rust: Whether to use Rust storage backend
+            path: Path to storage directory (unused, kept for backward compatibility)
 
         Returns:
             Self for method chaining
         """
         self._config.storage_path = path
-        self._config.use_rust_storage = use_rust
         return self
 
     def with_caching(
@@ -320,7 +316,7 @@ def production_config(storage_path: str = "./knowledge") -> ReasoningEngineConfi
     """
     Production configuration with all optimizations enabled.
 
-    - Rust storage
+    - TCP storage (via SUTRA_STORAGE_SERVER env var)
     - Vector indexing
     - Large cache with TTL
     - Batch embeddings
@@ -328,7 +324,7 @@ def production_config(storage_path: str = "./knowledge") -> ReasoningEngineConfi
     """
     return (
         ReasoningEngineConfig.builder()
-        .with_storage_path(storage_path, use_rust=True)
+        .with_storage_path(storage_path)
         .with_caching(enabled=True, max_size=5000, ttl_seconds=3600)
         .with_vector_index(enabled=True, dimension=768)  # EmbeddingGemma dimension
         .with_batch_embeddings(
@@ -343,7 +339,7 @@ def development_config() -> ReasoningEngineConfig:
     """
     Development configuration with fast iteration.
 
-    - In-memory storage (no Rust)
+    - TCP storage (via SUTRA_STORAGE_SERVER env var)
     - Small cache
     - Vector indexing enabled
     - Batch embeddings
@@ -351,7 +347,7 @@ def development_config() -> ReasoningEngineConfig:
     """
     return (
         ReasoningEngineConfig.builder()
-        .with_storage_path("./dev_knowledge", use_rust=False)
+        .with_storage_path("./dev_knowledge")
         .with_caching(enabled=True, max_size=500)
         .with_vector_index(enabled=True)
         .with_batch_embeddings(enabled=True)

@@ -69,24 +69,24 @@
 
 ## ✅ Protocol Migration (COMPLETE)
 
-### gRPC Deprecation
-- [x] **GrpcStorageAdapter deprecated** with warning
-  - ✅ DeprecationWarning issued on import
-  - ✅ Migration guide created: `docs/migrations/GRPC_TO_TCP_MIGRATION.md`
-- [x] **TCP Binary Protocol** - Production-ready
+### Clean Architecture Implementation (v3.0.1)
+- [x] **GrpcStorageAdapter removed** - Fully deleted in v3.0.1
+  - ✅ File deleted: `sutra_core/storage/grpc_adapter.py`
+  - ✅ Migration guide: `docs/migrations/GRPC_TO_TCP_MIGRATION.md`
+- [x] **RustStorageAdapter removed** - Fully deleted in v3.0.1
+  - ✅ File deleted: `sutra_core/storage/rust_adapter.py`
+  - ✅ Never used in production (dead code)
+- [x] **TCP Binary Protocol** - ONLY backend
   - ✅ 10-50x performance improvement
   - ✅ MessagePack serialization
-  - ✅ Full API compatibility
-- [x] **Legacy gRPC code documented**
-  - ⚠️ Still exists in: sutra-control, sutra-core, sutra-storage/server.rs
-  - ✅ Marked as deprecated
-  - ✅ Timeline: Remove in v4.0.0 (Q2 2026)
+  - ✅ Single initialization path
+  - ✅ All services use TcpStorageAdapter
 
 ### Protocol Usage
 - [x] **sutra-api** - Uses TCP Binary Protocol ✅
 - [x] **sutra-hybrid** - Uses TCP Binary Protocol ✅
 - [x] **sutra-storage** - TCP server active ✅
-- [ ] **sutra-control** - Still uses gRPC (needs migration)
+- [x] **sutra-core** - ONLY TcpStorageAdapter exported ✅
 
 ## ✅ Performance Optimization (COMPLETE)
 

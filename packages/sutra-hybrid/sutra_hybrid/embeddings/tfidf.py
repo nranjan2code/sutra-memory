@@ -3,6 +3,8 @@ TF-IDF based embedding provider as a lightweight fallback.
 
 Provides TF-IDF vectorization when sentence-transformers is not available
 or when lightweight embeddings are preferred.
+
+NOTE: Requires optional dependency: pip install sutra-hybrid[tfidf]
 """
 
 import logging
@@ -10,7 +12,13 @@ import pickle
 from typing import List, Optional
 
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
+
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+    TfidfVectorizer = None  # type: ignore
 
 from .base import EmbeddingProvider
 
@@ -35,7 +43,16 @@ class TfidfEmbedding(EmbeddingProvider):
         Args:
             max_features: Maximum number of features (embedding dimension)
             **kwargs: Additional arguments for TfidfVectorizer
+
+        Raises:
+            ImportError: If scikit-learn is not installed
         """
+        if not SKLEARN_AVAILABLE:
+            raise ImportError(
+                "TfidfEmbedding requires scikit-learn. "
+                "Install with: pip install sutra-hybrid[tfidf]"
+            )
+        
         self.max_features = max_features
         self.vectorizer = TfidfVectorizer(
             max_features=max_features,

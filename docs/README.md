@@ -2,13 +2,22 @@
 
 **Production-Ready Domain-Specific Reasoning Engine**
 
-**Version:** 3.0.0 | **Grade:** A+ (98/100) | **Status:** Production-Ready
+**Version:** 3.0.1 | **Grade:** A+ (98/100) | **Status:** Production-Ready
 
 ---
 
 ## 🎉 Production Readiness Complete (November 2025)
 
-**NEW: Performance Optimization (v3.0.0) - November 8, 2025**
+**NEW: Clean Architecture (v3.0.1) - November 9, 2025**
+- **Simplified Architecture**: Single TCP backend (removed RustStorageAdapter, GrpcStorageAdapter)
+- **1000+ LOC Removed**: Eliminated dead code and over-engineered patterns
+- **27MB Lighter**: Made sklearn/sqlalchemy/hnswlib optional
+- **Cleaner Codebase**: Single initialization path, no mode switching
+- **Exclusive Product**: No pluggable backends - integrated solution
+
+[**Architecture Changes →**](architecture/CLEAN_ARCHITECTURE_IMPLEMENTATION.md)
+
+**Performance Optimization (v3.0.0) - November 8, 2025**
 - **50-70× Throughput Improvements**: 0.13 → 9.06 req/sec (Sequential)
 - **100% Async Success**: Fixed dimension mismatch causing 0% success rate
 - **Config-Driven Dimensions**: Matryoshka 256-dim support without hardcoded validation

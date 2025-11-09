@@ -1,83 +1,60 @@
 # Storage Server Quick Start
 
+**Status:** ✅ Current Architecture (v3.0.1)  
+**Last Updated:** November 9, 2025
+
 ## TL;DR
 
-✅ All services connect to a standalone storage server over gRPC  
+✅ All services connect to a standalone storage server over **TCP Binary Protocol**  
 ✅ No embedded/in-process storage in API/Hybrid  
-✅ Python clients use the included storage-client package
+✅ Python clients use `TcpStorageAdapter` (included in sutra-core)
 
-## What You Get
+## Architecture
 
-**Before (Embedded):**
+**Production (v3.0.1+):**
 ```
-Process 1 → ConcurrentStorage → storage.dat
-Process 2 → ConcurrentStorage → storage.dat (separate instance!)
+Process 1 (API) ──┐
+Process 2 (Hybrid)┼─→ Storage Server (TCP :50051) → storage.dat
+Process 3 (Client)┘
 ```
 
-**After (Server):**
-```
-Process 1 ──┐
-Process 2 ──┼─→ Storage Server → storage.dat (single source of truth!)
-Process 3 ──┘
-```
+**Note:** Embedded mode has been removed in v3.0.1. All deployments use the storage server.
 
 ## Quick Start
 
 ### 1) Build storage-server
 
-```toml
-# packages/sutra-storage/Cargo.toml
-[dependencies]
-tonic = "0.10"
-prost = "0.12"
-tokio = { version = "1", features = ["full"] }
-
-[build-dependencies]
-tonic-build = "0.10"
+```bash
+cd packages/sutra-storage
+cargo build --release
 ```
 
-### Step 2: Modify Storage Adapter (1 line!)
+### 2) Python Client Usage
 
 ```python
-# packages/sutra-core/sutra_core/storage/rust_adapter.py
-# Line 55-66, replace:
+# Production code (automatic via environment)
+from sutra_core.storage import TcpStorageAdapter
 
-# OLD:
-try:
-    self.store = ConcurrentStorage(
-        str(self.storage_path),
-        reconcile_interval_ms=10,
-        memory_threshold=50000,
-    )
-
-# NEW:
-from .connection import get_storage_backend
-try:
-    self.store = get_storage_backend(
-        str(self.storage_path),
-        reconcile_interval_ms=10,
-        memory_threshold=50000,
-        vector_dimension=self.vector_dimension,
-    )
+# Initialize (reads SUTRA_STORAGE_SERVER env var)
+storage = TcpStorageAdapter(
+    server_address="storage-server:50051",
+    vector_dimension=768,
+)
 ```
 
-### Step 3: Build & Test (10 min)
+**Note:** As of v3.0.1, `RustStorageAdapter` and `connection.py` have been removed. Only `TcpStorageAdapter` is available.
+
+### 3) Build & Test
 
 ```bash
 # Build server
 cd packages/sutra-storage
-cargo build --release --features="server"
-
-# OR with maturin (includes Python bindings)
-maturin develop --features="server"
-
-# Python storage client is already included as a package
-# (no proto generation needed)
+cargo build --release
 
 # Start server
-./bin/storage-server --storage ./knowledge
+./target/release/storage-server --storage ./knowledge
 
-# Start API and Hybrid (connect automatically via env)
+# Start services (connect automatically via env)
 export SUTRA_STORAGE_SERVER=localhost:50051
 uvicorn sutra_api.main:app --host 0.0.0.0 --port 8000
 uvicorn sutra_hybrid.api.app:app --host 0.0.0.0 --port 8001

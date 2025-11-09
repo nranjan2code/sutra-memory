@@ -1,11 +1,13 @@
 """
-Sutra storage adapters.
+Sutra storage adapter.
 
-Provides storage adapters for local (Rust), gRPC (deprecated), and TCP (preferred) deployments.
+Uses TCP Binary Protocol (MessagePack) for high-performance communication
+with the Rust storage server. This is the ONLY supported backend.
+
+Architecture (Production):
+    Hybrid → Core → TcpStorageAdapter → Storage Server (Rust)
 """
 
-from .rust_adapter import RustStorageAdapter
-from .grpc_adapter import GrpcStorageAdapter
 from .tcp_adapter import TcpStorageAdapter
 
-__all__ = ["RustStorageAdapter", "GrpcStorageAdapter", "TcpStorageAdapter"]
+__all__ = ["TcpStorageAdapter"]

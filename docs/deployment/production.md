@@ -356,7 +356,7 @@ SUTRA_NUM_SHARDS=16 ./scale-validation
 **Storage Server**:
 ```bash
 STORAGE_PATH=/data                                    # Storage directory
-SUTRA_STORAGE_MODE=sharded                            # "single" or "sharded"
+# Note: SUTRA_STORAGE_MODE removed in v3.0.1 (automatic sharding)
 SUTRA_NUM_SHARDS=16                                   # Number of shards (4-16)
 VECTOR_DIMENSION=768                                  # Must be 768
 SUTRA_EMBEDDING_SERVICE_URL=http://embedding-ha:8888  # HA endpoint

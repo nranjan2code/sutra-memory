@@ -68,7 +68,6 @@ services:
       - SUTRA_EDITION=${SUTRA_EDITION:-simple}
       - SUTRA_LICENSE_KEY=${SUTRA_LICENSE_KEY}
       # Sharded Storage Configuration (edition-dependent)
-      - SUTRA_STORAGE_MODE=${SUTRA_STORAGE_MODE:-single}
       - SUTRA_NUM_SHARDS=${SUTRA_NUM_SHARDS:-1}
       # Unified Learning Pipeline Configuration (edition-dependent)
       - SUTRA_EMBEDDING_SERVICE_URL=${SUTRA_EMBEDDING_URL:-http://sutra-works-embedding-single:8888}
@@ -339,7 +338,6 @@ services:
       - "8000"
     environment:
       - PYTHONUNBUFFERED=1
-      - SUTRA_STORAGE_MODE=server
       - SUTRA_STORAGE_SERVER=storage-server:50051
       - SUTRA_USER_STORAGE_SERVER=user-storage-server:50051
       # JWT Configuration
@@ -988,7 +986,6 @@ services:
       - "8000"
     environment:
       - PYTHONUNBUFFERED=1
-      - SUTRA_STORAGE_MODE=server
       - SUTRA_STORAGE_SERVER=storage-server:50051
       # Edition Configuration
       - SUTRA_EDITION=${SUTRA_EDITION:-simple}
@@ -1180,7 +1177,6 @@ services:
       - SUTRA_EDITION=${SUTRA_EDITION:-simple}
       - SUTRA_LICENSE_KEY=${SUTRA_LICENSE_KEY}
       # Service Configuration
-      - SUTRA_STORAGE_MODE=server
       - SUTRA_STORAGE_SERVER=storage-server:50051
       - SUTRA_EMBEDDING_SERVICE_URL=${SUTRA_EMBEDDING_URL:-http://embedding-single:8888}
       - SUTRA_GRID_MASTER=${SUTRA_GRID_MASTER_URL:-}

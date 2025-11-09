@@ -269,7 +269,7 @@ from .reasoning import ReasoningEngine, PathFinder, QueryProcessor
 from .graph import Concept, Association
 # NO tenant-related classes
 
-# ReasoningEngine uses TcpStorageAdapter (via RustStorageAdapter)
+# ReasoningEngine uses TcpStorageAdapter
 # All operations go to single storage server - NO tenant context passed
 ```
 
@@ -330,11 +330,10 @@ async def learn(
 # sutra_hybrid/engine.py (647 lines)
 class SutraAI:
     def __init__(self, storage_server: str = "storage-server:50051", enable_semantic: bool = True):
-        os.environ["SUTRA_STORAGE_MODE"] = "server"
         os.environ["SUTRA_STORAGE_SERVER"] = storage_server
         
-        # NO tenant_id parameter
-        self._core = ReasoningEngine(use_rust_storage=True)
+        # NO tenant_id parameter (v3.0.1+ always uses TcpStorageAdapter)
+        self._core = ReasoningEngine()
         self.embedding_processor = EmbeddingServiceProvider(...)
         
     def learn(self, content: str, source: Optional[str] = None) -> LearnResult:

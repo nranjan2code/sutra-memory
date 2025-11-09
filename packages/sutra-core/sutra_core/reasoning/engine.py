@@ -90,7 +90,6 @@ class ReasoningEngine:
             enable_central_links=config.enable_central_links,
             central_link_confidence=config.central_link_confidence,
             central_link_type=config.central_link_type,
-            use_rust_storage=config.use_rust_storage,
             enable_batch_embeddings=config.enable_batch_embeddings,
             embedding_model=config.embedding_model,
             mps_batch_threshold=config.mps_batch_threshold,
@@ -108,7 +107,6 @@ class ReasoningEngine:
         enable_central_links: bool = True,
         central_link_confidence: float = 0.6,
         central_link_type: AssociationType = AssociationType.COMPOSITIONAL,
-        use_rust_storage: bool = True,
         enable_batch_embeddings: bool = True,
         embedding_model: str = "google/embeddinggemma-300m",
         mps_batch_threshold: int = 32,
@@ -120,7 +118,7 @@ class ReasoningEngine:
         Initialize the reasoning engine.
 
         Args:
-            storage_path: Path for storage files (Rust or JSON)
+            storage_path: Unused (storage server address set via SUTRA_STORAGE_SERVER env var)
             enable_caching: Enable query result caching
             max_cache_size: Maximum number of cached results
             cache_ttl_seconds: Optional TTL for cached query results
@@ -129,7 +127,6 @@ class ReasoningEngine:
                 learning
             central_link_confidence: Confidence for central links (0.0 - 1.0)
             central_link_type: Association type for central links
-            use_rust_storage: Use high-performance Rust storage (default: True)
             enable_batch_embeddings: Enable batch embedding generation with MPS support
             embedding_model: Sentence-transformer model for batch embeddings
             mps_batch_threshold: Minimum batch size to use MPS (Apple Silicon GPU)
@@ -137,9 +134,8 @@ class ReasoningEngine:
             association_workers: Number of worker processes for parallel extraction
             enable_entity_cache: Enable cached entity extraction with background LLM service (Phase 10)
         """
-        # Storage backend (single source of truth)
-        self.storage_path = storage_path
-        self.use_rust_storage = use_rust_storage
+        # Storage backend (single source of truth - TCP only)
+        self.storage_path = storage_path  # Kept for backward compatibility (unused)
         self.storage = None
 
         # Thread safety lock for cache only (storage is lock-free)
@@ -153,67 +149,31 @@ class ReasoningEngine:
         except (ImportError, OSError) as e:
             logger.warning(f"NLP processor unavailable: {e}")
 
-        # Initialize storage backend based on SUTRA_STORAGE_MODE
-        storage_mode = os.environ.get("SUTRA_STORAGE_MODE", "local")
-        
-        if storage_mode == "server":
-            # Distributed mode: use TCP to connect to storage server
-            try:
-                from ..storage import TcpStorageAdapter
-                
-                # Use EmbeddingGemma dimension (768) for HNSW
-                vector_dim = 768
-                server_address = os.environ.get("SUTRA_STORAGE_SERVER", "storage-server:50051")
-                
-                self.storage = TcpStorageAdapter(
-                    server_address=server_address,
-                    vector_dimension=vector_dim,
-                )
-                logger.info(
-                    f"TCP storage connected to {server_address} (dim={vector_dim})"
-                )
-                
-                # Get concept count from server
-                if self.storage:
-                    stats = self.storage.stats()
-                    concept_count = stats.get("total_concepts", 0)
-                    if concept_count > 0:
-                        logger.info(f"Loaded {concept_count} concepts from storage server")
-                
-                use_rust_storage = True  # Treat TCP as "storage available"
-            except Exception as e:
-                logger.error(f"Failed to connect to storage server: {e}")
-                raise RuntimeError(f"Storage server connection required but failed: {e}")
-        
-        elif use_rust_storage:
-            # Local mode: use direct Rust storage
-            try:
-                from ..storage import RustStorageAdapter
-
-                # Use EmbeddingGemma dimension (768) for HNSW
-                vector_dim = 768
-
-                self.storage = RustStorageAdapter(
-                    storage_path, vector_dimension=vector_dim, use_compression=True
-                )
-                logger.info(
-                    f"Rust storage initialized with native HNSW at {storage_path} (dim={vector_dim})"
-                )
-
-                # Load concept count
-                if self.storage:
-                    stats = self.storage.stats()
-                    concept_count = stats.get("total_concepts", 0)
-                    if concept_count > 0:
-                        logger.info(f"Loaded {concept_count} concepts from storage")
-
-            except ImportError as e:
-                logger.warning(
-                    f"Rust storage not available: {e}."
-                )
-                use_rust_storage = False
-
-        self.use_rust_storage = use_rust_storage
+        # Initialize TCP storage adapter (ONLY backend supported)
+        try:
+            from ..storage import TcpStorageAdapter
+            
+            # Use EmbeddingGemma dimension (768) for HNSW
+            vector_dim = 768
+            server_address = os.environ.get("SUTRA_STORAGE_SERVER", "storage-server:50051")
+            
+            self.storage = TcpStorageAdapter(
+                server_address=server_address,
+                vector_dimension=vector_dim,
+            )
+            logger.info(
+                f"TCP storage connected to {server_address} (dim={vector_dim})"
+            )
+            
+            # Get concept count from server
+            if self.storage:
+                stats = self.storage.stats()
+                concept_count = stats.get("total_concepts", 0)
+                if concept_count > 0:
+                    logger.info(f"Loaded {concept_count} concepts from storage server")
+        except Exception as e:
+            logger.error(f"Failed to connect to storage server: {e}")
+            raise RuntimeError(f"Storage server connection required but failed: {e}")
 
         # Initialize batch embedding processor (optional for faster learning)
         self.enable_batch_embeddings = enable_batch_embeddings
@@ -672,7 +632,7 @@ class ReasoningEngine:
             self._invalidate_cache(combined_content)
 
         # PRODUCTION: Persist all learned concepts to disk
-        if self.use_rust_storage and self.storage:
+        if self.storage:
             try:
                 self.storage.save()
                 logger.info(

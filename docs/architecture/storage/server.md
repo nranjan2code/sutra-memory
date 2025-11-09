@@ -1,11 +1,13 @@
 # Standalone Storage Server
 
+> **Note:** As of v3.0.1, Sutra ONLY supports TCP Binary Protocol server mode. This document describes historical embedded mode for reference.
+
 ## Overview
 
-The storage system can run in two modes:
+The storage system operates in **Server Mode** (TCP Binary Protocol):
 
-1. **Embedded Mode (default)**: Each process has its own `ConcurrentStorage` instance
-2. **Server Mode**: Single storage server that all processes connect to
+- **Server Mode (v3.0.1+)**: Single storage server that all processes connect to via TCP
+- ~~**Embedded Mode**: Removed in v3.0.1 (was never used in production)~~
 
 ## Architecture
 
@@ -13,11 +15,11 @@ The storage system can run in two modes:
 ┌─────────────────────────────┐
 │   Storage Server (Rust)     │
 │  - ConcurrentMemory          │  Port 50051
-│  - gRPC API                  │  (configurable)
+│  - TCP Binary Protocol       │  (configurable)
 │  - Single storage.dat        │
 └─────────────────────────────┘
          ↑ ↑ ↑
-         │ │ │ (gRPC clients)
+         │ │ │ (TCP clients)
     ┌────┘ │ └────┐
     │      │      │
 ┌───┴──┐ ┌─┴───┐ ┌┴────┐
@@ -116,49 +118,39 @@ python -m sutra_cli.main
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SUTRA_STORAGE_MODE` | `embedded` | Storage mode: `embedded` or `server` |
-| `SUTRA_STORAGE_SERVER` | `localhost:50051` | Server address (when mode=server) |
+| `SUTRA_STORAGE_SERVER` | `localhost:50051` | Server address for TCP connection |
 
-## Comparison: Embedded vs Server
+> **Note:** `SUTRA_STORAGE_MODE` removed in v3.0.1 - always uses TCP server mode
 
-### Embedded Mode (Current)
-
-```python
-from sutra_storage import ConcurrentStorage
-
-# Each process has its own instance
-storage = ConcurrentStorage("./knowledge")
-```
-
-**Pros:**
-- Simple deployment
-- No network overhead
-- Works offline
-
-**Cons:**
-- Multiple processes can't share state
-- Must reload from disk on startup
-- No coordination between instances
-
-### Server Mode (New)
+## TCP Binary Protocol (v3.0.1+)
 
 ```python
-from sutra_storage_client import StorageClient
+from sutra_core.storage import TcpStorageAdapter
 
 # All processes connect to same server
-storage = StorageClient("localhost:50051")
+storage = TcpStorageAdapter(
+    server_address="localhost:50051",
+    vector_dimension=768
+)
 ```
 
-**Pros:**
+**Benefits:**
 - Single source of truth
-- Shared in-memory state
+- Shared in-memory state  
 - Hot reload capability
 - Centralized monitoring
+- 10-50× faster than gRPC
+- MessagePack serialization
 
-**Cons:**
-- Network latency (~0.1-0.5ms local)
-- Requires running server
-- Single point of failure (can add HA later)
+**Network Performance:**
+- Local: ~0.1ms latency
+- LAN: ~0.5ms latency
+
+## Historical: Embedded Mode (Removed v3.0.1)
+
+~~Embedded mode where each process had its own ConcurrentStorage instance was removed in v3.0.1. It was never used in production.~~
+
+See `docs/architecture/CLEAN_ARCHITECTURE_IMPLEMENTATION.md` for details.
 
 ## Migration Guide
 
@@ -181,39 +173,42 @@ python -m grpc_tools.protoc \
   proto/storage.proto
 ```
 
-### Step 3: Update Code (Optional)
+### Step 3: Update Code (v3.0.1+)
 
-Your existing code works unchanged! Just set environment variables:
+All code uses TcpStorageAdapter:
 
 ```python
-# Old code - still works!
-from sutra_core.storage import RustStorageAdapter
+from sutra_core.storage import TcpStorageAdapter
+import os
 
-storage = RustStorageAdapter("./knowledge")
-# Automatically uses server mode if SUTRA_STORAGE_MODE=server
+# Get server address from environment
+server_address = os.environ.get("SUTRA_STORAGE_SERVER", "localhost:50051")
+
+storage = TcpStorageAdapter(
+    server_address=server_address,
+    vector_dimension=768
+)
 ```
 
-Or explicitly:
+Or use ReasoningEngine (automatically uses TcpStorageAdapter):
 
 ```python
-# New explicit code
-from sutra_core.storage.connection import get_storage_backend
+from sutra_core.reasoning import ReasoningEngine
 
-storage = get_storage_backend("./knowledge")
-# Returns StorageClient or ConcurrentStorage based on env
+# Automatically connects to SUTRA_STORAGE_SERVER
+engine = ReasoningEngine()
 ```
 
 ## Performance
 
-### Embedded Mode
-- **Write**: 0.02ms per concept (57K/sec)
-- **Read**: <0.01ms (zero-copy mmap)
-- **Path finding**: ~1ms (3-hop BFS)
+### TCP Binary Protocol (v3.0.1+)
+- **Write**: ~0.1ms per concept (10K/sec)
+- **Read**: ~0.05ms (local network + storage)
+- **Path finding**: ~1.1ms (3-hop BFS + network)
+- **Throughput**: 9+ req/sec sequential, 6.5+ req/sec concurrent
+- **Latency**: <200ms p99 under load
 
-### Server Mode (Local)
-- **Write**: ~0.1ms (embedded + network)
-- **Read**: ~0.05ms (embedded + network)
-- **Path finding**: ~1.1ms (embedded + network)
+See `docs/architecture/PERFORMANCE_OPTIMIZATION.md` for details.
 - **Network overhead**: ~50-100µs per RPC
 
 ### Server Mode (Remote - 1ms RTT)

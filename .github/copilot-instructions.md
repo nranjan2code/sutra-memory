@@ -72,14 +72,14 @@ docker ps                                  # Raw Docker status
 - **Simple/Community**: 8 services (storage, api, hybrid, embedding, nlg, bulk-ingester, client, control)
 - **Enterprise**: +2 grid services (grid-master, grid-agent)
 
-### Release Management (2025-11-03)
+### Release Management (2025-11-09)
 ```bash
-sutra version                      # Show current version (3.0.0)
+sutra version                      # Show current version (3.0.1)
 # Manual release process:
-echo "3.0.1" > VERSION            # Update version file (patch/minor/major)
+echo "3.0.2" > VERSION            # Update version file (patch/minor/major)
 git add VERSION
-git commit -m "Release v3.0.1"
-git tag -a v3.0.1 -m "Release version 3.0.1"
+git commit -m "Release v3.0.2"
+git tag -a v3.0.2 -m "Release version 3.0.2"
 git push origin main --tags        # Trigger automated builds
 sutra deploy                       # Deploy current version
 ```
@@ -218,19 +218,63 @@ Grid Components → EventEmitter (Rust) → Sutra Storage (TCP) → Natural Lang
 
 - **Unified CLI:** `./sutra` (Python CLI, single entry point for all operations)
 - **Build script:** `./sutra-optimize.sh` (backend build orchestration, called by ./sutra)
-- **Version control:** `VERSION` (single source of truth, currently 3.0.0)
+- **Version control:** `VERSION` (single source of truth, currently 3.0.1)
 - **Compose file:** `.sutra/compose/production.yml` (unified, profile-based)
 - **Storage engine:** `packages/sutra-storage/src/` (14K+ LOC Rust)
 - **Reasoning core:** `packages/sutra-core/sutra_core/` (42 Python modules)
-- **Architecture docs:** `WARP.md` (AI assistant guidance, 1600+ lines)
+- **Storage adapter:** `packages/sutra-core/sutra_core/storage/tcp_adapter.py` (ONLY adapter - TCP binary protocol)
+- **Architecture docs:** `.github/copilot-instructions.md` (AI assistant guidance)
 - **Documentation hub:** `docs/README.md` (navigation, user journeys)
 - **Build docs:** `docs/build/README.md` (build system guide)
 - **Deployment docs:** `docs/deployment/README.md` (deployment guide)
 - **Release docs:** `docs/release/README.md` (release management)
+- **Architecture changes:** `docs/architecture/CLEAN_ARCHITECTURE_IMPLEMENTATION.md` (v3.0.1 changes)
 - **E2E tests:** `tests/e2e/` (3 continuous learning tests, web-based)
 - **Test docs:** `tests/e2e/README.md` (complete test documentation)
 - **Page objects:** `e2e/page-objects.ts` (LoginPage, ChatPage)
 - **Smoke tests:** `scripts/smoke-test-embeddings.sh` (production validation)
+
+## Clean Architecture Implementation (November 2025 - v3.0.1)
+
+**Simplified to Single TCP Backend:**
+- **Removed:** `RustStorageAdapter` (573 LOC), `GrpcStorageAdapter` (200+ LOC), `connection.py` (80+ LOC)
+- **Total:** 1000+ LOC dead code eliminated
+- **Result:** Single initialization path, no mode switching, clearer architecture
+
+**Storage Adapter (Production):**
+```python
+# ONLY ONE ADAPTER - TCP Binary Protocol
+from sutra_core.storage import TcpStorageAdapter
+
+# Initialize (automatic via SUTRA_STORAGE_SERVER env var)
+storage = TcpStorageAdapter(
+    server_address=os.environ.get("SUTRA_STORAGE_SERVER", "storage-server:50051"),
+    vector_dimension=768,
+)
+```
+
+**Installation Modes:**
+```bash
+# Production (minimal dependencies)
+pip install sutra-core[server]  # 20MB (TCP client only)
+pip install sutra-hybrid         # 103MB (no sklearn)
+
+# Development (with local storage - NOT RECOMMENDED)
+pip install sutra-core[local]   # 30MB (includes sqlalchemy/hnswlib)
+pip install sutra-hybrid[tfidf] # 115MB (includes sklearn)
+```
+
+**Key Changes:**
+- ❌ **Removed:** `use_rust_storage` flag (always True, now removed)
+- ❌ **Removed:** `SUTRA_STORAGE_MODE` env var (always "server")
+- ❌ **Removed:** Embedded mode (RustStorageAdapter with local files)
+- ❌ **Removed:** gRPC mode (deprecated, TCP is 10-50× faster)
+- ✅ **Kept:** TCP Binary Protocol (ONLY backend)
+- ✅ **Made Optional:** sklearn (12MB), sqlalchemy (5MB), hnswlib (5MB)
+
+**Documentation:**
+- Complete guide: `docs/architecture/CLEAN_ARCHITECTURE_IMPLEMENTATION.md`
+- Analysis: `docs/architecture/CLEAN_ARCHITECTURE_ANALYSIS.md`
 
 ## Financial Intelligence System (November 2025)
 
@@ -309,7 +353,7 @@ Grid Components → EventEmitter (Rust) → Sutra Storage (TCP) → Natural Lang
 **Documentation:**
 - **Performance Guide**: `docs/architecture/PERFORMANCE_OPTIMIZATION.md` (complete guide with benchmarks)
 - **Troubleshooting**: `docs/guides/troubleshooting.md` (performance section added)
-- **System Architecture**: `docs/architecture/SYSTEM_ARCHITECTURE.md` (updated to v3.0.0)
+- **System Architecture**: `docs/architecture/SYSTEM_ARCHITECTURE.md` (updated to v3.0.1)
 
 **Testing:**
 ```bash
@@ -359,7 +403,7 @@ docs/
 Professional version control for customer deployments with centralized versioning and automated builds.
 
 ### Key Files
-- **VERSION** - Single source of truth for all package versions (3.0.0)
+- **VERSION** - Single source of truth for all package versions (3.0.1)
 - **./sutra** - Unified CLI for build, deploy, test, status commands
 - **sutra-optimize.sh** - Backend build orchestration (called by ./sutra)
 - **.sutra/compose/production.yml** - Docker Compose with edition profiles
@@ -370,21 +414,21 @@ Professional version control for customer deployments with centralized versionin
 
 **Check version:**
 ```bash
-sutra version                      # Show current version (3.0.0)
-cat VERSION                        # 3.0.0
+sutra version                      # Show current version (3.0.1)
+cat VERSION                        # 3.0.1
 ```
 
 **Create release:**
 ```bash
 # Update VERSION file manually based on change type
-echo "3.0.1" > VERSION  # Bug fixes (patch)
+echo "3.0.2" > VERSION  # Bug fixes (patch)
 echo "3.1.0" > VERSION  # New features (minor)
 echo "4.0.0" > VERSION  # Breaking changes (major)
 
 # Commit and tag
 git add VERSION
-git commit -m "Release v3.0.1"
-git tag -a v3.0.1 -m "Release version 3.0.1"
+git commit -m "Release v3.0.2"
+git tag -a v3.0.2 -m "Release version 3.0.2"
 ```
 
 **What happens:**

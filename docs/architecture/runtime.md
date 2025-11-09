@@ -158,15 +158,15 @@ sutra-client (:3000)
 sutra-api (:8000)
     ↓ SutraAI.ask()
 ReasoningEngine
-    ↓ RustStorageAdapter
+    ↓ TcpStorageAdapter
 StorageClient (Python)
-    ↓ gRPC LearnConcept()
+    ↓ TCP Binary Protocol (MessagePack)
 storage-server (:50051)
     ↓ ConcurrentMemory
 In-Memory Graph
     ↓ Response
 storage-server
-    ↓ gRPC response
+    ↓ TCP response
 StorageClient
     ↓ Python dict
 ReasoningEngine
@@ -186,7 +186,7 @@ Admin User
 sutra-control (:5000)
     ↓ Get storage client
 StorageClient (Python)
-    ↓ gRPC LearnConcept() x 1000
+    ↓ TCP Binary Protocol (MessagePack)
 storage-server (:50051)
     ↓ Batch writes
 WriteLog (lock-free append)
@@ -220,17 +220,14 @@ CONSISTENT! ✓
 ### Development (.env)
 
 ```bash
-# Storage mode (embedded or server)
-SUTRA_STORAGE_MODE=server
-
-# Storage server address
+# Storage server address (ONLY mode in v3.0.1+)
 SUTRA_STORAGE_SERVER=localhost:50051
 
 # API configuration
 SUTRA_API_PORT=8000
 SUTRA_API_HOST=0.0.0.0
 
-# Storage path (for embedded mode or server data dir)
+# Storage path (server data directory)
 SUTRA_STORAGE_PATH=./knowledge
 
 # Logging
@@ -241,9 +238,6 @@ SUTRA_LOG_LEVEL=INFO
 ### Production (.env.production)
 
 ```bash
-# Always use server mode in production
-SUTRA_STORAGE_MODE=server
-
 # Connect to dedicated storage node
 SUTRA_STORAGE_SERVER=storage.internal:50051
 

@@ -1,7 +1,9 @@
 # Sutra AI System Architecture
 
-**Version 3.0.0** | Last Updated: November 8, 2025
+**Version 3.0.1** | Last Updated: November 9, 2025
 
+> **🎯 NEW: [Clean Architecture Implementation](./CLEAN_ARCHITECTURE_IMPLEMENTATION.md)** - Simplified to single TCP backend, removed 1000+ LOC dead code (November 9, 2025)
+> 
 > **📊 NEW: [Embedding Service Scaling Strategy](./scaling/README.md)** - How to scale from 0.14 to 14+ concepts/sec for 1,000+ users (November 2025)
 > 
 > **⚡ NEW: [Performance Optimization Guide](./PERFORMANCE_OPTIMIZATION.md)** - 50-70× throughput improvements and critical fixes (November 2025)

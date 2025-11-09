@@ -312,7 +312,7 @@ obs.query("What's the system status?")
 
 ```bash
 export SUTRA_STORAGE_SERVER="storage-server:50051"
-export SUTRA_STORAGE_MODE="server"  # or "local"
+# Note: SUTRA_STORAGE_MODE removed in v3.0.1 - always uses TCP server
 ```
 
 ### API Ports

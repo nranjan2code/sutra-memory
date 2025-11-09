@@ -415,6 +415,15 @@ events.out.tfevents.*
 docker-compose.override.yml
 docker-compose.override.yaml
 
+# Docker build cache and volumes
+.docker/
+docker-data/
+**/docker-data/
+
+# Container logs
+container.log
+*.container.log
+
 # =============================================================================
 # Kubernetes
 # =============================================================================
@@ -477,11 +486,47 @@ tmp/
 temp/
 *.tmp
 
+# Backup and restore files
+*.backup
+*.bak
+*.orig
+*.restore
+*~
+
+# Process files
+*.pid
+*.lock
+*.socket
+
+# System files
+.DS_Store*
+Thumbs.db*
+
 # Lock files from package managers
 package-lock.json
 yarn.lock
 # Keep Cargo.lock for applications (this is an application workspace)
 # Cargo.lock
+
+# =============================================================================
+# Test Results and Performance Data
+# =============================================================================
+
+# Stress test results
+stress_test_results_*.json
+*_performance_*.json
+*_validation_results.json
+financial_data_validation_results.json
+
+# Performance benchmark files
+benchmark_results/
+**/benchmark_results/
+*.benchmark.json
+*_benchmark_*.json
+
+# Load test artifacts
+load_test_results/
+**/load_test_results/
 
 # =============================================================================
 # Sutra AI Specific
@@ -568,6 +613,13 @@ __cache__/
 # Write-ahead logs
 wal.log
 *.wal
+
+# Development and configuration files
+dev-hot-reload-config.json
+.hot-reload-*
+*-config.local.json
+config.development.*
+config.local.*
 
 # =============================================================================
 # Archives and Compressed Files

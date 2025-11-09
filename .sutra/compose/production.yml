@@ -26,7 +26,7 @@ services:
       # - ${SUTRA_SSL_KEY_PATH}:/etc/nginx/ssl/key.pem:ro
     environment:
       - NGINX_WORKER_PROCESSES=auto
-      - NGINX_WORKER_CONNECTIONS=2048
+      - NGINX_WORKER_CONNECTIONS=16384
     depends_on:
       - sutra-api
       - sutra-hybrid
@@ -351,9 +351,9 @@ services:
       - SUTRA_EDITION=${SUTRA_EDITION:-simple}
       - SUTRA_LICENSE_KEY=${SUTRA_LICENSE_KEY}
       - SUTRA_LICENSE_SECRET=${SUTRA_LICENSE_SECRET}
-      # Rate limits are set by feature flags, but keep for backwards compatibility
-      - SUTRA_RATE_LIMIT_LEARN=100
-      - SUTRA_RATE_LIMIT_REASON=200
+      # Rate limits DISABLED for maximum stress testing
+      - SUTRA_RATE_LIMIT_LEARN=1000000
+      - SUTRA_RATE_LIMIT_REASON=1000000
     depends_on:
       - storage-server
       - user-storage-server
@@ -437,9 +437,9 @@ services:
       - ML_BASE_CACHE_SIZE=10000
       - ML_BASE_MODEL_CACHE_DIR=/models/cache
       # Performance Configuration
-      - ML_BASE_MAX_BATCH_SIZE=64
-      - ML_BASE_BATCH_TIMEOUT_MS=50
-      - ML_BASE_MODEL_UNLOAD_TIMEOUT=300
+      - ML_BASE_MAX_BATCH_SIZE=256
+      - ML_BASE_BATCH_TIMEOUT_MS=10
+      - ML_BASE_MODEL_UNLOAD_TIMEOUT=600
       # Monitoring
       - ML_BASE_METRICS_ENABLED=true
       - ML_BASE_LOG_LEVEL=INFO
@@ -486,9 +486,9 @@ services:
       - ML_BASE_NLG_MODEL=google/gemma-2-2b-it
       - ML_BASE_CACHE_SIZE=10000
       - ML_BASE_MODEL_CACHE_DIR=/models/cache
-      - ML_BASE_MAX_BATCH_SIZE=64
-      - ML_BASE_BATCH_TIMEOUT_MS=50
-      - ML_BASE_MODEL_UNLOAD_TIMEOUT=300
+      - ML_BASE_MAX_BATCH_SIZE=256
+      - ML_BASE_BATCH_TIMEOUT_MS=10
+      - ML_BASE_MODEL_UNLOAD_TIMEOUT=600
       - ML_BASE_METRICS_ENABLED=true
       - ML_BASE_LOG_LEVEL=INFO
     volumes:
@@ -534,9 +534,9 @@ services:
       - ML_BASE_NLG_MODEL=google/gemma-2-2b-it
       - ML_BASE_CACHE_SIZE=10000
       - ML_BASE_MODEL_CACHE_DIR=/models/cache
-      - ML_BASE_MAX_BATCH_SIZE=64
-      - ML_BASE_BATCH_TIMEOUT_MS=50
-      - ML_BASE_MODEL_UNLOAD_TIMEOUT=300
+      - ML_BASE_MAX_BATCH_SIZE=256
+      - ML_BASE_BATCH_TIMEOUT_MS=10
+      - ML_BASE_MODEL_UNLOAD_TIMEOUT=600
       - ML_BASE_METRICS_ENABLED=true
       - ML_BASE_LOG_LEVEL=INFO
     volumes:
@@ -586,9 +586,9 @@ services:
       - ML_BASE_CACHE_SIZE=10000
       - ML_BASE_MODEL_CACHE_DIR=/models/cache
       # Performance Configuration
-      - ML_BASE_MAX_BATCH_SIZE=64
-      - ML_BASE_BATCH_TIMEOUT_MS=50
-      - ML_BASE_MODEL_UNLOAD_TIMEOUT=300
+      - ML_BASE_MAX_BATCH_SIZE=256
+      - ML_BASE_BATCH_TIMEOUT_MS=10
+      - ML_BASE_MODEL_UNLOAD_TIMEOUT=600
       # Monitoring
       - ML_BASE_METRICS_ENABLED=true
       - ML_BASE_LOG_LEVEL=INFO

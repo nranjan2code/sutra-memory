@@ -8,7 +8,7 @@ aiohttp==3.10.5
 pydantic==2.9.2
 
 # Logging and monitoring (internal only)
-structlog==24.4.0
+structlog==25.5.0
 tenacity==9.0.0
 
 # Health checks and utilities

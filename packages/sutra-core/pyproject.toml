@@ -34,7 +34,7 @@ dependencies = [
 # Local mode dependencies (not used in production)
 # These are only needed for Jupyter notebooks or local development
 local = [
-    "sqlalchemy==2.0.35",
+    "sqlalchemy==2.0.44",
     "hnswlib==0.8.0",
 ]
 
@@ -62,7 +62,7 @@ dev = [
 
 # All optional dependencies
 all = [
-    "sqlalchemy==2.0.35",
+    "sqlalchemy==2.0.44",
     "hnswlib==0.8.0",
     "spacy==3.7.6",
 ]

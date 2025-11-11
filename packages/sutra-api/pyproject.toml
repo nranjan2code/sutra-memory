@@ -28,7 +28,7 @@ dependencies = [
   "pydantic-settings==2.5.2",  # ✅ Pinned for security
   "python-multipart==0.0.12",  # ✅ Pinned for security
   "msgpack==1.1.0",  # For custom binary protocol
-  "argon2-cffi==23.1.0",  # For secure password hashing
+  "argon2-cffi==25.1.0",  # For secure password hashing
   "pyjwt[crypto]==2.9.0",  # For JWT token generation and verification
   "python-jose==3.3.0",  # Additional JWT utilities
   "itsdangerous==2.2.0",  # Secure session signing

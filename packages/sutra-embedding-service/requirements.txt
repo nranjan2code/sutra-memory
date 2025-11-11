@@ -12,4 +12,4 @@ structlog==24.4.0
 tenacity==9.0.0
 
 # Health checks and utilities
-psutil==6.0.0
+psutil==7.1.3

@@ -41,7 +41,7 @@ local = [
 nlp = [
     # Optional: spaCy for advanced NLP (noun chunking, lemmatization)
     # System falls back to simple word extraction if unavailable
-    "spacy==3.7.6",
+    "spacy==3.8.8",
 ]
 
 # Server mode (production) - minimal dependencies
@@ -64,7 +64,7 @@ dev = [
 all = [
     "sqlalchemy==2.0.35",
     "hnswlib==0.8.0",
-    "spacy==3.7.6",
+    "spacy==3.8.8",
 ]
 
 [project.urls]

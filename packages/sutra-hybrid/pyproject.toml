@@ -40,7 +40,7 @@ tfidf = [
 
 # Optional enhanced semantic understanding
 embeddings = [
-    "sentence-transformers==3.1.1",
+    "sentence-transformers==5.1.2",
 ]
 
 # Optional API server
@@ -63,7 +63,7 @@ dev = [
 
 # All optional dependencies
 all = [
-    "sentence-transformers==3.1.1",
+    "sentence-transformers==5.1.2",
     "fastapi==0.115.0",
     "uvicorn[standard]==0.30.6",
     "pydantic==2.9.2",

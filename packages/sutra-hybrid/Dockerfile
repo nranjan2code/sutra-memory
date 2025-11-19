@@ -15,7 +15,8 @@ COPY packages/sutra-core ./packages/sutra-core
 # Install dependencies
 RUN pip install --no-cache-dir --prefix=/install \
     ./packages/sutra-storage-client-tcp \
-    ./packages/sutra-core && \
+    ./packages/sutra-core \
+    gunicorn uvicorn[standard] fastapi httpx requests && \
 
 # Cleanup
 RUN find /install -name "*.pyc" -delete && \

@@ -99,8 +99,9 @@ class EmbeddingServiceProvider(EmbeddingProvider):
                 # Lightweight client - check ML-Base connectivity
                 if not health_data.get("ml_base_connected", False):
                     raise ConnectionError("ML-Base service not connected")
-            elif not health_data.get("model_loaded", False):
-                # Standalone service - check model loaded
+            elif health_data.get("model_loaded") is False:
+                # Standalone service - check model loaded (only fail if explicitly False)
+                # External services may not report this field, so treat missing as OK
                 raise ConnectionError("Embedding model not loaded in service")
             
                 # Check service info for basic health
@@ -122,7 +123,8 @@ class EmbeddingServiceProvider(EmbeddingProvider):
             test_response.raise_for_status()
             
             test_data = test_response.json()
-            dimension = test_data.get("dimension", 0)
+            # Try both 'dimension' (internal) and 'dimensions' (external service)
+            dimension = test_data.get("dimension") or test_data.get("dimensions", 0)
             model = test_data.get("model", "")
             
             # Get expected dimension from environment (Phase 0: Matryoshka support)

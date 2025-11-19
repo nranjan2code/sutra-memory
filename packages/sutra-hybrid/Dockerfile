@@ -8,27 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-# Copy core packages
+# Copy required local packages
 COPY packages/sutra-storage-client-tcp ./packages/sutra-storage-client-tcp
 COPY packages/sutra-core ./packages/sutra-core
-COPY packages/sutra-nlg ./packages/sutra-nlg
 
-# Install production-grade dependencies for hybrid reasoning
+# Install dependencies
 RUN pip install --no-cache-dir --prefix=/install \
     ./packages/sutra-storage-client-tcp \
-    ./packages/sutra-core \
-    ./packages/sutra-nlg && \
-    pip install --no-cache-dir --prefix=/install \
-    "fastapi>=0.104.0,<0.105.0" \
-    "gunicorn>=21.2.0" \
-    "uvicorn[standard]==0.24.0" \
-    "pydantic>=2.0.0,<3.0.0" \
-    "pydantic-settings>=2.0.0,<3.0.0" \
-    "msgpack>=1.0.0,<2.0.0" \
-    "requests>=2.31.0,<3.0.0" \
-    "numpy==1.24.4" \
-    "scipy==1.11.4" \
-    "scikit-learn==1.3.2"
+    ./packages/sutra-core && \
 
 # Cleanup
 RUN find /install -name "*.pyc" -delete && \

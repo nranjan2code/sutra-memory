@@ -617,26 +617,21 @@ services:
   # ============================================================================
   
   # Single Advanced Embedding Service (Simple & Community Editions)
-  # Uses external ghcr.io/nranjan2code/sutra-embedder:v1.0.0 (4x faster Rust implementation)
+  # Uses external ghcr.io/nranjan2code/sutra-embedder:v1.0.1 (4x faster Rust implementation)
   sutra-works-embedding-single:
-    image: ghcr.io/nranjan2code/sutra-embedder:v1.0.0
+    image: ghcr.io/nranjan2code/sutra-embedder:v1.0.1
     container_name: sutra-works-embedding-single
-    # SECURITY: Internal only - advanced embedding service backend
+    # SECURITY: Internal only - embedding service backend
     expose:
       - "8888"
     environment:
-      - RUST_LOG=info
+      - PYTHONUNBUFFERED=1
       - EMBEDDING_PORT=8888
       - EMBEDDING_HOST=0.0.0.0
-      # Advanced Configuration
-      - MODEL_PATH=/models/nomic-embed-text-v1.5
+      # Configuration
       - VECTOR_DIMENSION=${MATRYOSHKA_DIM:-768}
-      - CACHE_SIZE=50000
-      - BATCH_SIZE=256
-      # Performance Optimization
-      - SIMD_ACCELERATION=true
-      - GPU_ACCELERATION=auto
-      - QUANTIZATION=int8
+      - BATCH_SIZE=32
+      - MODEL_NAME=nomic-ai/nomic-embed-text-v1.5
       # Instance Configuration
       - INSTANCE_ID=embedding-single
     networks:
@@ -644,16 +639,16 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
-      retries: 5
+      retries: 3
       start_period: 30s
     deploy:
       resources:
         limits:
-          memory: 2G  # Optimized Rust implementation
-        reservations:
           memory: 1G
+        reservations:
+          memory: 512M
     profiles:
       - simple
       - community
@@ -664,7 +659,7 @@ services:
   
   # Advanced Embedding Service Replica 1
   embedding-1:
-    image: ghcr.io/nranjan2code/sutra-embedder:v1.0.0
+    image: ghcr.io/nranjan2code/sutra-embedder:v1.0.1
     container_name: sutra-works-embedding-1
     environment:
       - RUST_LOG=info
@@ -699,7 +694,7 @@ services:
   
   # Advanced Embedding Service Replica 2
   embedding-2:
-    image: ghcr.io/nranjan2code/sutra-embedder:v1.0.0
+    image: ghcr.io/nranjan2code/sutra-embedder:v1.0.1
     container_name: sutra-works-embedding-2
     environment:
       - RUST_LOG=info
@@ -734,7 +729,7 @@ services:
   
   # Advanced Embedding Service Replica 3
   embedding-3:
-    image: ghcr.io/nranjan2code/sutra-embedder:v1.0.0
+    image: ghcr.io/nranjan2code/sutra-embedder:v1.0.1
     container_name: sutra-works-embedding-3
     environment:
       - RUST_LOG=info

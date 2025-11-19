@@ -754,7 +754,7 @@ deploy_optimized() {
         export SUTRA_VERSION="${SUTRA_VERSION:-latest}"
     fi
     
-    export SUTRA_EDITION="${SUTRA_EDITION:-community}"  # Default to community for Phase 0+1+2
+    export SUTRA_EDITION="${SUTRA_EDITION:-simple}"  # Respect user's edition choice
     export SUTRA_SECURE_MODE="${SUTRA_SECURE_MODE:-false}"
     export HF_TOKEN="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"
     

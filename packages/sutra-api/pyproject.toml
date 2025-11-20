@@ -32,6 +32,7 @@ dependencies = [
   "pyjwt[crypto]==2.9.0",  # For JWT token generation and verification
   "python-jose==3.3.0",  # Additional JWT utilities
   "itsdangerous==2.2.0",  # Secure session signing
+  "requests==2.31.0",  # For HTTP calls to embedding service
 ]
 
 [project.optional-dependencies]

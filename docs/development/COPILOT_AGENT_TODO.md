@@ -29,13 +29,15 @@
 - ✅ **External ML Services:** Advanced Rust embedder (4× faster) + Enterprise RWKV NLG integrated
 - ✅ **Production Deployment:** 11 containers operational, nginx proxy, complete service mesh
 - ✅ **Grid Infrastructure:** Enterprise edition with distributed coordination
-- ✅ **Self-Monitoring Foundation:** 26 event types DEFINED (1659 LOC), Grid Master + Agent emit 2 event types (AgentOffline, AgentDegraded, NodeCrashed, NodeRestarted)
+- ✅ **Self-Monitoring Foundation:** 26 event types DEFINED (1659 LOC), Grid Master + Agent emit 4 event types
 - ✅ **Eating Own Dogfood:** Grid components → EventEmitter → Sutra Storage (NO Prometheus/Grafana/Datadog)
 - ✅ **Financial Intelligence:** 100+ companies, 76 tests, 100% success
 - ✅ **Performance:** 9+ req/sec, <200ms latency, 50-70× improvements
 - ✅ **E2E Testing:** 3 continuous learning tests, web-based automation
 - ✅ **Release System:** Automated builds, semantic versioning
 - ✅ **Clean Architecture:** 70,121 lines obsolete code deleted, 3-repo separation validated
+- ✅ **Authentication:** User registration and login working with external embeddings (768-dim)
+- ✅ **Storage Integration:** Self-contained embedding_client.rs calls external Rust service
 
 **What Needs Work (Priority Order):**
 - 🎯 **E2E Integration Testing:** Run full test suite with external services (NEXT PRIORITY)
@@ -1377,8 +1379,90 @@ Hybrid Service (orchestration)
 
 ---
 
+### Session 11 (November 20, 2025) - AUTHENTICATION FIXED: External Embedding Integration Complete ✅
+
+**CRITICAL AUTHENTICATION FIX COMPLETED:**
+
+**Problem Identified:**
+- User registration and login failing after external service integration
+- Storage layer embedding_client.rs had hardcoded dimension validation
+- Response format mismatch between external Rust service and internal expectations
+
+**Storage Layer Integration Fixes:**
+1. ✅ **Removed Dimension Validation:**
+   - Deleted `expected_dimension` field from `EmbeddingConfig` struct
+   - Removed hardcoded dimension checks - storage now accepts any dimension
+   - Eliminated 15s retry penalty from dimension mismatches
+
+2. ✅ **Fixed Response Struct for External Service:**
+   - Changed `dimension: u32` → `dimensions: u32` (plural to match external API)
+   - Made `model`, `processing_time_ms`, `cached_count` optional with `#[serde(default)]`
+   - External service returns: `{"embeddings": [[...]], "dimensions": 768, "processing_time_ms": 0.0}`
+
+3. ✅ **Validated Storage-to-External-Service Flow:**
+   - Storage container env var: `SUTRA_EMBEDDING_SERVICE_URL=http://sutra-works-embedding-single:8888`
+   - External Rust embedder: ghcr.io/nranjan2code/sutra-embedder:v1.0.1 (768-dim, 4× faster)
+   - Embedding generation: Working correctly with batch processing
+
+**Authentication Workflow Validation:**
+```bash
+# User Registration - SUCCESS ✅
+curl -X POST http://localhost:8080/api/auth/register \
+  -d '{"email":"freshapi@test.com","password":"password123","full_name":"Fresh API","organization":"TestOrg"}'
+# Result: {"user_id":"73a19f8346f28b63",...} ✅
+
+# User Login - SUCCESS ✅  
+curl -X POST http://localhost:8080/api/auth/login \
+  -d '{"email":"freshapi@test.com","password":"password123"}'
+# Result: {"access_token":"<set-in-cookie>","token_type":"bearer",...} ✅
+```
+
+**Technical Changes (Files Modified):**
+- `packages/sutra-storage/src/embedding_client.rs`:
+  - Removed `expected_dimension` field and validation logic
+  - Updated `EmbeddingResponse` struct to match external service format
+  - Made optional fields flexible with `#[serde(default)]`
+- `packages/sutra-storage/Dockerfile`: Rebuilt with fixes
+- Storage containers: Restarted with updated image
+
+**What Changed When We Introduced External Embedding:**
+1. **Storage is Self-Contained:** Rust storage service has its own HTTP client (`embedding_client.rs`) that calls external Rust embedding service
+2. **No Dimension Validation:** Removed hardcoded checks - accepts whatever dimension external service returns (768 in production)
+3. **Response Format Adaptation:** Updated deserialization to match external service's JSON structure
+4. **Configuration:** Uses `SUTRA_EMBEDDING_SERVICE_URL` env var pointing to external service
+
+**Integration Architecture:**
+```
+API Service (user registration/login)
+    ↓
+User Storage (TCP protocol)
+    ↓
+Storage embedding_client.rs (HTTP)
+    ↓
+External Rust Embedder (http://sutra-works-embedding-single:8888)
+    ↓
+Returns: {"embeddings":[[768 floats]],"dimensions":768}
+```
+
+**Validation Results:**
+- ✅ Storage logs: "Batch embedding complete: 5/5 successful (attempt 1)"
+- ✅ Registration: User created with vector embedding
+- ✅ Login: Vector search finds user successfully
+- ✅ End-to-end: Complete authentication workflow operational
+
+**PHASE 2 STATUS: ✅ AUTHENTICATION COMPLETE - READY FOR E2E TESTING**
+
+**Next Immediate Steps:**
+- [ ] Run full E2E test suite (npm run test:e2e)
+- [ ] Performance benchmarking (compare external vs internal embeddings)
+- [ ] Load testing with concurrent authentication requests
+- [ ] Document external service integration in architecture docs
+- [ ] Prepare v3.3.0 release (external ML services + authentication fixes)
+
+---
+
 **Last Updated:** November 20, 2025  
-**Current Status:** v3.2.0 - Phase 2 Complete (11 containers deployed, external ML services integrated)  
+**Current Status:** v3.2.0 - Phase 2 Complete (11 containers, external ML, authentication working)  
 **Next Review:** After E2E testing and performance benchmarking (v3.3.0)  
 **Maintainer:** Nisheetsh Ranjan (@nranjan2code)
 

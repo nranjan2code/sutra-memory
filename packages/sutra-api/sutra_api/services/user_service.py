@@ -180,41 +180,32 @@ class UserService:
             import json
             import secrets
             
-            logger.info(f"Vector search login: {email}")
+            logger.info(f"Semantic search login: {email}")
             
-            # Generate proper embedding for the email to find user
-            try:
-                import requests
-                embedding_url = "http://sutra-works-embedding-single:8888/embed"
-                response = requests.post(embedding_url, json={"text": f"user {email}"}, timeout=5)
-                if response.status_code == 200:
-                    user_vector = response.json()["embedding"]
-                else:
-                    # Fallback: search through more concepts with dummy vector
-                    user_vector = [0.0] * 768
-                    logger.warning(f"Failed to get embedding for user {email}, using fallback")
-            except Exception as e:
-                # Fallback: use dummy vector but search more broadly
-                user_vector = [0.0] * 768
-                logger.warning(f"Embedding service unavailable for user {email}: {e}")
+            # Use semantic search with email as required term (same as registration check)
+            semantic_filter = {
+                "required_terms": [email],
+                "has_causal_relation": False,
+            }
             
-            # Search with generated or fallback vector
-            vector_results = self.storage.vector_search(user_vector, k=100)  # Increased k for better coverage
+            semantic_results = self.storage.query_by_semantic(
+                semantic_filter=semantic_filter,
+                max_results=10
+            )
             
             # Find user with matching email
             user_data = None
             user_concept_id = None
             
-            for concept_id, similarity in vector_results:
-                concept = self.storage.query_concept(concept_id)
+            for concept in semantic_results:
                 if concept and concept.get("content"):
                     try:
                         data = json.loads(concept["content"])
                         if (data.get("type") == "user" and 
                             data.get("email") == email):
                             user_data = data
-                            user_concept_id = concept_id
-                            logger.info(f"User found: {email} with similarity {similarity:.3f}")
+                            user_concept_id = concept.get("concept_id")
+                            logger.info(f"User found via semantic search: {email}")
                             break
                     except json.JSONDecodeError:
                         continue

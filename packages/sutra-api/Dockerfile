@@ -48,6 +48,7 @@ starlette>=0.27.0,<0.28.0
 # HTTP client for inter-service communication
 httpx>=0.25.0,<0.26.0
 aiofiles>=23.0.0,<24.0.0
+requests>=2.31.0,<3.0.0
 EOF
 
 # Install packages with minimal footprint

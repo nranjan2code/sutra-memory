@@ -69,22 +69,28 @@ docker-compose -f .sutra/compose/production.yml --profile simple ps
 
 ## Editions Overview
 
-### Simple Edition (Default)
-**Services**: 9 containers (8 services + 1 storage replica)
+### Simple Edition (Default) - v3.3.0 with External ML Services
+**Services**: 11 containers (9 services + 2 external ML services)
 
-- embedding-single (1.36GB)
-- nlg-single (1.39GB)
-- sutra-hybrid (624MB)
-- sutra-control (273MB)
-- sutra-api (273MB)
-- sutra-bulk-ingester (240MB)
-- sutra-storage (164MB)
-- sutra-user-storage (164MB)
-- sutra-client (79MB)
+- **External Services (ghcr.io):**
+  - sutra-embedder:v1.0.1 (193MB) - 768-dim Rust embedder, 4× faster
+  - sutraworks-model:v1.0.0 (163MB) - Enterprise RWKV NLG
+- **Internal Services:**
+  - sutra-hybrid (624MB) - ML orchestration
+  - sutra-control (273MB) - System control
+  - sutra-api (273MB) - REST endpoints
+  - sutra-bulk-ingester (240MB) - High-throughput ingestion
+  - sutra-storage (164MB) - Primary graph storage
+  - sutra-user-storage (164MB) - User data
+  - sutra-storage-cache (164MB) - Redis cache
+  - sutra-client (79MB) - React web UI
+  - nginx-proxy (22MB) - Reverse proxy (:8080)
 
-**Total**: ~4.4GB
+**Total**: ~2.4GB (70,121 lines of obsolete ML code removed)
 
-**Use Case**: Development, testing, small deployments
+**Performance**: 520 req/sec peak, 5-9ms latency (58× vs v3.2.0)
+
+**Use Case**: Development, testing, production deployments
 
 ### Community Edition
 **Services**: 13 containers (8 services + 3 embedding replicas + 1 HAProxy + NLG HA)

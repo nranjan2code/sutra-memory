@@ -1,7 +1,9 @@
 # Sutra AI System Architecture
 
-**Version 3.0.1** | Last Updated: November 9, 2025
+**Version 3.3.0** | Last Updated: November 21, 2025
 
+> **🔥 NEW: [v3.3.0 Release Notes](../release/RELEASE_NOTES_V3.3.0.md)** - External ML service integration with **58× throughput improvement** and **5-9ms latency** (November 21, 2025)
+> 
 > **🎯 NEW: [Clean Architecture Implementation](./CLEAN_ARCHITECTURE_IMPLEMENTATION.md)** - Simplified to single TCP backend, removed 1000+ LOC dead code (November 9, 2025)
 > 
 > **📊 NEW: [Embedding Service Scaling Strategy](./scaling/README.md)** - How to scale from 0.14 to 14+ concepts/sec for 1,000+ users (November 2025)
@@ -143,10 +145,11 @@ Sutra AI employs a **layered microservices architecture** with clear separation 
 └─────────────────────────────────────────────────────────────┘
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 3.5: ML Foundation Services (sutra-ml-base)          │
-│  • Embedding Service (8889) • NLG Service (8890)           │
-│  • Edition-aware scaling • Standardized APIs                │
-│  • Health/Metrics/Caching • GPU acceleration               │
+│  Layer 3.5: External ML Services (v3.3.0 - Advanced Rust)  │
+│  • Rust Embedder (8888) - 768-dim Matryoshka (4× faster)  │
+│  • RWKV NLG (8003) - Enterprise AI framework               │
+│  • GitHub Container Registry (ghcr.io/nranjan2code)        │
+│  • Production HTTP APIs • Health/Metrics/Caching           │
 └─────────────────────────────────────────────────────────────┘
                            ▼
 ┌─────────────────────────────────────────────────────────────┐

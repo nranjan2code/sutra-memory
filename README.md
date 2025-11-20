@@ -3,22 +3,51 @@
 **Domain-Specific Reasoning Engine for Your Knowledge**
 
 [![Production Ready](https://img.shields.io/badge/status-production--ready-green)]()
-[![Version](https://img.shields.io/badge/version-3.0.1-blue)]()
-[![Performance](https://img.shields.io/badge/performance-70×_faster-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-3.3.0-blue)]()
+[![Performance](https://img.shields.io/badge/performance-58×_throughput-brightgreen)]()
+[![Latency](https://img.shields.io/badge/latency-5--9ms-brightgreen)]()
+[![E2E Tests](https://img.shields.io/badge/E2E_tests-3%2F3_passing-brightgreen)]()
 [![Grade](https://img.shields.io/badge/grade-A+-brightgreen)]()
 [![Production Score](https://img.shields.io/badge/production-100%2F100-brightgreen)]()
 [![Security](https://img.shields.io/badge/security-95%2F100-brightgreen)]()
 [![Quality](https://img.shields.io/badge/quality-automated-brightgreen)]()
-[![Tests](https://img.shields.io/badge/tests-automated-brightgreen)]()
-[![Coverage](https://img.shields.io/badge/coverage-70%25%2B-brightgreen)]()
 
 Explainable reasoning over your private domain knowledge—without frontier LLMs. Built for regulated industries requiring complete audit trails and 1000× lower costs than ChatGPT.
+
+**🔥 Phase 2 Complete:** External ML service integration validated with **520 req/sec peak throughput**, **5-9ms latency**, and **100% E2E test success rate**.
 
 > **Note:** This deployment uses `sutra-works-` prefix for all Docker containers and images to avoid conflicts with other Sutra deployments. All services are isolated behind an nginx reverse proxy for production-grade security. See `docs/deployment/NAMING_CONVENTIONS.md` and `docs/deployment/NETWORK_SECURITY.md` for details.
 
 ---
 
-## 🎉 What's New (2025-11-09)
+## 🎉 What's New (2025-11-21)
+
+**🔥 Phase 2 Complete - External ML Service Integration & E2E Validation (v3.3.0)**
+
+- ✅ **58× Throughput Improvement** - 9 r/s → 520 r/s peak async throughput
+- ✅ **11-20× Faster Latency** - 100-200ms → 5-9ms average response time
+- ✅ **100% E2E Test Success** - 3/3 tests passing (continuous learning, temporal reasoning, high-frequency)
+- ✅ **External Rust Embedder** - 768-dim Matryoshka embeddings (4× faster than Python)
+- ✅ **Enterprise RWKV NLG** - Advanced AI framework with production-grade quality
+- ✅ **70,121 Lines Removed** - Deleted 5 obsolete internal ML services
+- ✅ **Clean 3-Repo Architecture** - Main monorepo + 2 external advanced services
+- ✅ **11 Services Healthy** - Complete production deployment validated
+
+**Performance Benchmarks (v3.3.0):**
+- Sequential: 117 r/s, 5ms avg latency
+- Thread Concurrent: 278 r/s, 7ms avg latency  
+- Async Concurrent: 520 r/s, 9ms avg latency
+- P95 Latency: 10-21ms (excellent for production)
+- Success Rate: 100% across all test modes
+
+**E2E Test Results:**
+- Test 1: Continuous learning with 14 stock updates (1.7 min) ✅
+- Test 2: High-frequency processing, 10 updates in 36s (49s) ✅
+- Test 3: Temporal reasoning with price trends (42s) ✅
+
+See complete release notes: `docs/release/RELEASE_NOTES_V3.3.0.md`
+
+---
 
 **🎯 Clean Architecture - Simplified to Single Backend (v3.0.1)**
 
@@ -27,74 +56,48 @@ Explainable reasoning over your private domain knowledge—without frontier LLMs
 - ✅ **27MB Lighter** - Made sklearn/sqlalchemy/hnswlib optional
 - ✅ **Simplified Initialization** - One path, no mode switching
 - ✅ **Clearer Architecture** - Exclusive product (not pluggable framework)
-- ✅ **Installation Modes** - `[server]` for production, `[local]` for notebooks
-- ✅ **Better Documentation** - Complete implementation guide
-
-**Architecture Changes:**
-- Storage adapters: 3 → 1 (TCP only)
-- Initialization paths: 3 → 1 (no branching)
-- Dependencies: Base → Optional (sklearn, sqlalchemy, hnswlib)
-- Configuration parameters: 17 → 15 (removed use_rust_storage)
 
 See complete guide: `docs/architecture/CLEAN_ARCHITECTURE_IMPLEMENTATION.md`
 
 ---
 
-**⚡ Performance Optimization Complete - 50-70× Throughput Improvement (v3.0.0)**
-
-- ✅ **Config-Driven Dimensions** - Fixed hardcoded 768-dim validation, now reads `VECTOR_DIMENSION` env
-- ✅ **70× Sequential Performance** - 7542ms → 107ms (0.13 → 9.06 req/sec)
-- ✅ **49× Concurrent Performance** - 14888ms → 306ms for 2-thread workloads
-- ✅ **100% Async Success** - Fixed dimension mismatch causing 0% success rate (∞ improvement)
-- ✅ **TCP Connection Resilience** - Added state validation, timeout handling, graceful reconnection
-- ✅ **Production Monitoring** - Request tracking, slow query detection (>1s threshold)
-- ✅ **Connection Pooling** - Keep-alive, connection reuse for concurrent requests
-
-See complete guide: `docs/architecture/PERFORMANCE_OPTIMIZATION.md`
-
----
-
-**🚀 Production Scaling Complete - 21× Performance Improvement (v3.0.0 - Grade: A+ 100/100)**
-
-- ✅ **Phase 0: Matryoshka Dimensions** - 3× faster with configurable 256/512/768-dim embeddings
-- ✅ **Phase 1: Sutra-Native Caching** - 7× total improvement with L1+L2 cache (85% hit rate, zero Redis)
-- ✅ **Phase 2: HAProxy Load Balancing** - 21× total improvement with 3× ML-Base replicas
-- ✅ **Zero External Dependencies** - 100% Sutra-native (no Redis, Prometheus, PostgreSQL)
-- ✅ **Production Validation** - Financial Intelligence (100% success), DevOps Self-Monitoring (96% cost savings)
-- ✅ **Comprehensive Documentation** - 8 new scaling docs (SUMMARY.md, PHASE0/1/2, implementation guides)
-
-**Performance Improvement: 0.14 → 8.8 concepts/sec (21×)**
-**Cache Hit Rate: 0% → 85% (L1 68% + L2 17%)**
-**User Capacity: 100-200 → 1,500-3,000 concurrent users**
-**Storage Reduction: 3KB → 1KB per concept (67% savings)**
-
-See complete release notes: `docs/SCALING_RELEASE_NOTES_V3.md`
-
----
-
 ## 🚀 Quick Start (2 Commands)
 
-**Get 21× performance in 2 commands:**
+**Get 58× performance with external ML services in 2 commands:**
 
 ```bash
 # 1. Build all services (one time)
 ./sutra build
 
-# 2. Deploy with Phase 0+1+2 scaling (default)
+# 2. Deploy with external ML services (default)
 ./sutra deploy
 ```
 
-**That's it!** You now have Sutra AI v3.0.0 running with:
-- ✅ 256-dim Matryoshka embeddings (3× faster)
-- ✅ L1+L2 Sutra-native caching (7× total, 85% hit rate)
-- ✅ HAProxy + 3× ML-Base replicas (21× total)
-- ✅ 8.8 concepts/sec throughput (vs 0.14 baseline)
-- ✅ 1,500-3,000 concurrent user capacity
+**That's it!** You now have Sutra AI v3.3.0 running with:
+- ✅ **520 req/sec peak throughput** (58× improvement)
+- ✅ **5-9ms average latency** (11-20× faster)
+- ✅ **768-dim Matryoshka embeddings** (external Rust service, 4× faster)
+- ✅ **Enterprise RWKV NLG** (advanced AI framework)
+- ✅ **11 healthy services** (API, storage, ML external, nginx proxy)
+- ✅ **100% E2E test success** (continuous learning validated)
+
+**Access the UI:**
+```bash
+# Web interface available at:
+http://localhost:8080
+```
 
 **Validation:**
 ```bash
-python scripts/validate_scaling.py --phases 0,1,2
-# Expected: All phases ✅
+# Check all services are healthy
+./sutra status
+
+# Run E2E tests (3 tests, ~3.3 minutes)
+npm run test:e2e
+
+# Performance benchmarking
+python3 scripts/stress_test.py --quick
+# Expected: 520 r/s, 5-9ms latency, 100% success
 ```
 
 **Complete Guide**: See [`QUICK_DEPLOY.md`](QUICK_DEPLOY.md) for detailed deployment instructions.

@@ -1,6 +1,6 @@
 [package]
 name = "sutra-desktop"
-version = "1.0.0"
+version = "2.0.0"
 edition = "2021"
 authors = ["Sutra AI Team"]
 description = "Sutra AI Desktop - Native GUI for the knowledge reasoning engine"
@@ -50,6 +50,13 @@ directories = "5.0"  # Platform-specific data directories
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = { workspace = true }
 md5 = "0.7"  # For concept ID generation
+
+# ============================================================================
+# NEW: Graph visualization and analytics
+# ============================================================================
+rand = "0.8"               # Force-directed layout randomization
+csv = "1.3"                # CSV export/import
+quick-xml = "0.36"         # GraphML export
 
 # macOS specific
 [target.'cfg(target_os = "macos")'.dependencies]

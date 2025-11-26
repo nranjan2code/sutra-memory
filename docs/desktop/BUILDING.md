@@ -1,368 +1,431 @@
 # Building Sutra Desktop
 
-**Version:** 1.0.0  
+**Version:** 3.3.0  
 **Updated:** November 26, 2025
 
-Complete guide to building Sutra Desktop from source.
+This guide covers building Sutra Desktop from source, including platform-specific configurations and optimization options.
+
+---
 
 ## Prerequisites
 
 ### Required
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Rust | 1.70+ | Compiler and Cargo |
-| Xcode CLT | Latest | macOS compilation |
+| Tool | Version | Check Command |
+|------|---------|---------------|
+| Rust | 1.70+ | `rustc --version` |
+| Cargo | 1.70+ | `cargo --version` |
+| Git | 2.0+ | `git --version` |
 
-### Installing Rust
+### Platform-Specific
 
+**macOS:**
 ```bash
-# Install rustup
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Verify installation
-rustc --version
-cargo --version
-```
-
-### Installing Xcode Command Line Tools
-
-```bash
+# Xcode command line tools
 xcode-select --install
 ```
 
-## Workspace Structure
-
-Desktop is part of the Sutra monorepo:
-
-```
-sutra-memory/
-├── Cargo.toml              # Workspace manifest
-├── desktop/                # Desktop application
-│   ├── Cargo.toml         # Package manifest
-│   └── src/               # Source code
-├── packages/
-│   └── sutra-storage/     # Storage engine (dependency)
-└── target/                # Build output
+**Linux (Debian/Ubuntu):**
+```bash
+# Build essentials and graphics libraries
+sudo apt install build-essential libxcb-render0-dev libxcb-shape0-dev \
+    libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
 ```
 
-## Build Commands
+**Linux (Fedora):**
+```bash
+sudo dnf install gcc gcc-c++ libxcb-devel libxkbcommon-devel openssl-devel
+```
+
+**Windows:**
+```powershell
+# Visual Studio Build Tools (or full Visual Studio with C++ workload)
+winget install Microsoft.VisualStudio.2022.BuildTools
+```
+
+---
+
+## Quick Build
 
 ### Development Build
 
-Fast compilation with debug symbols:
-
 ```bash
 # From workspace root
-cd /path/to/sutra-memory
-
-# Build desktop package
 cargo build -p sutra-desktop
 
-# Binary output
-./target/debug/sutra-desktop
+# Run directly
+cargo run -p sutra-desktop
 ```
 
 ### Release Build
 
-Optimized for performance:
-
 ```bash
-# Optimized build
+# Optimized build (recommended for daily use)
 cargo build -p sutra-desktop --release
 
-# Binary output (much smaller, faster)
+# Run release build
 ./target/release/sutra-desktop
 ```
 
-### Run Directly
+---
 
-Build and run in one command:
+## Build Options
 
-```bash
-# Development
-cargo run -p sutra-desktop
+### Features
 
-# Release
-cargo run -p sutra-desktop --release
-```
-
-## Cargo.toml Configuration
+The desktop crate supports these features in `desktop/Cargo.toml`:
 
 ```toml
-[package]
-name = "sutra-desktop"
-version = "1.0.0"
-edition = "2021"
-description = "Sutra AI Desktop Edition - Self-contained semantic reasoning"
-authors = ["Sutra Works"]
-license = "MIT"
-
-[dependencies]
-# GUI framework
-eframe = "0.29"
-egui = "0.29"
-
-# Storage engine (workspace crate)
-sutra-storage = { path = "../packages/sutra-storage" }
-
-# Utilities
-md5 = "0.7"
-chrono = "0.4"
-directories = "5.0"
-tracing = "0.1"
-tracing-subscriber = "0.3"
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-strip = true
+[features]
+default = ["native"]
+native = ["eframe/default", "eframe/persistence"]
 ```
 
-## macOS App Bundle
+**Feature Details:**
+- `native`: Full native window support with state persistence (recommended)
+- Without `native`: Reduced functionality, mainly for testing
 
-### Bundle Structure
+### Environment Variables
 
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
+| `SUTRA_DATA_DIR` | Platform-specific | Override data directory |
+
+Example:
+```bash
+RUST_LOG=debug cargo run -p sutra-desktop
 ```
-Sutra Desktop.app/
-└── Contents/
-    ├── Info.plist          # App metadata
-    ├── MacOS/
-    │   └── sutra-desktop   # Executable
-    └── Resources/
-        └── AppIcon.icns    # App icon
-```
 
-### Build Script
+---
+
+## Platform Builds
+
+### macOS App Bundle
+
+Create a proper `.app` bundle for distribution:
 
 ```bash
-#!/bin/bash
-# desktop/scripts/build-macos.sh
+cd desktop
+./scripts/build-macos.sh
+```
 
-set -e
+This script:
+1. Builds release binary
+2. Creates `Sutra Desktop.app` bundle structure
+3. Copies binary and resources
+4. Sets up `Info.plist` metadata
+5. Creates app icon (icns)
 
-APP_NAME="Sutra Desktop"
-BUNDLE_ID="ai.sutra.desktop"
-VERSION="1.0.0"
+Output location: `target/release/bundle/Sutra Desktop.app`
 
-# Build release binary
+**Manual Bundle Creation:**
+
+```bash
+# Build release
 cargo build -p sutra-desktop --release
 
 # Create bundle structure
-BUNDLE_DIR="target/release/bundle/${APP_NAME}.app"
-mkdir -p "${BUNDLE_DIR}/Contents/MacOS"
-mkdir -p "${BUNDLE_DIR}/Contents/Resources"
+mkdir -p "target/release/bundle/Sutra Desktop.app/Contents/MacOS"
+mkdir -p "target/release/bundle/Sutra Desktop.app/Contents/Resources"
 
 # Copy binary
-cp target/release/sutra-desktop "${BUNDLE_DIR}/Contents/MacOS/"
+cp target/release/sutra-desktop "target/release/bundle/Sutra Desktop.app/Contents/MacOS/"
 
 # Create Info.plist
-cat > "${BUNDLE_DIR}/Contents/Info.plist" << EOF
+cat > "target/release/bundle/Sutra Desktop.app/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" 
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>${APP_NAME}</string>
+    <string>Sutra Desktop</string>
     <key>CFBundleDisplayName</key>
-    <string>${APP_NAME}</string>
+    <string>Sutra Desktop</string>
     <key>CFBundleIdentifier</key>
-    <string>${BUNDLE_ID}</string>
+    <string>ai.sutra.SutraDesktop</string>
     <key>CFBundleVersion</key>
-    <string>${VERSION}</string>
+    <string>3.3.0</string>
     <key>CFBundleShortVersionString</key>
-    <string>${VERSION}</string>
+    <string>3.3.0</string>
     <key>CFBundleExecutable</key>
     <string>sutra-desktop</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>
-    <string>12.0</string>
+    <string>11.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
-    <key>LSApplicationCategoryType</key>
-    <string>public.app-category.productivity</string>
 </dict>
 </plist>
 EOF
-
-echo "✅ Bundle created: ${BUNDLE_DIR}"
 ```
 
-### Running the Script
+### Linux AppImage
 
 ```bash
-cd desktop
-chmod +x scripts/build-macos.sh
-./scripts/build-macos.sh
+# Install appimage tools
+wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+chmod +x linuxdeploy-x86_64.AppImage
 
-# Open the app
-open "target/release/bundle/Sutra Desktop.app"
+# Build release
+cargo build -p sutra-desktop --release
+
+# Create AppImage (requires .desktop file and icon)
+./linuxdeploy-x86_64.AppImage \
+    --appdir AppDir \
+    --executable target/release/sutra-desktop \
+    --desktop-file sutra-desktop.desktop \
+    --icon-file sutra-desktop.png \
+    --output appimage
 ```
 
-## Build Options
+Example `sutra-desktop.desktop`:
+```ini
+[Desktop Entry]
+Name=Sutra Desktop
+Comment=Semantic Knowledge Reasoning
+Exec=sutra-desktop
+Icon=sutra-desktop
+Type=Application
+Categories=Utility;Development;
+```
 
-### Feature Flags
+### Windows Installer
+
+Using `cargo-wix` for MSI installer:
+
+```powershell
+# Install cargo-wix
+cargo install cargo-wix
+
+# Initialize WiX configuration (once)
+cargo wix init -p sutra-desktop
+
+# Build installer
+cargo wix -p sutra-desktop
+```
+
+Output: `target/wix/sutra-desktop-3.3.0-x86_64.msi`
+
+---
+
+## Optimization Options
+
+### Release Profile
+
+The default release profile in `desktop/Cargo.toml`:
 
 ```toml
-[features]
-default = []
-local-embeddings = ["ort"]  # Future: ONNX runtime
+[profile.release]
+opt-level = 3      # Maximum optimization
+lto = true         # Link-time optimization
+codegen-units = 1  # Better optimization, slower compile
+strip = true       # Strip debug symbols
+panic = "abort"    # Smaller binary, no unwinding
 ```
+
+**Build times vs binary size:**
+
+| Profile | Build Time | Binary Size | Performance |
+|---------|------------|-------------|-------------|
+| Debug | ~30s | ~80MB | Baseline |
+| Release (default) | ~2min | ~20MB | 10x faster |
+| Release + thin LTO | ~1min | ~25MB | 8x faster |
+
+### Thin LTO (Faster Builds)
+
+For faster release builds with slightly larger binary:
 
 ```bash
-# Build with specific features
-cargo build -p sutra-desktop --release --features local-embeddings
+# One-time: add to ~/.cargo/config.toml
+[profile.release]
+lto = "thin"
+
+# Or via environment
+CARGO_PROFILE_RELEASE_LTO=thin cargo build -p sutra-desktop --release
 ```
 
-### Target Architectures
+### Static Linking (Linux)
+
+For maximum portability on Linux:
 
 ```bash
-# Apple Silicon (M1/M2/M3)
-cargo build -p sutra-desktop --release --target aarch64-apple-darwin
-
-# Intel Mac
-cargo build -p sutra-desktop --release --target x86_64-apple-darwin
-
-# Universal Binary (both architectures)
-cargo build -p sutra-desktop --release --target aarch64-apple-darwin
-cargo build -p sutra-desktop --release --target x86_64-apple-darwin
-lipo -create \
-  target/aarch64-apple-darwin/release/sutra-desktop \
-  target/x86_64-apple-darwin/release/sutra-desktop \
-  -output target/release/sutra-desktop-universal
+# Build with musl for static linking
+rustup target add x86_64-unknown-linux-musl
+cargo build -p sutra-desktop --release --target x86_64-unknown-linux-musl
 ```
+
+---
+
+## Dependencies
+
+### Direct Dependencies
+
+| Crate | Version | Purpose |
+|-------|---------|---------|
+| `sutra-storage` | workspace | Core storage engine |
+| `eframe` | 0.29 | Native windowing framework |
+| `egui` | 0.29 | Immediate mode GUI |
+| `egui_extras` | 0.29 | Additional widgets |
+| `tokio` | workspace | Async runtime |
+| `serde` | workspace | Serialization |
+| `tracing` | workspace | Logging |
+| `directories` | 5.0 | Platform data paths |
+| `chrono` | 0.4 | Date/time handling |
+| `anyhow` | workspace | Error handling |
+| `md5` | 0.7 | Concept ID generation |
+| `rand` | 0.8 | Graph layout |
+| `csv` | 1.3 | CSV export |
+| `quick-xml` | 0.36 | GraphML export |
+
+### macOS-Specific
+
+| Crate | Version | Purpose |
+|-------|---------|---------|
+| `cocoa` | 0.26 | macOS bindings |
+| `objc` | 0.2 | Objective-C runtime |
+
+---
 
 ## Troubleshooting
 
 ### Compilation Errors
 
-**Problem**: Missing system frameworks
-```
-error: linking with `cc` failed
+**Missing OpenSSL (Linux):**
+```bash
+# Debian/Ubuntu
+sudo apt install libssl-dev pkg-config
+
+# Fedora
+sudo dnf install openssl-devel
 ```
 
-**Solution**: Install Xcode CLT
+**Missing xcb (Linux):**
 ```bash
+# Debian/Ubuntu
+sudo apt install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+```
+
+**Linker errors (macOS):**
+```bash
+# Ensure Xcode tools are installed
 xcode-select --install
+
+# Reset if corrupted
+sudo xcode-select --reset
 ```
+
+### Runtime Issues
+
+**Icon not showing (macOS):**
+- Ensure `Info.plist` has correct `CFBundleIconFile`
+- Icon must be `.icns` format in `Resources/` folder
+
+**Window blank on startup (Linux Wayland):**
+```bash
+# Force X11 backend
+WINIT_UNIX_BACKEND=x11 ./sutra-desktop
+```
+
+**High DPI issues (Windows):**
+- Set `WINIT_HIDPI_FACTOR=1.0` for fixed scaling
+- Or let Windows handle via compatibility settings
 
 ---
 
-**Problem**: sutra-storage not found
-```
-error: failed to load manifest for workspace member `desktop`
-```
+## CI/CD Integration
 
-**Solution**: Build from workspace root
-```bash
-cd /path/to/sutra-memory  # Not desktop/
-cargo build -p sutra-desktop
-```
-
----
-
-**Problem**: egui version mismatch
-```
-error: failed to select a version for `egui`
-```
-
-**Solution**: Check Cargo.lock and update
-```bash
-cargo update -p egui
-cargo update -p eframe
-```
-
-### Runtime Errors
-
-**Problem**: App crashes on startup
-```
-thread 'main' panicked at 'Failed to initialize storage'
-```
-
-**Solution**: Check data directory permissions
-```bash
-ls -la ~/Library/Application\ Support/
-mkdir -p ~/Library/Application\ Support/ai.sutra.SutraDesktop
-```
-
----
-
-**Problem**: Window doesn't appear (macOS)
-```
-No visible window after launch
-```
-
-**Solution**: Check for accessibility permissions in System Preferences
-
-### Performance Issues
-
-**Problem**: Slow compilation
-```bash
-# Use faster linker (macOS)
-RUSTFLAGS="-C link-arg=-fuse-ld=lld" cargo build -p sutra-desktop
-
-# Or use mold (Linux)
-RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=mold" cargo build
-```
-
-**Problem**: Large binary size
-```bash
-# Enable LTO and stripping
-cargo build -p sutra-desktop --release
-
-# Check size
-ls -lh target/release/sutra-desktop
-# Typical: 15-25 MB
-```
-
-## Continuous Integration
-
-### GitHub Actions Workflow
+### GitHub Actions Example
 
 ```yaml
-# .github/workflows/desktop.yml
-name: Desktop Build
+name: Build Desktop
 
 on:
   push:
-    paths:
-      - 'desktop/**'
-      - 'packages/sutra-storage/**'
+    tags: ['v*']
 
 jobs:
-  build-macos:
-    runs-on: macos-latest
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
       
       - name: Install Rust
         uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.target }}
       
-      - name: Build Desktop
-        run: cargo build -p sutra-desktop --release
-      
-      - name: Create App Bundle
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          cd desktop
-          ./scripts/build-macos.sh
+          sudo apt-get update
+          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev \
+            libxcb-xfixes0-dev libxkbcommon-dev
       
-      - name: Upload Artifact
+      - name: Build
+        run: cargo build -p sutra-desktop --release --target ${{ matrix.target }}
+      
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sutra-desktop-macos
-          path: target/release/bundle/
+          name: sutra-desktop-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/sutra-desktop*
 ```
 
-## Next Steps
+---
 
-After building:
+## Development Workflow
 
-1. **Run the app**: `cargo run -p sutra-desktop`
-2. **Learn concepts** in the Chat view
-3. **Browse knowledge** in the Knowledge view
-4. **Configure settings** in Settings
+### Watch Mode
 
-See [Desktop README](./README.md) for usage guide.
+```bash
+# Install cargo-watch
+cargo install cargo-watch
+
+# Auto-rebuild on changes
+cargo watch -x "run -p sutra-desktop"
+```
+
+### Profiling
+
+```bash
+# Build with profiling symbols
+RUSTFLAGS="-C force-frame-pointers=yes" cargo build -p sutra-desktop --release
+
+# Profile with perf (Linux)
+perf record -g ./target/release/sutra-desktop
+perf report
+
+# Profile with Instruments (macOS)
+xcrun xctrace record --template 'Time Profiler' --launch ./target/release/sutra-desktop
+```
+
+### Binary Size Analysis
+
+```bash
+# Install bloat analyzer
+cargo install cargo-bloat
+
+# Analyze binary size
+cargo bloat -p sutra-desktop --release -n 20
+```
+
+---
+
+## Related Documentation
+
+- [README.md](./README.md) - Overview and usage
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Internal design
+- [UI_COMPONENTS.md](./UI_COMPONENTS.md) - UI reference

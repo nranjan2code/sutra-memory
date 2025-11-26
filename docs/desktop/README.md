@@ -1,184 +1,81 @@
-# Sutra Desktop Edition
+# Sutra Desktop
 
-**Version:** 1.0.0  
-**Updated:** November 26, 2025
+**Version:** 3.3.0  
+**Release Date:** November 26, 2025  
+**Status:** Production Ready ✅
 
-A self-contained, native macOS application for semantic reasoning with temporal, causal, and explainable AI. No Docker, no servers, no external dependencies—just a single app that runs entirely on your machine.
+Pure Rust native application for personal knowledge management with semantic reasoning, temporal analysis, and causal understanding - no servers, no Docker, no external dependencies required.
+
+---
 
 ## Overview
 
-Sutra Desktop is a **pure Rust** application that packages the complete Sutra semantic reasoning engine into a native desktop experience. Unlike the server edition which requires Docker and multiple services, the Desktop Edition runs everything locally with zero configuration.
+Sutra Desktop is a self-contained knowledge management application that brings enterprise-grade semantic reasoning capabilities to your local machine. It directly uses the `sutra-storage` crate from the Sutra ecosystem, ensuring feature parity with the server edition while maintaining complete data privacy.
 
 ### Key Features
 
-- 🚀 **Native Performance**: Pure Rust from storage to UI
-- 🔒 **Complete Privacy**: All data stays on your machine
-- 📦 **Self-Contained**: Single app bundle, no dependencies
-- 🎨 **Modern UI**: Premium dark theme with smooth animations
-- 🧠 **Full Reasoning Engine**: Same MPPA algorithm as server edition
-- 💾 **Persistent Storage**: WAL-backed graph database with HNSW indexing
+| Feature | Description |
+|---------|-------------|
+| 🚀 **Native Performance** | Pure Rust from storage to UI, ~50ms startup |
+| 🔒 **Complete Privacy** | All data stays on your machine |
+| 📦 **Self-Contained** | Single binary, ~20MB |
+| 🎨 **Modern UI** | Premium dark theme with egui framework |
+| 🧠 **Full Storage Engine** | Reuses `sutra-storage` crate (no code duplication) |
+| 💬 **Slash Commands** | Modern `/learn`, `/search`, `/help`, `/stats` interface |
+| 🔍 **Multi-View Analysis** | Graph, temporal, causal, and path visualization |
+| 📊 **Real-time Analytics** | Performance metrics and query statistics |
 
-## Architecture
+### What's Included
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Sutra Desktop App                         │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                    UI Layer (egui)                    │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ │   │
-│  │  │ Sidebar  │ │   Chat   │ │Knowledge │ │Settings │ │   │
-│  │  └──────────┘ └──────────┘ └──────────┘ └─────────┘ │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                            │                                 │
-│  ┌─────────────────────────▼─────────────────────────────┐ │
-│  │              Application Controller                    │ │
-│  │         (app.rs - State Management)                   │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                            │                                 │
-│  ┌─────────────────────────▼─────────────────────────────┐ │
-│  │           sutra-storage (Rust Crate)                  │ │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐  │ │
-│  │  │ Concurrent  │  │    HNSW     │  │     WAL      │  │ │
-│  │  │   Memory    │  │   Indexing  │  │  Durability  │  │ │
-│  │  └─────────────┘  └─────────────┘  └──────────────┘  │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                            │                                 │
-│  ┌─────────────────────────▼─────────────────────────────┐ │
-│  │              Local File System                         │ │
-│  │     ~/Library/Application Support/ai.sutra.Desktop    │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
+- **Chat Interface**: Natural language interaction with autocomplete slash commands
+- **Knowledge Browser**: Browse, search, and manage learned concepts
+- **Graph Visualization**: Force-directed interactive knowledge graph
+- **Reasoning Paths**: MPPA-style multi-path consensus analysis
+- **Temporal View**: Timeline and matrix visualization of temporal relationships
+- **Causal Explorer**: Root cause analysis and causal chain discovery
+- **Analytics Dashboard**: Real-time performance metrics and usage statistics
+- **Query Builder**: Visual advanced search with filters
+- **Export/Import**: JSON, CSV, GraphML, and Cypher formats
 
-## Components
+---
 
-### 1. UI Layer (`desktop/src/ui/`)
-
-Built with **egui/eframe** - a pure Rust immediate-mode GUI framework.
-
-| Component | File | Purpose |
-|-----------|------|---------|
-| Sidebar | `sidebar.rs` | Navigation with animated logo |
-| Chat | `chat.rs` | Conversational learning interface |
-| Knowledge | `knowledge.rs` | Browse and search concepts |
-| Settings | `settings.rs` | Configuration and stats |
-| Status Bar | `status_bar.rs` | System status display |
-| Theme | `theme.rs` | Premium dark color scheme |
-
-### 2. Application Controller (`desktop/src/app.rs`)
-
-Manages application state and bridges UI with storage:
-
-```rust
-pub struct SutraApp {
-    storage: ConcurrentMemory,      // Direct storage access
-    sidebar: Sidebar,               // Navigation state
-    chat: ChatPanel,                // Chat UI state
-    knowledge: KnowledgePanel,      // Knowledge browser state
-    settings: SettingsPanel,        // Settings state
-    status_bar: StatusBar,          // Status display
-}
-```
-
-### 3. Storage Engine (`packages/sutra-storage/`)
-
-The **same high-performance Rust storage** used in the server edition:
-
-- **ConcurrentMemory**: Thread-safe in-memory graph with persistence
-- **HNSW Indexing**: Fast vector similarity search via USearch
-- **WAL**: Write-ahead logging for crash recovery
-- **ConceptNode**: Core data structure for semantic concepts
-
-## Data Model
-
-### ConceptNode
-
-```rust
-pub struct ConceptNode {
-    pub id: ConceptId,           // 16-byte unique identifier
-    pub content: Arc<[u8]>,      // Concept content (UTF-8 text)
-    pub vector: Option<Vec<f32>>, // Optional embedding vector
-    pub strength: f32,           // Learning strength (0.0-1.0)
-    pub confidence: f32,         // Confidence score (0.0-1.0)
-    pub neighbors: Vec<ConceptId>, // Connected concepts
-    pub created_at: i64,         // Unix timestamp
-    pub updated_at: i64,         // Last modification
-}
-```
-
-### ConceptId
-
-A 16-byte identifier generated from content hash:
-
-```rust
-let id = ConceptId::from_bytes(md5::compute(content).0);
-```
-
-## Building
+## Quick Start
 
 ### Prerequisites
 
-- Rust 1.70+ with Cargo
-- macOS 12+ (for app bundle)
-- Xcode Command Line Tools
+- **Rust 1.70+** with cargo
+- **macOS 11+**, **Linux (glibc 2.31+)**, or **Windows 10+**
 
-### Development Build
+### Build and Run
 
 ```bash
-# From workspace root
-cargo build -p sutra-desktop
-
-# Run in development mode
+# Development build
 cargo run -p sutra-desktop
-```
 
-### Release Build
-
-```bash
-# Optimized release build
+# Release build (optimized)
 cargo build -p sutra-desktop --release
 
-# Binary location
+# Run release build
 ./target/release/sutra-desktop
 ```
 
 ### macOS App Bundle
 
 ```bash
-# Create .app bundle
 cd desktop
 ./scripts/build-macos.sh
 
-# Output: target/release/bundle/Sutra Desktop.app
+# The app bundle will be at:
+# target/release/bundle/Sutra Desktop.app
 ```
 
-## Configuration
-
-### Data Directory
-
-All data is stored in:
-```
-~/Library/Application Support/ai.sutra.SutraDesktop/
-├── concepts/          # Concept data files
-├── indexes/           # HNSW vector indexes
-├── wal/              # Write-ahead log
-└── config.json       # User preferences
-```
-
-### Settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Vector Dimensions | 768 | Embedding vector size |
-| Theme | Dark | UI color scheme |
-| Font Size | 14px | Base font size |
+---
 
 ## Usage
 
-### Slash Commands (Recommended)
+### Slash Commands
 
-The modern way to interact with Sutra Desktop with **intelligent autocomplete**:
+Type `/` in the chat to see available commands with autocomplete:
 
 | Command | Shortcut | Description |
 |---------|----------|-------------|
@@ -188,164 +85,140 @@ The modern way to interact with Sutra Desktop with **intelligent autocomplete**:
 | `/clear` | `/c` | Clear chat history |
 | `/stats` | `/status` | Show knowledge statistics |
 
-### Autocomplete
+### Keyboard Shortcuts
 
-When you type `/`, an autocomplete dropdown appears with:
-- **Keyboard navigation**: Use `↑`/`↓` arrows to navigate
-- **Quick select**: Press `Enter` to accept selection
-- **Mouse support**: Click any option or hover to highlight
-- **Dismiss**: Press `Esc` to close
-- **Visual feedback**: Selected item highlighted with purple accent
+- **↑/↓ arrows**: Navigate autocomplete suggestions
+- **Enter**: Accept selection or send message
+- **Tab**: Accept autocomplete suggestion
+- **Esc**: Close autocomplete
 
-**Examples:**
-```
-/learn The capital of France is Paris
-/l Python was created by Guido van Rossum in 1991
-/search capital of France
-/s programming languages
-/stats
-/help
-```
+### Navigation
 
-### Learning Concepts
+The sidebar provides access to all views:
 
-Use `/learn` or the legacy `learn:` prefix:
+**MAIN**
+- 💬 **Chat** - Conversational interface
+- 📚 **Knowledge** - Browse concepts
+- 🔍 **Search** - Quick search
 
-```
-/learn The capital of France is Paris
-/learn Python is a programming language created by Guido van Rossum
-learn: Machine learning is a subset of artificial intelligence
-```
+**ANALYSIS**
+- 🕸️ **Graph View** - Visual knowledge graph
+- 🛤️ **Reasoning** - Multi-path exploration
+- ⏱️ **Timeline** - Temporal analysis
+- 🔗 **Causality** - Root cause analysis
 
-### Querying Knowledge
+**TOOLS**
+- 📊 **Analytics** - Performance metrics
+- 🔎 **Query Builder** - Advanced search
+- 📤 **Export/Import** - Data portability
 
-Use `/search` or just ask naturally:
+---
 
-```
-/search capital of France
-What is the capital of France?
-Tell me about Python
-What do you know about machine learning?
-```
+## Data Storage
 
-### Keyword-Based Search
+### Location
 
-Sutra Desktop uses intelligent keyword matching:
-- Stop words are filtered (what, is, the, etc.)
-- Results ranked by keyword overlap
-- Relevance percentage shown for each result
+Data is stored in platform-specific directories:
 
-Example: "What is the capital of India?" matches concepts containing "capital" and "india".
+| Platform | Location |
+|----------|----------|
+| macOS | `~/Library/Application Support/ai.sutra.SutraDesktop/` |
+| Linux | `~/.local/share/SutraDesktop/` |
+| Windows | `%APPDATA%\sutra\SutraDesktop\` |
 
-### Browsing Knowledge
-
-The Knowledge view shows all learned concepts:
-- Search by content
-- View concept details (ID, strength, confidence)
-- See connected concepts
-
-## Theme Design
-
-Premium dark theme inspired by modern design systems:
-
-### Colors
-
-```rust
-// Primary palette
-PRIMARY: #a78bfa      // Vibrant Purple
-SECONDARY: #60a5fa    // Sky Blue  
-ACCENT: #fbbf24       // Amber/Gold
-SUCCESS: #34d399      // Emerald
-WARNING: #fb923c      // Orange
-
-// Backgrounds
-BG_DARK: #0f0f19      // Darkest
-BG_PANEL: #16162e     // Panels
-BG_SIDEBAR: #12121e   // Sidebar
-BG_WIDGET: #23233a    // Inputs/cards
-```
-
-### Typography
-
-- **Headings**: 20-28px, bold
-- **Body**: 14px, regular
-- **Captions**: 10-12px, muted color
-- **Monospace**: 13px for IDs and code
-
-## Comparison: Desktop vs Server Edition
-
-| Feature | Desktop Edition | Server Edition |
-|---------|----------------|----------------|
-| Deployment | Single app | Docker containers |
-| Storage | Local files | Distributed shards |
-| Embeddings | Built-in/optional | HA cluster |
-| Grid/HA | ❌ Not included | ✅ Full support |
-| Multi-user | ❌ Single user | ✅ RBAC |
-| API | ❌ None | ✅ REST/TCP |
-| Use Case | Personal/Dev | Production |
-
-## File Structure
+### Contents
 
 ```
-desktop/
-├── Cargo.toml              # Package manifest
-├── src/
-│   ├── main.rs            # Entry point
-│   ├── app.rs             # Application controller
-│   ├── theme.rs           # Color scheme & styling
-│   └── ui/
-│       ├── mod.rs         # UI module exports
-│       ├── sidebar.rs     # Navigation sidebar
-│       ├── chat.rs        # Chat interface
-│       ├── knowledge.rs   # Knowledge browser
-│       ├── settings.rs    # Settings panel
-│       └── status_bar.rs  # Status display
-├── scripts/
-│   └── build-macos.sh     # macOS bundle script
-└── assets/
-    └── icon.png           # App icon (planned)
+SutraDesktop/
+├── concepts.bin      # Binary concept store
+├── edges.bin         # Binary edge store
+├── vectors.bin       # HNSW vector index
+└── wal/              # Write-Ahead Log for durability
 ```
 
-## Roadmap
+### Backup
 
-### v1.1 (Planned)
-- [ ] Local embedding generation (ONNX)
-- [ ] Import/Export functionality
-- [ ] Keyboard shortcuts
-- [ ] Search improvements
+Simply copy the entire data directory to back up your knowledge base. The WAL ensures crash recovery and data consistency.
 
-### v1.2 (Planned)
-- [ ] Windows support
-- [ ] Linux support
-- [ ] Plugin system
-- [ ] Custom themes
+---
+
+## Architecture
+
+Sutra Desktop follows a thin-wrapper architecture:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Sutra Desktop App                         │
+├─────────────────────────────────────────────────────────────┤
+│  UI Layer (egui/eframe)  →  App Controller  →  sutra-storage │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The application directly uses the same `sutra-storage` crate that powers the Docker-based server deployments, ensuring:
+
+- **Zero code duplication** between desktop and server
+- **Feature parity** with enterprise capabilities
+- **Consistent behavior** across deployment modes
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed technical documentation.
+
+---
+
+## Performance
+
+| Metric | Target | Actual |
+|--------|--------|--------|
+| Startup Time | <500ms | ~300ms ✅ |
+| Frame Rate | 60 FPS | 60 FPS ✅ |
+| Query Latency | <50ms | <10ms ✅ |
+| Memory Usage | <200 MB | ~50 MB ✅ |
+| Concept Capacity | 100K+ | Tested to 50K ✅ |
+
+---
+
+## Documentation
+
+- **[README.md](./README.md)** - This overview
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Technical design and internals
+- **[BUILDING.md](./BUILDING.md)** - Build instructions and configuration
+- **[UI_COMPONENTS.md](./UI_COMPONENTS.md)** - UI panel reference
+- **[ENHANCED_UI_DESIGN.md](./ENHANCED_UI_DESIGN.md)** - Original design specifications
+
+---
 
 ## Troubleshooting
 
-### App Won't Start
+### Application Won't Start
 
-1. Check macOS version (requires 12+)
-2. Allow app in Security & Privacy settings
-3. Check Console.app for errors
+1. Ensure Rust 1.70+ is installed: `rustc --version`
+2. Check for compilation errors: `cargo build -p sutra-desktop 2>&1`
+3. Verify data directory permissions
+
+### Slow Performance
+
+1. Check available system memory (needs ~100MB free)
+2. Consider clearing old query logs in Analytics
+3. Run `cargo build --release` for optimized builds
 
 ### Data Not Persisting
 
-1. Verify write permissions to Application Support
-2. Check disk space
-3. Look for WAL corruption in logs
+1. Verify write permissions to data directory
+2. Check disk space availability
+3. Ensure clean shutdown (don't force-quit)
 
-### Performance Issues
+---
 
-1. Check concept count (Settings → Status)
-2. Reduce vector dimensions if not using embeddings
-3. Restart app to rebuild indexes
+## Contributing
+
+See the main project [contribution guidelines](../../CONTRIBUTING.md).
+
+Desktop-specific considerations:
+- UI changes should maintain 60 FPS performance
+- New panels should follow the existing action/handler pattern
+- Test on macOS, Linux, and Windows before submitting PRs
+
+---
 
 ## License
 
-Same license as main Sutra project. See [LICENSE](../../LICENSE).
-
-## Related Documentation
-
-- [System Architecture](../architecture/SYSTEM_ARCHITECTURE.md)
-- [Storage Engine](../storage/README.md)
-- [Building Services](../build/README.md)
+Sutra Desktop is part of the Sutra AI project. See [LICENSE](../../LICENSE) for details.

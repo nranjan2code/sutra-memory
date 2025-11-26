@@ -1,483 +1,543 @@
-# Desktop Edition Architecture
+# Sutra Desktop Architecture
 
-**Version:** 1.0.0  
+**Version:** 3.3.0  
 **Updated:** November 26, 2025
 
-Deep dive into the architectural decisions and internal design of Sutra Desktop.
+This document describes the internal architecture of Sutra Desktop, including module structure, data flow, and design decisions.
 
-## Design Philosophy
+---
 
-### 1. Zero External Dependencies
+## Design Principles
 
-Unlike the server edition which requires:
-- Docker runtime
-- Multiple service containers
-- Network configuration
-- External embedding service
+### 1. Zero Code Duplication
 
-Desktop Edition runs **entirely self-contained**:
-- Single binary executable
-- No network required
-- No containerization
-- Local file storage only
+The desktop application is a **thin UI wrapper** around `sutra-storage`. All storage logic, including:
+- Concept learning and retrieval
+- Graph traversal and pathfinding
+- HNSW vector indexing
+- WAL-based persistence
 
-### 2. Crate Reuse
+...comes directly from the shared crate. This ensures:
+- Feature parity with server deployments
+- Single source of truth for storage logic
+- Automatic updates when storage crate improves
 
-Desktop Edition **reuses existing workspace crates** rather than duplicating code:
+### 2. Immediate Mode GUI
+
+Using **egui** (immediate mode GUI), the UI is:
+- Rebuilt every frame (~60 FPS)
+- Stateless rendering (state lives in data structures)
+- Highly responsive with no layout thrashing
+- Memory efficient with minimal allocations
+
+### 3. Single-Threaded UI with Background Storage
+
+- **UI Thread**: All egui rendering and user interaction
+- **Storage Operations**: Most operations are synchronous but fast (<10ms)
+- **Future**: Long operations (bulk import, export) will use tokio for async
+
+---
+
+## Module Structure
 
 ```
-┌─────────────────────────────────────────────┐
-│              sutra-desktop                   │
-│           (thin GUI wrapper)                │
-└─────────────────┬───────────────────────────┘
-                  │ depends on
-                  ▼
-┌─────────────────────────────────────────────┐
-│             sutra-storage                    │
-│    (same crate used by server edition)      │
-│                                             │
-│  • ConcurrentMemory                         │
-│  • ConcurrentConfig                         │
-│  • ConceptNode                              │
-│  • HNSW indexing                            │
-│  • WAL persistence                          │
-└─────────────────────────────────────────────┘
+desktop/
+├── Cargo.toml              # Dependencies and features
+├── scripts/
+│   └── build-macos.sh      # macOS app bundle script
+└── src/
+    ├── main.rs             # Entry point, window setup
+    ├── app.rs              # Main application controller
+    ├── theme.rs            # Color palette and styling
+    ├── types.rs            # Shared data types
+    └── ui/
+        ├── mod.rs          # Module exports
+        ├── sidebar.rs      # Navigation sidebar
+        ├── chat.rs         # Chat interface
+        ├── knowledge.rs    # Concept browser
+        ├── settings.rs     # Settings panel
+        ├── status_bar.rs   # Bottom status bar
+        ├── graph_view.rs   # Interactive graph visualization
+        ├── reasoning_paths.rs   # MPPA path explorer
+        ├── temporal_view.rs     # Timeline analysis
+        ├── causal_view.rs       # Root cause analysis
+        ├── analytics.rs         # Performance dashboard
+        ├── query_builder.rs     # Advanced search
+        └── export_import.rs     # Data portability
 ```
 
-This ensures:
-- ✅ Single source of truth for storage logic
-- ✅ Bug fixes apply to both editions
-- ✅ Consistent behavior across editions
-- ✅ Reduced maintenance burden
+---
 
-### 3. Pure Rust Stack
+## Core Components
 
-Every layer is written in Rust:
-
-| Layer | Technology | Why Rust? |
-|-------|------------|-----------|
-| UI | egui/eframe | Cross-platform, immediate mode |
-| App Logic | Native Rust | Type safety, performance |
-| Storage | sutra-storage | Zero-copy, thread-safe |
-| Persistence | WAL + mmap | Crash recovery |
-
-No Python, no JavaScript, no Swift—just Rust.
-
-## Component Architecture
-
-### Main Entry Point
+### main.rs - Application Entry Point
 
 ```rust
-// desktop/src/main.rs
-fn main() -> eframe::Result<()> {
-    // Initialize logging
-    tracing_subscriber::fmt::init();
-    
-    // Configure native window
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1200.0, 800.0])
-            .with_min_inner_size([800.0, 600.0])
-            .with_title("Sutra AI - Desktop Edition"),
-        ..Default::default()
-    };
-    
-    // Run application
-    eframe::run_native(
-        "Sutra Desktop",
-        options,
-        Box::new(|cc| Ok(Box::new(SutraApp::new(cc))))
-    )
+fn main() -> Result<()> {
+    // 1. Initialize logging
+    // 2. Configure native window options
+    // 3. Apply custom theme
+    // 4. Create and run SutraApp
 }
 ```
 
-### Application State
+Responsibilities:
+- Tracing/logging setup
+- Window configuration (size, icon, title)
+- Theme application to egui context
+- eframe application lifecycle
+
+### app.rs - Application Controller
 
 ```rust
-// desktop/src/app.rs
 pub struct SutraApp {
-    // Core storage - directly uses sutra-storage crate
-    storage: ConcurrentMemory,
+    // Storage engine (from sutra-storage crate)
+    storage: Arc<ConcurrentMemory>,
+    data_dir: PathBuf,
     
-    // UI component states
+    // Core UI panels
     sidebar: Sidebar,
     chat: ChatPanel,
     knowledge: KnowledgePanel,
     settings: SettingsPanel,
     status_bar: StatusBar,
     
-    // Runtime state
-    data_dir: PathBuf,
+    // Enhanced UI panels
+    graph_view: GraphView,
+    reasoning_paths: ReasoningPathsPanel,
+    temporal_view: TemporalView,
+    causal_view: CausalView,
+    analytics: AnalyticsDashboard,
+    query_builder: QueryBuilder,
+    export_import: ExportImportPanel,
+    
+    // State
+    initialized: bool,
 }
 ```
 
-### Storage Integration
+Key methods:
+- `new()` - Initialize storage and all panels
+- `update()` - egui frame update (called 60x/sec)
+- `handle_*_action()` - Action handlers for each panel
+- `on_exit()` - Flush storage on shutdown
 
-Desktop directly instantiates `ConcurrentMemory` from sutra-storage:
+### theme.rs - Visual Design System
+
+Color palette following modern dark theme principles:
 
 ```rust
-impl SutraApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // Apply custom theme
-        theme::setup_custom_theme(&cc.egui_ctx);
-        
-        // Determine data directory
-        let data_dir = dirs::data_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("ai.sutra.SutraDesktop");
-        
-        // Initialize storage with configuration
-        let config = ConcurrentConfig {
-            data_path: data_dir.clone(),
-            vector_dimension: 768,
-            enable_wal: true,
-            ..Default::default()
-        };
-        
-        let storage = ConcurrentMemory::new(config)
-            .expect("Failed to initialize storage");
-        
-        Self {
-            storage,
-            sidebar: Sidebar::default(),
-            chat: ChatPanel::default(),
-            knowledge: KnowledgePanel::default(),
-            settings: SettingsPanel::default(),
-            status_bar: StatusBar::default(),
-            data_dir,
+// Primary colors
+pub const PRIMARY: Color32 = Color32::from_rgb(167, 139, 250);     // Vibrant Purple
+pub const SECONDARY: Color32 = Color32::from_rgb(96, 165, 250);    // Sky Blue
+pub const ACCENT: Color32 = Color32::from_rgb(251, 191, 36);       // Amber
+pub const SUCCESS: Color32 = Color32::from_rgb(52, 211, 153);      // Emerald
+pub const WARNING: Color32 = Color32::from_rgb(251, 146, 60);      // Orange
+pub const ERROR: Color32 = Color32::from_rgb(248, 113, 113);       // Red
+
+// Backgrounds
+pub const BG_DARK: Color32 = Color32::from_rgb(15, 15, 25);        // Darkest
+pub const BG_PANEL: Color32 = Color32::from_rgb(22, 22, 35);       // Panels
+pub const BG_WIDGET: Color32 = Color32::from_rgb(35, 35, 55);      // Inputs/cards
+```
+
+Helper functions:
+- `setup_custom_theme()` - Apply theme to egui context
+- `card_frame()` - Styled card component
+- `elevated_card()` - More prominent card variant
+- `button_frame()` - Styled button container
+
+### types.rs - Shared Data Structures
+
+Types used across multiple panels:
+
+```rust
+// Graph visualization
+pub struct GraphNode { id, label, content, confidence, x, y, vx, vy }
+pub struct GraphEdge { from, to, strength, edge_type }
+pub enum EdgeType { Semantic, Causal, Temporal, Hierarchical, Similar }
+
+// Reasoning paths (MPPA)
+pub struct ReasoningPath { path: Vec<PathStep>, confidence, depth }
+pub struct ConsensusResult { primary_cluster, alternatives, total_paths }
+
+// Temporal analysis
+pub struct TimelineEvent { concept_id, label, timestamp, relative_time }
+pub enum TemporalRelation { Before, After, During, Concurrent }
+
+// Causal analysis
+pub struct CausalChain { nodes: Vec<CausalNode>, confidence, depth }
+pub enum CausalRelationType { DirectCause, IndirectCause, Contributing, Correlation }
+
+// Analytics
+pub struct AnalyticsMetrics { total_concepts, total_edges, query_latency_ms, ... }
+
+// Query builder
+pub struct QueryFilters { min_confidence, max_results, has_causal, has_temporal, ... }
+
+// Export/import
+pub enum ExportFormat { Json, Csv, GraphML, Cypher }
+```
+
+---
+
+## Data Flow
+
+### Action-Handler Pattern
+
+Each UI panel communicates through a typed action enum:
+
+```rust
+// Panel returns optional action
+pub fn ui(&mut self, ui: &mut egui::Ui) -> Option<ChatAction> {
+    // ... render UI ...
+    if button_clicked {
+        return Some(ChatAction::Learn(content));
+    }
+    None
+}
+
+// App controller handles actions
+fn handle_chat_action(&mut self, action: ChatAction) {
+    match action {
+        ChatAction::Learn(content) => {
+            self.storage.learn_concept(...);
+            self.refresh_stats();
         }
+        // ...
     }
 }
 ```
 
-## UI Architecture
+Benefits:
+- Clear separation of UI and logic
+- Type-safe communication
+- Easy to test handlers independently
+- Consistent pattern across all panels
 
-### Immediate Mode GUI
+### Storage Integration
 
-egui uses **immediate mode** rendering—UI is rebuilt every frame:
+The app uses `sutra-storage::ConcurrentMemory` directly:
+
+```rust
+// Initialization
+let config = ConcurrentConfig {
+    storage_path: data_dir.clone(),
+    memory_threshold: 10_000,
+    vector_dimension: 256,
+    // ...
+};
+let storage = ConcurrentMemory::new(config);
+
+// Learning
+let concept_id = ConceptId::from_bytes(md5_hash);
+storage.learn_concept(concept_id, content.as_bytes().to_vec(), None, 1.0, 1.0)?;
+
+// Searching
+let results = storage.text_search(&query, limit);
+
+// Graph operations
+let neighbors = storage.query_neighbors(&concept_id);
+let weighted = storage.query_neighbors_weighted(&concept_id);
+
+// Pathfinding
+let pathfinder = ParallelPathFinder::new(confidence_decay);
+let paths = pathfinder.find_paths_parallel(snapshot, from, to, max_depth, max_paths);
+
+// Persistence
+storage.flush()?;
+```
+
+---
+
+## View Architecture
+
+### Sidebar Navigation
+
+```rust
+pub enum SidebarView {
+    // MAIN section
+    Chat, Knowledge, Search,
+    // ANALYSIS section (collapsible)
+    Graph, Paths, Timeline, Causal,
+    // TOOLS section (collapsible)
+    Analytics, Query, Export,
+    // Always visible
+    Settings,
+}
+```
+
+The sidebar renders differently based on current selection and provides visual feedback.
+
+### Panel Update Cycle
 
 ```rust
 impl eframe::App for SutraApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Sidebar panel (left)
-        egui::SidePanel::left("sidebar")
-            .exact_width(260.0)
-            .show(ctx, |ui| {
-                self.sidebar.ui(ui);
-            });
+        // 1. Initial data load (once)
+        if !self.initialized {
+            self.handle_knowledge_action(KnowledgeAction::Refresh);
+            self.graph_view.load_from_storage(&self.storage);
+            self.initialized = true;
+        }
         
-        // Status bar (bottom)
-        egui::TopBottomPanel::bottom("status")
-            .exact_height(32.0)
-            .show(ctx, |ui| {
-                self.status_bar.ui(ui);
-            });
+        // 2. Request repaint for animations
+        ctx.request_repaint_after(Duration::from_millis(100));
         
-        // Main content (center)
+        // 3. Render sidebar
+        egui::SidePanel::left("sidebar").show(ctx, |ui| {
+            self.sidebar.ui(ui);
+        });
+        
+        // 4. Render status bar
+        egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
+            self.status_bar.ui(ui);
+        });
+        
+        // 5. Render main content based on current view
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.sidebar.current_view {
-                SidebarView::Chat => self.render_chat(ui),
-                SidebarView::Knowledge => self.render_knowledge(ui),
-                SidebarView::Search => self.render_search(ui),
-                SidebarView::Settings => self.render_settings(ui),
+                SidebarView::Chat => {
+                    if let Some(action) = self.chat.ui(ui) {
+                        self.handle_chat_action(action);
+                    }
+                }
+                // ... other views
             }
         });
     }
 }
 ```
 
-### Component Communication
+---
 
-Components return **actions** rather than mutating state directly:
+## Graph Visualization
+
+### Force-Directed Layout
+
+The graph view implements a simple force-directed algorithm:
 
 ```rust
-// In chat.rs
-pub enum ChatAction {
-    Query(String),      // Search knowledge
-    Learn(String),      // Teach new knowledge  
-    Help,               // Show help
-    Clear,              // Clear chat
-    Stats,              // Show statistics
-}
-
-impl ChatPanel {
-    pub fn ui(&mut self, ui: &mut egui::Ui) -> Option<ChatAction> {
-        // ... render UI ...
+impl GraphView {
+    fn simulate_step(&mut self) {
+        // 1. Repulsion: all nodes push each other away
+        for i in 0..nodes.len() {
+            for j in (i+1)..nodes.len() {
+                let force = self.repulsion / distance_squared;
+                // Apply to velocities
+            }
+        }
         
-        if send_button_clicked {
-            self.parse_command(&self.input)
-        } else {
-            None
+        // 2. Attraction: connected nodes pull together
+        for edge in &self.edges {
+            let force = distance * self.attraction * edge.strength;
+            // Apply to velocities
+        }
+        
+        // 3. Apply velocities with damping
+        for node in &mut self.nodes {
+            node.vx *= self.damping;
+            node.vy *= self.damping;
+            node.x += node.vx;
+            node.y += node.vy;
+        }
+        
+        // 4. Stop when movement is minimal
+        if total_movement < 0.5 {
+            self.simulation_running = false;
         }
     }
 }
+```
 
-// In app.rs
-fn handle_chat_action(&mut self, action: ChatAction) {
-    match action {
-        ChatAction::Learn(content) => {
-            self.storage.learn_concept(...);
-        }
-        ChatAction::Query(query) => {
-            // Uses shared text_search from sutra-storage
-            let results = self.storage.text_search(&query, 5);
-        }
-        ChatAction::Help => {}, // Handled in ChatPanel
-        ChatAction::Clear => { /* clear messages */ }
-        ChatAction::Stats => { /* show stats */ }
+### Camera System
+
+```rust
+pub struct Camera {
+    pub offset: Vec2,  // Pan offset
+    pub zoom: f32,     // Zoom level (0.1 - 5.0)
+}
+
+impl Camera {
+    pub fn world_to_screen(&self, world: Pos2, rect: Rect) -> Pos2 {
+        let center = rect.center();
+        Pos2::new(
+            center.x + (world.x + self.offset.x) * self.zoom,
+            center.y + (world.y + self.offset.y) * self.zoom,
+        )
     }
 }
 ```
 
-## Storage Operations
+---
 
-### Learning a Concept
+## MPPA Consensus Analysis
 
-```rust
-fn learn_concept(&mut self, content: &str) {
-    // Generate deterministic ID from content
-    let id = ConceptId::from_bytes(md5::compute(content).0);
-    
-    // Store in sutra-storage
-    self.storage.learn_concept(
-        id,
-        content.as_bytes().to_vec(),
-        None,  // No embedding vector (local mode)
-        1.0,   // Initial strength
-        1.0,   // Initial confidence
-    ).expect("Failed to store concept");
-    
-    // Update UI state
-    self.status_bar.set_concept_count(
-        self.storage.get_snapshot().all_concepts().len()
-    );
-    self.status_bar.set_activity("Learned new concept");
-}
-```
-
-### Querying Concepts
-
-Desktop uses the **shared `text_search()` method** from `sutra-storage` - the same method available to the enterprise edition. This ensures no code duplication.
+The reasoning paths panel implements MPPA-style clustering:
 
 ```rust
-fn handle_query(&mut self, query: &str) {
-    // Uses ConcurrentMemory::text_search() - shared with enterprise
-    // Filters stop words, ranks by keyword overlap, returns relevance scores
-    let results = self.storage.text_search(&query, 5);
+fn analyze_consensus(&self) -> ConsensusResult {
+    // 1. Cluster paths by destination concept
+    let mut clusters: HashMap<ConceptId, Vec<ReasoningPath>> = HashMap::new();
+    for path in &self.paths {
+        let destination = path.path.last().unwrap().concept_id;
+        clusters.entry(destination).or_default().push(path.clone());
+    }
     
-    // Results: Vec<(ConceptId, String content, f32 relevance)>
-    for (id, content, relevance) in results {
-        println!("{}: {} ({}%)", id.to_hex(), content, relevance * 100.0);
+    // 2. Score each cluster
+    for cluster in &mut clusters {
+        let support_ratio = cluster.paths.len() as f32 / total_paths as f32;
+        let avg_confidence = cluster.paths.iter().map(|p| p.confidence).sum() / cluster.len();
+        
+        // MPPA scoring formula
+        let consensus_bonus = if support_ratio >= 0.5 { 1.0 + (support_ratio - 0.5) } else { 1.0 };
+        let outlier_penalty = if support_ratio < 0.2 { 0.7 } else { 1.0 };
+        cluster.consensus_weight = avg_confidence * support_ratio * consensus_bonus * outlier_penalty;
+    }
+    
+    // 3. Rank by consensus weight
+    clusters.sort_by_consensus_weight();
+    
+    ConsensusResult {
+        primary_cluster: clusters[0],
+        alternatives: clusters[1..],
+        total_paths,
     }
 }
 ```
 
-**How text_search works:**
-1. Extracts keywords from query (filters stop words like "what", "is", "the")
-2. Searches all concepts for keyword matches
-3. Scores by number of matching keywords
-4. Returns results sorted by relevance (0.0 - 1.0)
+---
 
-Example: Query "What is the capital of India?" → Keywords: ["capital", "india"] → Matches "Delhi is capital of India" with 100% relevance.
+## Export Formats
 
-### Browsing All Concepts
+### JSON (Full Fidelity)
 
-```rust
-fn get_all_concepts(&self) -> Vec<ConceptInfo> {
-    let snapshot = self.storage.get_snapshot();
-    
-    snapshot.all_concepts()
-        .iter()
-        .map(|node| ConceptInfo {
-            id: format!("{:032x}", node.id),
-            content: String::from_utf8_lossy(&node.content).to_string(),
-            strength: node.strength,
-            confidence: node.confidence,
-            neighbors: node.neighbors.iter()
-                .map(|n| format!("{:032x}", n))
-                .collect(),
-        })
-        .collect()
-}
-```
-
-## Theme System
-
-### Color Palette Definition
-
-```rust
-// desktop/src/theme.rs
-
-// Primary palette - Vibrant and modern
-pub const PRIMARY: Color32 = Color32::from_rgb(167, 139, 250);    // Purple
-pub const PRIMARY_DIM: Color32 = Color32::from_rgb(139, 92, 246); // Deep Purple
-pub const SECONDARY: Color32 = Color32::from_rgb(96, 165, 250);   // Sky Blue
-pub const ACCENT: Color32 = Color32::from_rgb(251, 191, 36);      // Amber
-pub const SUCCESS: Color32 = Color32::from_rgb(52, 211, 153);     // Emerald
-pub const WARNING: Color32 = Color32::from_rgb(251, 146, 60);     // Orange
-
-// Background hierarchy
-pub const BG_DARK: Color32 = Color32::from_rgb(15, 15, 25);       // Deepest
-pub const BG_PANEL: Color32 = Color32::from_rgb(22, 22, 35);      // Panels
-pub const BG_SIDEBAR: Color32 = Color32::from_rgb(18, 18, 30);    // Sidebar
-pub const BG_WIDGET: Color32 = Color32::from_rgb(35, 35, 55);     // Cards
-pub const BG_HOVER: Color32 = Color32::from_rgb(45, 45, 70);      // Hover
-pub const BG_ELEVATED: Color32 = Color32::from_rgb(40, 40, 62);   // Raised
-
-// Text hierarchy
-pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(248, 250, 252);
-pub const TEXT_SECONDARY: Color32 = Color32::from_rgb(148, 163, 184);
-pub const TEXT_MUTED: Color32 = Color32::from_rgb(100, 116, 139);
-```
-
-### Applying Theme to egui
-
-```rust
-pub fn setup_custom_theme(ctx: &egui::Context) {
-    let mut visuals = Visuals::dark();
-    
-    // Window styling
-    visuals.window_fill = BG_PANEL;
-    visuals.window_stroke = Stroke::new(1.0, Color32::from_rgb(50, 50, 75));
-    visuals.window_rounding = Rounding::same(16.0);
-    
-    // Widget styling
-    visuals.widgets.noninteractive.bg_fill = BG_WIDGET;
-    visuals.widgets.noninteractive.rounding = Rounding::same(10.0);
-    
-    visuals.widgets.hovered.bg_fill = BG_HOVER;
-    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, PRIMARY.gamma_multiply(0.4));
-    
-    visuals.widgets.active.bg_fill = PRIMARY.gamma_multiply(0.25);
-    visuals.widgets.active.fg_stroke = Stroke::new(1.5, PRIMARY);
-    
-    // Selection
-    visuals.selection.bg_fill = PRIMARY.gamma_multiply(0.25);
-    visuals.selection.stroke = Stroke::new(1.0, PRIMARY);
-    
-    ctx.set_visuals(visuals);
-}
-```
-
-## Data Flow
-
-### Learning Flow
-
-```
-User Input → ChatPanel → ChatAction::LearnConcept
-                              ↓
-                        SutraApp::learn_concept()
-                              ↓
-                        ConceptId::from_bytes(md5)
-                              ↓
-                        storage.learn_concept()
-                              ↓
-                   ┌──────────┴──────────┐
-                   ↓                     ↓
-              ConcurrentMemory      WAL Write
-                   ↓                     ↓
-              In-Memory Graph      Disk Persistence
-```
-
-### Query Flow
-
-```
-User Query → ChatPanel → ChatAction::QueryConcept
-                              ↓
-                        SutraApp::query_concept()
-                              ↓
-                        storage.get_snapshot()
-                              ↓
-                        Text Matching / Vector Search
-                              ↓
-                        Best Match Found
-                              ↓
-                        ChatPanel::add_message(Response)
-```
-
-## Performance Characteristics
-
-### Memory Usage
-
-| Component | Typical Usage |
-|-----------|---------------|
-| Base App | ~50 MB |
-| Per 1K Concepts | ~2-5 MB |
-| HNSW Index | ~4 bytes × vectors × dimensions |
-| UI Overhead | ~20 MB |
-
-### Startup Time
-
-| Phase | Duration |
-|-------|----------|
-| Window Creation | ~100ms |
-| Theme Setup | ~10ms |
-| Storage Init | ~50ms |
-| Index Load | ~100-500ms (depends on size) |
-| **Total** | **~300-700ms** |
-
-### Operations
-
-| Operation | Latency |
-|-----------|---------|
-| Learn Concept | <1ms |
-| Query (text match) | <10ms for 10K concepts |
-| Query (vector) | <50ms for 100K concepts |
-| UI Frame | ~16ms (60 FPS) |
-
-## Future Considerations
-
-### Local Embeddings
-
-Planned integration with ONNX Runtime for local embedding generation:
-
-```rust
-// Future: Local embedding service
-pub struct LocalEmbedder {
-    session: ort::Session,
-    tokenizer: Tokenizer,
-}
-
-impl LocalEmbedder {
-    pub fn embed(&self, text: &str) -> Vec<f32> {
-        let tokens = self.tokenizer.encode(text);
-        let output = self.session.run(tokens);
-        output.into_vec()
+```json
+{
+  "version": "2.0.0",
+  "exported_at": "2025-11-26T14:32:00Z",
+  "format": "sutra-desktop",
+  "concepts": [
+    {
+      "id": "a3f2e8c1...",
+      "content": "Memory leak in connection pool",
+      "confidence": 0.92,
+      "strength": 0.88,
+      "neighbors": ["b8e4...", "c9f1..."]
     }
+  ],
+  "edges": [
+    {"from": "a3f2...", "to": "b8e4..."}
+  ]
 }
 ```
 
-### Multi-Window Support
+### CSV (Simplified)
 
-egui supports multiple viewports:
-
-```rust
-// Future: Detachable panels
-ctx.show_viewport_immediate(
-    ViewportId::from_hash_of("knowledge_popup"),
-    ViewportBuilder::default().with_title("Knowledge Browser"),
-    |ctx, _| {
-        self.knowledge.ui(ctx);
-    }
-);
+```csv
+id,content,confidence,strength,neighbor_count
+a3f2e8c1,Memory leak in connection pool,0.92,0.88,8
 ```
 
-### Plugin System
+### GraphML (Neo4j Compatible)
 
-Planned extension points:
-
-```rust
-// Future: Plugin trait
-pub trait SutraPlugin {
-    fn name(&self) -> &str;
-    fn on_concept_learned(&mut self, concept: &ConceptNode);
-    fn on_query(&mut self, query: &str) -> Option<String>;
-    fn render_panel(&mut self, ui: &mut egui::Ui);
-}
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+  <key id="content" for="node" attr.name="content" attr.type="string"/>
+  <graph id="sutra" edgedefault="directed">
+    <node id="a3f2e8c1">
+      <data key="content">Memory leak</data>
+    </node>
+  </graph>
+</graphml>
 ```
+
+### Cypher (Neo4j Import Script)
+
+```cypher
+CREATE (c1:Concept {id: 'a3f2e8c1', content: 'Memory leak', confidence: 0.92});
+MATCH (a:Concept {id: 'a3f2e8c1'}), (b:Concept {id: 'b8e4f1a2'})
+CREATE (a)-[:RELATES_TO]->(b);
+```
+
+---
+
+## Performance Optimizations
+
+### Frame Budget
+
+At 60 FPS, each frame has ~16ms budget:
+- UI layout: ~2ms
+- Storage queries: ~1-5ms (cached)
+- Graph rendering: ~3ms (up to 1000 nodes)
+- Reserve: ~6ms for spikes
+
+### Memory Management
+
+- **Lazy loading**: Graph nodes loaded on-demand
+- **Ring buffers**: Analytics history capped at 1440 entries
+- **LOD rendering**: Distant graph nodes simplified
+- **Culling**: Only visible elements rendered
+
+### Storage Efficiency
+
+- **WAL batching**: Multiple writes combined
+- **HNSW caching**: Vector index memory-mapped
+- **Snapshot sharing**: Read-only snapshots avoid locks
+
+---
+
+## Testing
+
+### Unit Tests
+
+```bash
+cd desktop
+cargo test
+```
+
+### Integration Tests
+
+```bash
+# Full build and run cycle
+cargo build -p sutra-desktop --release
+./target/release/sutra-desktop --test-mode
+```
+
+### UI Testing
+
+Manual testing checklist:
+- [ ] All slash commands work
+- [ ] Autocomplete navigation (keyboard and mouse)
+- [ ] Graph zoom/pan/select
+- [ ] Path finding between concepts
+- [ ] Export/import round-trip
+- [ ] Graceful shutdown (data persisted)
+
+---
+
+## Future Enhancements
+
+### Planned (v3.4+)
+
+1. **Local Embeddings**: ONNX Runtime for offline vector generation
+2. **Multi-Window**: Detachable panels using egui viewports
+3. **Themes**: Light mode and custom color schemes
+4. **Undo/Redo**: Transaction-based history
+
+### Considered (v4.0+)
+
+1. **Plugin System**: Rust-based extensions
+2. **Collaborative**: Multi-user sync with conflict resolution
+3. **Mobile**: Touch-optimized UI for tablets
+4. **AI Assistant**: Local LLM integration (llama.cpp)
+
+---
 
 ## Related Documentation
 
-- [Desktop README](./README.md)
-- [Building Desktop](./BUILDING.md)
-- [UI Components](./UI_COMPONENTS.md)
+- [README.md](./README.md) - Overview and quick start
+- [BUILDING.md](./BUILDING.md) - Build configuration
+- [UI_COMPONENTS.md](./UI_COMPONENTS.md) - Panel reference
+- [sutra-storage docs](../storage/) - Storage engine internals

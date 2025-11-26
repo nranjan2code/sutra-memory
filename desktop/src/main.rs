@@ -2,10 +2,19 @@
 //!
 //! This is a THIN GUI layer that directly uses `sutra-storage` crate.
 //! NO duplication of storage logic - we embed the same engine used by Docker deployments.
+//!
+//! ENHANCED UI (v3.3) features:
+//! - Interactive graph visualization with force-directed layout
+//! - MPPA-style reasoning path exploration
+//! - Temporal and causal analysis views
+//! - Real-time analytics dashboard
+//! - Advanced query builder
+//! - Export/Import functionality
 
 mod app;
 mod ui;
 mod theme;
+mod types;
 
 use anyhow::Result;
 use eframe::egui;

@@ -1,7 +1,7 @@
 //! Sidebar navigation - Premium design with animated elements
 
 use eframe::egui::{self, Color32, RichText, Rounding, Sense, Stroke, Vec2};
-use crate::theme::{PRIMARY, PRIMARY_DIM, SECONDARY, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BG_HOVER, BG_WIDGET, BG_SIDEBAR, BG_ELEVATED};
+use crate::theme::{PRIMARY, PRIMARY_DIM, SECONDARY, ACCENT, SUCCESS, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BG_HOVER, BG_WIDGET, BG_SIDEBAR, BG_ELEVATED};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SidebarView {
@@ -9,16 +9,61 @@ pub enum SidebarView {
     Chat,
     Knowledge,
     Search,
+    // Enhanced views
+    Graph,
+    Paths,
+    Timeline,
+    Causal,
+    Analytics,
+    Query,
+    Export,
+    // Settings
     Settings,
+}
+
+impl SidebarView {
+    /// Get display info for the view
+    pub fn info(&self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            SidebarView::Chat => ("💬", "Chat", "Have a conversation"),
+            SidebarView::Knowledge => ("📚", "Knowledge", "Browse concepts"),
+            SidebarView::Search => ("🔍", "Search", "Find information"),
+            SidebarView::Graph => ("🕸️", "Graph View", "Visualize connections"),
+            SidebarView::Paths => ("🛤️", "Reasoning", "Explore paths"),
+            SidebarView::Timeline => ("⏱️", "Timeline", "Temporal analysis"),
+            SidebarView::Causal => ("🔗", "Causality", "Root cause analysis"),
+            SidebarView::Analytics => ("📊", "Analytics", "Performance metrics"),
+            SidebarView::Query => ("🔎", "Query Builder", "Advanced search"),
+            SidebarView::Export => ("📤", "Export/Import", "Data portability"),
+            SidebarView::Settings => ("⚙️", "Settings", "Configure app"),
+        }
+    }
+    
+    /// Check if this is an analysis view (for grouping)
+    pub fn is_analysis(&self) -> bool {
+        matches!(self, SidebarView::Graph | SidebarView::Paths | SidebarView::Timeline | SidebarView::Causal)
+    }
+    
+    /// Check if this is a tools view
+    pub fn is_tools(&self) -> bool {
+        matches!(self, SidebarView::Analytics | SidebarView::Query | SidebarView::Export)
+    }
 }
 
 pub struct Sidebar {
     pub current_view: SidebarView,
+    /// Track collapsed sections
+    pub analysis_collapsed: bool,
+    pub tools_collapsed: bool,
 }
 
 impl Default for Sidebar {
     fn default() -> Self {
-        Self { current_view: SidebarView::Chat }
+        Self { 
+            current_view: SidebarView::Chat,
+            analysis_collapsed: false,
+            tools_collapsed: false,
+        }
     }
 }
 
@@ -37,61 +82,136 @@ impl Sidebar {
             Stroke::new(1.0, Color32::from_rgb(45, 45, 70))
         );
         
-        ui.vertical(|ui| {
-            ui.add_space(20.0);
-            
-            // Logo with glow effect
-            ui.horizontal(|ui| {
-                ui.add_space(16.0);
-                self.draw_logo(ui);
+        egui::ScrollArea::vertical()
+            .auto_shrink([false; 2])
+            .show(ui, |ui| {
+                ui.vertical(|ui| {
+                    ui.add_space(20.0);
+                    
+                    // Logo with glow effect
+                    ui.horizontal(|ui| {
+                        ui.add_space(16.0);
+                        self.draw_logo(ui);
+                    });
+                    
+                    ui.add_space(4.0);
+                    
+                    // Subtitle with version badge
+                    ui.horizontal(|ui| {
+                        ui.add_space(16.0);
+                        ui.label(RichText::new("Desktop").size(11.0).color(TEXT_MUTED));
+                        ui.add_space(6.0);
+                        // Version badge - pill style
+                        egui::Frame::none()
+                            .fill(PRIMARY_DIM.gamma_multiply(0.2))
+                            .rounding(Rounding::same(8.0))
+                            .inner_margin(egui::Margin::symmetric(8.0, 3.0))
+                            .show(ui, |ui| {
+                                ui.label(RichText::new("v3.3").size(10.0).color(PRIMARY));
+                            });
+                    });
+                    
+                    ui.add_space(24.0);
+                    
+                    // ========================================
+                    // MAIN section
+                    // ========================================
+                    self.section_header(ui, "MAIN");
+                    ui.add_space(8.0);
+                    
+                    self.nav_item(ui, SidebarView::Chat);
+                    ui.add_space(2.0);
+                    self.nav_item(ui, SidebarView::Knowledge);
+                    ui.add_space(2.0);
+                    self.nav_item(ui, SidebarView::Search);
+                    
+                    ui.add_space(16.0);
+                    
+                    // ========================================
+                    // ANALYSIS section (collapsible)
+                    // ========================================
+                    self.collapsible_section(ui, "ANALYSIS", &mut self.analysis_collapsed.clone(), |sidebar, ui| {
+                        sidebar.nav_item(ui, SidebarView::Graph);
+                        ui.add_space(2.0);
+                        sidebar.nav_item(ui, SidebarView::Paths);
+                        ui.add_space(2.0);
+                        sidebar.nav_item(ui, SidebarView::Timeline);
+                        ui.add_space(2.0);
+                        sidebar.nav_item(ui, SidebarView::Causal);
+                    });
+                    
+                    ui.add_space(16.0);
+                    
+                    // ========================================
+                    // TOOLS section (collapsible)
+                    // ========================================
+                    self.collapsible_section(ui, "TOOLS", &mut self.tools_collapsed.clone(), |sidebar, ui| {
+                        sidebar.nav_item(ui, SidebarView::Analytics);
+                        ui.add_space(2.0);
+                        sidebar.nav_item(ui, SidebarView::Query);
+                        ui.add_space(2.0);
+                        sidebar.nav_item(ui, SidebarView::Export);
+                    });
+                    
+                    ui.add_space(24.0);
+                    
+                    // Divider before settings
+                    self.draw_divider(ui, sidebar_width);
+                    ui.add_space(12.0);
+                    
+                    // Settings always visible
+                    self.nav_item(ui, SidebarView::Settings);
+                    
+                    ui.add_space(20.0);
+                });
             });
+    }
+    
+    fn section_header(&self, ui: &mut egui::Ui, label: &str) {
+        ui.horizontal(|ui| {
+            ui.add_space(16.0);
+            ui.label(RichText::new(label).size(10.0).color(TEXT_MUTED).strong());
+        });
+    }
+    
+    fn collapsible_section<F>(&mut self, ui: &mut egui::Ui, label: &str, collapsed: &mut bool, content: F)
+    where
+        F: FnOnce(&mut Self, &mut egui::Ui),
+    {
+        // Clone the collapsed state to avoid borrow issues
+        let is_collapsed = *collapsed;
+        
+        ui.horizontal(|ui| {
+            ui.add_space(16.0);
+            
+            // Collapse/expand button
+            let symbol = if is_collapsed { "▶" } else { "▼" };
+            let response = ui.add(
+                egui::Label::new(RichText::new(symbol).size(9.0).color(TEXT_MUTED))
+                    .sense(Sense::click())
+            );
             
             ui.add_space(4.0);
             
-            // Subtitle with version badge
-            ui.horizontal(|ui| {
-                ui.add_space(16.0);
-                ui.label(RichText::new("Desktop").size(11.0).color(TEXT_MUTED));
-                ui.add_space(6.0);
-                // Version badge - pill style
-                egui::Frame::none()
-                    .fill(PRIMARY_DIM.gamma_multiply(0.2))
-                    .rounding(Rounding::same(8.0))
-                    .inner_margin(egui::Margin::symmetric(8.0, 3.0))
-                    .show(ui, |ui| {
-                        ui.label(RichText::new("v3.3").size(10.0).color(PRIMARY));
-                    });
-            });
+            let label_response = ui.add(
+                egui::Label::new(RichText::new(label).size(10.0).color(TEXT_MUTED).strong())
+                    .sense(Sense::click())
+            );
             
-            ui.add_space(24.0);
-            
-            // Section label with line
-            ui.horizontal(|ui| {
-                ui.add_space(16.0);
-                ui.label(RichText::new("MENU").size(10.0).color(TEXT_MUTED).strong());
-            });
-            ui.add_space(12.0);
-            
-            // Main navigation items
-            self.nav_item(ui, "💬", "Chat", "Have a conversation", SidebarView::Chat);
-            ui.add_space(2.0);
-            self.nav_item(ui, "📚", "Knowledge", "Browse stored concepts", SidebarView::Knowledge);
-            ui.add_space(2.0);
-            self.nav_item(ui, "🔍", "Search", "Find information", SidebarView::Search);
-            
-            // Spacer to push settings to bottom
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.add_space(20.0);
-                
-                // Settings at bottom
-                self.nav_item(ui, "⚙️", "Settings", "Configure app", SidebarView::Settings);
-                
-                ui.add_space(12.0);
-                
-                // Bottom divider
-                self.draw_divider(ui, sidebar_width);
-            });
+            if response.clicked() || label_response.clicked() {
+                // Toggle the actual field
+                if label == "ANALYSIS" {
+                    self.analysis_collapsed = !self.analysis_collapsed;
+                } else if label == "TOOLS" {
+                    self.tools_collapsed = !self.tools_collapsed;
+                }
+            }
         });
+        
+        if !is_collapsed {
+            ui.add_space(8.0);
+            content(self, ui);
+        }
     }
     
     fn draw_logo(&self, ui: &mut egui::Ui) {
@@ -154,7 +274,8 @@ impl Sidebar {
         ui.painter().line_segment([start, end], Stroke::new(1.0, BG_WIDGET));
     }
     
-    fn nav_item(&mut self, ui: &mut egui::Ui, icon: &str, label: &str, hint: &str, view: SidebarView) {
+    fn nav_item(&mut self, ui: &mut egui::Ui, view: SidebarView) {
+        let (icon, label, hint) = view.info();
         let is_selected = self.current_view == view;
         
         let margin_h = 12.0;

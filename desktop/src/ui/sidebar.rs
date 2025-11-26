@@ -99,7 +99,7 @@ impl Sidebar {
                     // Subtitle with version badge
                     ui.horizontal(|ui| {
                         ui.add_space(16.0);
-                        ui.label(RichText::new("Desktop").size(11.0).color(TEXT_MUTED));
+                        ui.label(RichText::new("Desktop").size(12.0).color(TEXT_MUTED));
                         ui.add_space(6.0);
                         // Version badge - pill style
                         egui::Frame::none()
@@ -107,7 +107,7 @@ impl Sidebar {
                             .rounding(Rounding::same(8.0))
                             .inner_margin(egui::Margin::symmetric(8.0, 3.0))
                             .show(ui, |ui| {
-                                ui.label(RichText::new("v3.3").size(10.0).color(PRIMARY));
+                                ui.label(RichText::new("v3.3").size(11.0).color(PRIMARY));
                             });
                     });
                     
@@ -170,7 +170,7 @@ impl Sidebar {
     fn section_header(&self, ui: &mut egui::Ui, label: &str) {
         ui.horizontal(|ui| {
             ui.add_space(16.0);
-            ui.label(RichText::new(label).size(10.0).color(TEXT_MUTED).strong());
+            ui.label(RichText::new(label).size(11.0).color(TEXT_MUTED).strong());
         });
     }
     
@@ -187,14 +187,14 @@ impl Sidebar {
             // Collapse/expand button
             let symbol = if is_collapsed { "▶" } else { "▼" };
             let response = ui.add(
-                egui::Label::new(RichText::new(symbol).size(9.0).color(TEXT_MUTED))
+                egui::Label::new(RichText::new(symbol).size(10.0).color(TEXT_MUTED))
                     .sense(Sense::click())
             );
             
             ui.add_space(4.0);
             
             let label_response = ui.add(
-                egui::Label::new(RichText::new(label).size(10.0).color(TEXT_MUTED).strong())
+                egui::Label::new(RichText::new(label).size(11.0).color(TEXT_MUTED).strong())
                     .sense(Sense::click())
             );
             
@@ -358,7 +358,7 @@ impl Sidebar {
                 rect.min + Vec2::new(52.0, 29.0),
                 egui::Align2::LEFT_TOP,
                 hint,
-                egui::FontId::proportional(11.0),
+                egui::FontId::proportional(12.0),
                 TEXT_MUTED,
             );
             

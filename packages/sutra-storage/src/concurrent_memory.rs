@@ -895,7 +895,10 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let config = ConcurrentConfig {
             storage_path: dir.path().to_path_buf(),
-            reconcile_interval_ms: 50,
+            adaptive_reconciler_config: AdaptiveReconcilerConfig {
+                base_interval_ms: 50,
+                ..Default::default()
+            },
             ..Default::default()
         };
         
@@ -930,7 +933,10 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let config = ConcurrentConfig {
             storage_path: dir.path().to_path_buf(),
-            reconcile_interval_ms: 50,
+            adaptive_reconciler_config: AdaptiveReconcilerConfig {
+                base_interval_ms: 50,
+                ..Default::default()
+            },
             ..Default::default()
         };
         
@@ -964,7 +970,10 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let config = ConcurrentConfig {
             storage_path: dir.path().to_path_buf(),
-            reconcile_interval_ms: 50,
+            adaptive_reconciler_config: AdaptiveReconcilerConfig {
+                base_interval_ms: 50,
+                ..Default::default()
+            },
             ..Default::default()
         };
         
@@ -1006,7 +1015,10 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let config = ConcurrentConfig {
             storage_path: dir.path().to_path_buf(),
-            reconcile_interval_ms: 20,
+            adaptive_reconciler_config: AdaptiveReconcilerConfig {
+                base_interval_ms: 20,
+                ..Default::default()
+            },
             ..Default::default()
         };
         
@@ -1050,7 +1062,10 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let config = ConcurrentConfig {
             storage_path: dir.path().to_path_buf(),
-            reconcile_interval_ms: 50,
+            adaptive_reconciler_config: AdaptiveReconcilerConfig {
+                base_interval_ms: 50,
+                ..Default::default()
+            },
             ..Default::default()
         };
         
@@ -1076,7 +1091,10 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let config = ConcurrentConfig {
             storage_path: dir.path().to_path_buf(),
-            reconcile_interval_ms: 50,
+            adaptive_reconciler_config: AdaptiveReconcilerConfig {
+                base_interval_ms: 50,
+                ..Default::default()
+            },
             ..Default::default()
         };
         
@@ -1155,7 +1173,10 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let config = ConcurrentConfig {
             storage_path: dir.path().to_path_buf(),
-            reconcile_interval_ms: 50,
+            adaptive_reconciler_config: AdaptiveReconcilerConfig {
+                base_interval_ms: 50,
+                ..Default::default()
+            },
             ..Default::default()
         };
         

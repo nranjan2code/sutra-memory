@@ -5,7 +5,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 DESKTOP_DIR="$ROOT_DIR/desktop"
 BUILD_DIR="$DESKTOP_DIR/build"
 APP_NAME="Sutra Desktop"

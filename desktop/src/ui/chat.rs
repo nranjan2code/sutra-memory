@@ -505,15 +505,15 @@ impl ChatPanel {
                                 MessageRole::Assistant => ("Sutra", SECONDARY),
                                 MessageRole::System => ("System", ACCENT),
                             };
-                            ui.label(RichText::new(role_name).size(11.0).color(role_color).strong());
+                            ui.label(RichText::new(role_name).size(12.0).color(role_color).strong());
                             ui.add_space(8.0);
-                            ui.label(RichText::new(msg.timestamp.format("%H:%M").to_string()).size(10.0).color(TEXT_MUTED));
+                            ui.label(RichText::new(msg.timestamp.format("%H:%M").to_string()).size(11.0).color(TEXT_MUTED));
                         });
                         ui.add_space(4.0);
                     }
                     
                     // Message content
-                    ui.label(RichText::new(&msg.content).size(13.5).color(TEXT_PRIMARY));
+                    ui.label(RichText::new(&msg.content).size(14.0).color(TEXT_PRIMARY));
                 });
             
             // Avatar for user (shown on right)

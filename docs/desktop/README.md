@@ -17,9 +17,10 @@ Sutra Desktop is a self-contained knowledge management application that brings e
 | Feature | Description |
 |---------|-------------|
 | 🚀 **Native Performance** | Pure Rust from storage to UI, ~50ms startup |
+| ⚡ **Async Architecture** | Non-blocking UI with background processing |
 | 🔒 **Complete Privacy** | All data stays on your machine |
 | 📦 **Self-Contained** | Single binary, ~20MB |
-| 🎨 **Modern UI** | Premium dark theme with egui framework |
+| 🎨 **Modern UI** | Premium dark theme (WCAG AA Compliant) |
 | 🧠 **Full Storage Engine** | Reuses `sutra-storage` crate (no code duplication) |
 | 💬 **Slash Commands** | Modern `/learn`, `/search`, `/help`, `/stats` interface |
 | 🔍 **Multi-View Analysis** | Graph, temporal, causal, and path visualization |
@@ -144,13 +145,13 @@ Simply copy the entire data directory to back up your knowledge base. The WAL en
 
 ## Architecture
 
-Sutra Desktop follows a thin-wrapper architecture:
+Sutra Desktop follows a thin-wrapper architecture with asynchronous processing:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Sutra Desktop App                         │
 ├─────────────────────────────────────────────────────────────┤
-│  UI Layer (egui/eframe)  →  App Controller  →  sutra-storage │
+│  UI Layer (egui)  ↔  Async Controller  ↔  sutra-storage      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -159,6 +160,7 @@ The application directly uses the same `sutra-storage` crate that powers the Doc
 - **Zero code duplication** between desktop and server
 - **Feature parity** with enterprise capabilities
 - **Consistent behavior** across deployment modes
+- **Non-blocking UI** via background thread offloading
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed technical documentation.
 

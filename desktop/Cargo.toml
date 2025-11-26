@@ -1,6 +1,6 @@
 [package]
 name = "sutra-desktop"
-version = "2.0.0"
+version = "3.3.0"
 edition = "2021"
 authors = ["Sutra AI Team"]
 description = "Sutra AI Desktop - Native GUI for the knowledge reasoning engine"
@@ -47,6 +47,7 @@ tracing-subscriber = { workspace = true }
 # Utilities
 # ============================================================================
 directories = "5.0"  # Platform-specific data directories
+dirs = "5.0"         # Home directory expansion
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = { workspace = true }
 md5 = "0.7"  # For concept ID generation

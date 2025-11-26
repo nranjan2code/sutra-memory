@@ -9,6 +9,69 @@ use chrono::{DateTime, Local};
 use sutra_storage::ConceptId;
 
 // ============================================================================
+// Application Messages (Async)
+// ============================================================================
+
+#[derive(Debug)]
+pub enum AppMessage {
+    LearnResult {
+        content: String,
+        concept_id: Option<ConceptId>,
+        error: Option<String>,
+        duration_ms: u64,
+    },
+    SearchResults {
+        query: String,
+        results: Vec<(ConceptId, String, f32)>, // id, content, confidence
+        duration_ms: u64,
+    },
+    KnowledgeLoaded {
+        concepts: Vec<ConceptInfo>,
+    },
+    GraphLoaded {
+        nodes: HashMap<ConceptId, GraphNode>,
+        edges: Vec<GraphEdge>,
+    },
+    ReasoningPathsFound {
+        paths: Vec<ReasoningPath>,
+        consensus: Option<ConsensusResult>,
+        error: Option<String>,
+    },
+    CausalAnalysisComplete {
+        chains: Vec<CausalChain>,
+        root_causes: Vec<CausalNode>,
+        error: Option<String>,
+    },
+    QueryBuilderResults {
+        results: Vec<ConceptInfo>,
+        duration_ms: u64,
+    },
+    BatchImportProgress {
+        completed: usize,
+        total: usize,
+        errors: usize,
+    },
+    BatchImportComplete {
+        completed: usize,
+        errors: usize,
+        error: Option<String>,
+    },
+    TemporalEventsLoaded {
+        events: Vec<TimelineEvent>,
+    },
+}
+
+/// Concept info for UI display
+#[derive(Debug, Clone)]
+pub struct ConceptInfo {
+    pub id: String,
+    pub content: String,
+    pub strength: f32,
+    pub confidence: f32,
+    pub neighbors: Vec<String>,
+}
+
+// ============================================================================
 // Graph Visualization Types
 // ============================================================================
 

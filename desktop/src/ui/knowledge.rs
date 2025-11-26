@@ -1,7 +1,7 @@
 //! Knowledge browser panel - Premium visual design
 
 use eframe::egui::{self, Color32, RichText, Rounding, ScrollArea, Stroke, Vec2};
-use crate::app::ConceptInfo;
+use crate::types::ConceptInfo;
 use crate::theme::{PRIMARY, SECONDARY, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, SUCCESS, BG_PANEL, BG_WIDGET, card_frame};
 
 pub struct KnowledgePanel {
@@ -42,7 +42,7 @@ impl KnowledgePanel {
                             ui.add_space(8.0);
                             ui.vertical(|ui| {
                                 ui.label(RichText::new("Knowledge Base").size(18.0).color(TEXT_PRIMARY).strong());
-                                ui.label(RichText::new("Explore learned concepts").size(11.0).color(TEXT_MUTED));
+                                ui.label(RichText::new("Explore learned concepts").size(12.0).color(TEXT_MUTED));
                             });
                         });
                         
@@ -138,7 +138,7 @@ impl KnowledgePanel {
                 .inner_margin(egui::Margin::symmetric(8.0, 3.0))
                 .show(ui, |ui| {
                     ui.label(RichText::new(format!("{} concepts", self.concepts.len()))
-                        .size(11.0).color(PRIMARY));
+                        .size(12.0).color(PRIMARY));
                 });
             
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -178,7 +178,7 @@ impl KnowledgePanel {
             ui.add_space(16.0);
             ui.label(RichText::new("No concepts yet").size(15.0).color(TEXT_SECONDARY));
             ui.add_space(4.0);
-            ui.label(RichText::new("Start a conversation to teach me!").size(12.0).color(TEXT_MUTED));
+            ui.label(RichText::new("Start a conversation to teach me!").size(13.0).color(TEXT_MUTED));
         });
     }
     
@@ -204,7 +204,7 @@ impl KnowledgePanel {
                 } else { 
                     c.content.clone() 
                 };
-                ui.label(RichText::new(title).size(13.0).color(TEXT_PRIMARY));
+                ui.label(RichText::new(title).size(14.0).color(TEXT_PRIMARY));
                 
                 ui.add_space(8.0);
                 
@@ -217,7 +217,7 @@ impl KnowledgePanel {
                         .inner_margin(egui::Margin::symmetric(4.0, 2.0))
                         .show(ui, |ui| {
                             ui.label(RichText::new(format!("{}...", &c.id[..8]))
-                                .size(9.0).color(TEXT_MUTED).monospace());
+                                .size(10.0).color(TEXT_MUTED).monospace());
                         });
                     
                     ui.add_space(6.0);
@@ -236,8 +236,8 @@ impl KnowledgePanel {
     fn mini_stat(&self, ui: &mut egui::Ui, icon: &str, value: String, color: Color32) {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 2.0;
-            ui.label(RichText::new(icon).size(10.0));
-            ui.label(RichText::new(value).size(10.0).color(color));
+            ui.label(RichText::new(icon).size(11.0));
+            ui.label(RichText::new(value).size(11.0).color(color));
         });
     }
     
@@ -294,7 +294,7 @@ impl KnowledgePanel {
     }
     
     fn detail_section(&self, ui: &mut egui::Ui, title: &str, content: impl FnOnce(&mut egui::Ui)) {
-        ui.label(RichText::new(title).size(11.0).color(TEXT_MUTED).strong());
+        ui.label(RichText::new(title).size(12.0).color(TEXT_MUTED).strong());
         ui.add_space(6.0);
         content(ui);
     }
@@ -307,7 +307,7 @@ impl KnowledgePanel {
             .inner_margin(16.0)
             .show(ui, |ui| {
                 ui.vertical(|ui| {
-                    ui.label(RichText::new(label).size(11.0).color(TEXT_MUTED));
+                    ui.label(RichText::new(label).size(12.0).color(TEXT_MUTED));
                     ui.label(RichText::new(value).size(28.0).color(color).strong());
                 });
             });
@@ -328,7 +328,7 @@ impl KnowledgePanel {
             ui.add_space(20.0);
             ui.label(RichText::new("Select a concept").size(16.0).color(TEXT_SECONDARY));
             ui.add_space(6.0);
-            ui.label(RichText::new("Click on any concept to view details").size(12.0).color(TEXT_MUTED));
+            ui.label(RichText::new("Click on any concept to view details").size(13.0).color(TEXT_MUTED));
         });
     }
     

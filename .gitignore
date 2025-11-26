@@ -21,9 +21,15 @@ desktop.ini
 # IDE and Editor Files
 # =============================================================================
 
-# Visual Studio Code
-.vscode/
+# Visual Studio Code (keep tasks.json and settings for team)
+.vscode/launch.json
+.vscode/extensions.json
+.vscode/settings.json
 *.code-workspace
+
+# Keep team configurations:
+# .vscode/tasks.json - Build and development tasks
+# .vscode/tasks.json should be committed for team productivity
 
 # IntelliJ IDEA / PyCharm
 .idea/

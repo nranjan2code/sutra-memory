@@ -12,7 +12,7 @@
 //! - Export/Import functionality
 
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, mpsc};
 use std::time::Instant;
 use eframe::egui;
 use tracing::{info, error, warn};
@@ -28,6 +28,9 @@ use sutra_storage::{
     AdaptiveReconcilerConfig,
     ConceptId,
     ConceptNode,
+    semantic::SemanticType,
+    ParallelPathFinder,
+    PathResult,
 };
 
 // Core UI imports
@@ -49,6 +52,11 @@ use crate::ui::{
 };
 
 use crate::theme::{BG_DARK, BG_PANEL};
+use crate::types::{
+    AppMessage, ConceptInfo, GraphNode, GraphEdge, EdgeType,
+    ReasoningPath, PathStep, ConsensusResult, PathCluster,
+    CausalChain, CausalNode, CausalRelationType, TimelineEvent,
+};
 
 /// Main Sutra Desktop application
 pub struct SutraApp {
@@ -58,6 +66,10 @@ pub struct SutraApp {
     // ========================================================================
     storage: Arc<ConcurrentMemory>,
     data_dir: PathBuf,
+    
+    // Async communication
+    tx: mpsc::Sender<AppMessage>,
+    rx: mpsc::Receiver<AppMessage>,
     
     // Core UI Components
     sidebar: Sidebar,
@@ -122,9 +134,13 @@ impl SutraApp {
         status_bar.set_status(ConnectionStatus::Connected);
         status_bar.set_concept_count(stats.snapshot.concept_count);
         
+        let (tx, rx) = mpsc::channel();
+        
         Self {
             storage: Arc::new(storage),
             data_dir,
+            tx,
+            rx,
             sidebar: Sidebar::default(),
             chat: ChatPanel::default(),
             knowledge: KnowledgePanel::default(),
@@ -150,59 +166,65 @@ impl SutraApp {
         match action {
             ChatAction::Learn(content) => {
                 self.chat.is_processing = true;
-                let start = Instant::now();
+                let storage = self.storage.clone();
+                let tx = self.tx.clone();
+                let content_clone = content.clone();
                 
-                let hash = md5::compute(content.as_bytes());
-                let concept_id = ConceptId::from_bytes(hash.0);
-                
-                match self.storage.learn_concept(
-                    concept_id,
-                    content.as_bytes().to_vec(),
-                    None,
-                    1.0,
-                    1.0,
-                ) {
-                    Ok(_) => {
-                        let elapsed_ms = start.elapsed().as_millis() as u64;
-                        self.chat.add_response(format!(
-                            "✅ Learned! Stored as concept `{}`.\n\nYou can now ask me questions about this.",
-                            &concept_id.to_hex()[..8]
-                        ));
-                        let preview = if content.len() > 30 { &content[..30] } else { &content };
-                        self.status_bar.set_activity(format!("Learned: {}... ({}ms)", preview, elapsed_ms));
-                        self.refresh_stats();
+                std::thread::spawn(move || {
+                    let start = Instant::now();
+                    let hash = md5::compute(content_clone.as_bytes());
+                    let concept_id = ConceptId::from_bytes(hash.0);
+                    
+                    match storage.learn_concept(
+                        concept_id,
+                        content_clone.as_bytes().to_vec(),
+                        None,
+                        1.0,
+                        1.0,
+                    ) {
+                        Ok(_) => {
+                            let elapsed_ms = start.elapsed().as_millis() as u64;
+                            let _ = tx.send(AppMessage::LearnResult {
+                                content: content_clone,
+                                concept_id: Some(concept_id),
+                                error: None,
+                                duration_ms: elapsed_ms,
+                            });
+                        }
+                        Err(e) => {
+                            let elapsed_ms = start.elapsed().as_millis() as u64;
+                            let _ = tx.send(AppMessage::LearnResult {
+                                content: content_clone,
+                                concept_id: None,
+                                error: Some(format!("{:?}", e)),
+                                duration_ms: elapsed_ms,
+                            });
+                        }
                     }
-                    Err(e) => {
-                        self.chat.add_response(format!("❌ Failed to learn: {:?}", e));
-                        error!("Learn failed: {:?}", e);
-                    }
-                }
-                
-                self.chat.is_processing = false;
+                });
             }
             
             ChatAction::Query(query) => {
                 self.chat.is_processing = true;
-                let start = Instant::now();
+                let storage = self.storage.clone();
+                let tx = self.tx.clone();
+                let query_clone = query.clone();
                 
-                let results = self.storage.text_search(&query, 5);
-                let elapsed_ms = start.elapsed().as_millis() as u64;
-                
-                if results.is_empty() {
-                    self.chat.add_response(
-                        "🤔 I don't have knowledge about that yet.\n\nTeach me with: `/learn <your knowledge>`".to_string()
-                    );
-                } else {
-                    let mut response = String::from("Based on my knowledge:\n\n");
-                    for (i, (_id, content, confidence)) in results.iter().enumerate() {
-                        response.push_str(&format!("{}. {} (relevance: {:.0}%)\n", i + 1, content, confidence * 100.0));
-                    }
-                    self.chat.add_response(response);
-                }
-                
-                let preview = if query.len() > 30 { &query[..30] } else { &query };
-                self.status_bar.set_activity(format!("Searched: {} ({}ms)", preview, elapsed_ms));
-                self.chat.is_processing = false;
+                std::thread::spawn(move || {
+                    let start = Instant::now();
+                    let results = storage.text_search(&query_clone, 5);
+                    let elapsed_ms = start.elapsed().as_millis() as u64;
+                    
+                    let result_data = results.into_iter()
+                        .map(|(id, content, conf)| (id, content, conf))
+                        .collect();
+                        
+                    let _ = tx.send(AppMessage::SearchResults {
+                        query: query_clone,
+                        results: result_data,
+                        duration_ms: elapsed_ms,
+                    });
+                });
             }
             
             ChatAction::Help => {}
@@ -242,30 +264,50 @@ impl SutraApp {
         match action {
             KnowledgeAction::Search(query) => {
                 self.knowledge.is_loading = true;
+                let storage = self.storage.clone();
+                let tx = self.tx.clone();
                 
-                let concepts = if query.is_empty() {
-                    self.load_all_concepts(100)
-                } else {
-                    let results = self.storage.text_search(&query, 50);
-                    results
-                        .into_iter()
-                        .filter_map(|(concept_id, _, _)| {
-                            let snapshot = self.storage.get_snapshot();
-                            snapshot.get_concept(&concept_id)
-                                .map(|node| node_to_concept_info(&node, &self.storage))
-                        })
-                        .collect()
-                };
-                
-                self.knowledge.set_concepts(concepts);
+                std::thread::spawn(move || {
+                    let concepts = if query.is_empty() {
+                        let snapshot = storage.get_snapshot();
+                        snapshot.all_concepts()
+                            .into_iter()
+                            .take(100)
+                            .map(|node| node_to_concept_info(&node, &storage))
+                            .collect()
+                    } else {
+                        let results = storage.text_search(&query, 50);
+                        results
+                            .into_iter()
+                            .filter_map(|(concept_id, _, _)| {
+                                let snapshot = storage.get_snapshot();
+                                snapshot.get_concept(&concept_id)
+                                    .map(|node| node_to_concept_info(&node, &storage))
+                            })
+                            .collect()
+                    };
+                    
+                    let _ = tx.send(AppMessage::KnowledgeLoaded { concepts });
+                });
             }
             
             KnowledgeAction::Refresh => {
                 self.knowledge.is_loading = true;
-                let concepts = self.load_all_concepts(100);
-                self.knowledge.set_concepts(concepts);
-                self.status_bar.set_activity("Knowledge refreshed");
-                self.refresh_stats();
+                let storage = self.storage.clone();
+                let tx = self.tx.clone();
+                
+                std::thread::spawn(move || {
+                    let snapshot = storage.get_snapshot();
+                    let concepts = snapshot.all_concepts()
+                        .into_iter()
+                        .take(100)
+                        .map(|node| node_to_concept_info(&node, &storage))
+                        .collect();
+                    
+                    let _ = tx.send(AppMessage::KnowledgeLoaded { concepts });
+                });
+                
+                self.status_bar.set_activity("Refreshing knowledge...");
             }
             
             KnowledgeAction::SelectConcept(id) => {
@@ -281,15 +323,113 @@ impl SutraApp {
     fn handle_graph_action(&mut self, action: GraphAction) {
         match action {
             GraphAction::Refresh => {
-                self.graph_view.load_from_storage(&self.storage);
-                self.status_bar.set_activity("Graph refreshed");
+                self.status_bar.set_activity("Refreshing graph...");
+                let storage = self.storage.clone();
+                let tx = self.tx.clone();
+                
+                std::thread::spawn(move || {
+                    let mut nodes = std::collections::HashMap::new();
+                    let mut edges = Vec::new();
+                    
+                    let snapshot = storage.get_snapshot();
+                    let concepts = snapshot.all_concepts();
+                    
+                    // Create nodes
+                    for concept in &concepts {
+                        let content = String::from_utf8_lossy(&concept.content).to_string();
+                        let mut node = GraphNode::new(
+                            concept.id,
+                            content,
+                            concept.confidence,
+                            concept.strength,
+                        );
+                        node.neighbor_count = concept.neighbors.len();
+                        nodes.insert(concept.id, node);
+                    }
+                    
+                    // Create edges
+                    for concept in &concepts {
+                        for neighbor_id in &concept.neighbors {
+                            // Only add edge once (from lower to higher id to avoid duplicates)
+                            if concept.id.to_hex() < neighbor_id.to_hex() {
+                                let content = String::from_utf8_lossy(&concept.content).to_lowercase();
+                                let edge_type = if content.contains("causes") || content.contains("leads to") || content.contains("results in") {
+                                    EdgeType::Causal
+                                } else if content.contains("before") || content.contains("after") || content.contains("during") {
+                                    EdgeType::Temporal
+                                } else if content.contains("is a") || content.contains("part of") || content.contains("contains") {
+                                    EdgeType::Hierarchical
+                                } else if content.contains("similar") || content.contains("like") || content.contains("same") {
+                                    EdgeType::Similar
+                                } else {
+                                    EdgeType::Semantic
+                                };
+                                
+                                edges.push(GraphEdge {
+                                    from: concept.id,
+                                    to: *neighbor_id,
+                                    strength: concept.strength,
+                                    edge_type,
+                                });
+                            }
+                        }
+                    }
+                    
+                    let _ = tx.send(AppMessage::GraphLoaded { nodes, edges });
+                });
             }
             GraphAction::SelectNode(id) => {
                 self.graph_view.selected = Some(id);
                 self.status_bar.set_activity(format!("Selected node: {}...", &id.to_hex()[..8]));
             }
             GraphAction::ExportImage => {
-                self.status_bar.set_activity("Export image not yet implemented");
+                // Export graph as GraphML which can be visualized in other tools
+                let snapshot = self.storage.get_snapshot();
+                let concepts = snapshot.all_concepts();
+                
+                let mut graphml = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+                graphml.push_str("<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\">\n");
+                graphml.push_str("  <key id=\"label\" for=\"node\" attr.name=\"label\" attr.type=\"string\"/>\n");
+                graphml.push_str("  <key id=\"confidence\" for=\"node\" attr.name=\"confidence\" attr.type=\"double\"/>\n");
+                graphml.push_str("  <graph id=\"G\" edgedefault=\"directed\">\n");
+                
+                for node in concepts.iter() {
+                    let content = String::from_utf8_lossy(&node.content);
+                    let label = content.chars().take(50).collect::<String>().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+                    graphml.push_str(&format!(
+                        "    <node id=\"{}\">\n      <data key=\"label\">{}</data>\n      <data key=\"confidence\">{:.3}</data>\n    </node>\n",
+                        node.id.to_hex(), label, node.confidence
+                    ));
+                }
+                
+                // Add edges based on associations
+                let mut edge_id = 0;
+                for node in concepts.iter() {
+                    for assoc in &node.associations {
+                        graphml.push_str(&format!(
+                            "    <edge id=\"e{}\" source=\"{}\" target=\"{}\"/>\n",
+                            edge_id, node.id.to_hex(), assoc.target_id.to_hex()
+                        ));
+                        edge_id += 1;
+                    }
+                }
+                
+                graphml.push_str("  </graph>\n</graphml>\n");
+                
+                // Write to file
+                if let Some(home) = dirs::home_dir() {
+                    let path = home.join("sutra_graph.graphml");
+                    match std::fs::write(&path, graphml) {
+                        Ok(_) => {
+                            self.status_bar.set_activity(format!("Graph exported to {:?}", path));
+                        }
+                        Err(e) => {
+                            self.status_bar.set_activity(format!("Export failed: {}", e));
+                        }
+                    }
+                } else {
+                    self.status_bar.set_activity("Could not determine home directory");
+                }
             }
         }
     }
@@ -302,23 +442,104 @@ impl SutraApp {
         match action {
             ReasoningPathsAction::FindPaths(from, to) => {
                 self.status_bar.set_activity("Finding reasoning paths...");
+                self.reasoning_paths.is_loading = true;
+                self.reasoning_paths.error_message = None;
                 
-                // Search for source and target concepts
-                let from_results = self.storage.text_search(&from, 1);
-                let to_results = self.storage.text_search(&to, 1);
+                let storage = self.storage.clone();
+                let tx = self.tx.clone();
+                let max_depth = self.reasoning_paths.max_depth;
+                let max_paths = self.reasoning_paths.max_paths;
+                let decay = self.reasoning_paths.confidence_decay;
+                let threshold = self.reasoning_paths.consensus_threshold;
                 
-                if let (Some((from_id, _, _)), Some((to_id, _, _))) = 
-                    (from_results.first(), to_results.first()) 
-                {
-                    self.reasoning_paths.find_paths(&self.storage, *from_id, *to_id);
-                    self.status_bar.set_activity(format!("Found {} paths", self.reasoning_paths.paths.len()));
-                } else {
-                    self.reasoning_paths.error_message = Some("Could not find source or target concepts".to_string());
-                    self.status_bar.set_activity("No paths found");
-                }
+                std::thread::spawn(move || {
+                    // Search for source and target concepts
+                    let from_results = storage.text_search(&from, 1);
+                    let to_results = storage.text_search(&to, 1);
+                    
+                    if let (Some((from_id, _, _)), Some((to_id, _, _))) = 
+                        (from_results.first(), to_results.first()) 
+                    {
+                        let snapshot = storage.get_snapshot();
+                        let pathfinder = ParallelPathFinder::new(decay);
+                        
+                        let raw_paths = pathfinder.find_paths_parallel(
+                            snapshot.clone(),
+                            *from_id,
+                            *to_id,
+                            max_depth,
+                            max_paths,
+                        );
+                        
+                        if raw_paths.is_empty() {
+                            let _ = tx.send(AppMessage::ReasoningPathsFound {
+                                paths: vec![],
+                                consensus: None,
+                                error: Some("No paths found between these concepts.".to_string()),
+                            });
+                        } else {
+                            // Convert paths
+                            let paths: Vec<ReasoningPath> = raw_paths
+                                .into_iter()
+                                .map(|p| ReasoningPathsPanel::convert_path_static(&p, &snapshot, decay))
+                                .collect();
+                            
+                            // Analyze consensus
+                            let consensus = ReasoningPathsPanel::analyze_consensus_static(&paths, threshold);
+                            
+                            let _ = tx.send(AppMessage::ReasoningPathsFound {
+                                paths,
+                                consensus: Some(consensus),
+                                error: None,
+                            });
+                        }
+                    } else {
+                        let _ = tx.send(AppMessage::ReasoningPathsFound {
+                            paths: vec![],
+                            consensus: None,
+                            error: Some("Could not find source or target concepts".to_string()),
+                        });
+                    }
+                });
             }
             ReasoningPathsAction::ExportReasoning => {
-                self.status_bar.set_activity("Export reasoning not yet implemented");
+                // Export reasoning paths as JSON
+                let paths = &self.reasoning_paths.paths;
+                
+                let export_data: Vec<serde_json::Value> = paths.iter().enumerate().map(|(idx, path)| {
+                    let steps: Vec<serde_json::Value> = path.path.iter().map(|step| {
+                        serde_json::json!({
+                            "concept_id": step.concept_id.to_hex(),
+                            "content": step.content,
+                            "confidence": step.confidence
+                        })
+                    }).collect();
+                    
+                    serde_json::json!({
+                        "path_index": idx,
+                        "confidence": path.confidence,
+                        "depth": path.depth,
+                        "step_count": path.path.len(),
+                        "steps": steps
+                    })
+                }).collect();
+                
+                let json_str = serde_json::to_string_pretty(&export_data).unwrap_or_default();
+                
+                // Write to file
+                if let Some(home) = dirs::home_dir() {
+                    let path = home.join("sutra_reasoning_paths.json");
+                    match std::fs::write(&path, json_str) {
+                        Ok(_) => {
+                            self.status_bar.set_activity(format!("Reasoning paths exported to {:?}", path));
+                        }
+                        Err(e) => {
+                            self.status_bar.set_activity(format!("Export failed: {}", e));
+                        }
+                    }
+                } else {
+                    self.status_bar.set_activity("Could not determine home directory");
+                }
             }
         }
     }
@@ -335,11 +556,22 @@ impl SutraApp {
                 self.graph_view.selected = Some(concept_id);
                 self.sidebar.current_view = SidebarView::Graph;
             }
-            TemporalViewAction::ExploreRelations(id, _relation) => {
-                self.status_bar.set_activity(format!("Exploring relations for {}...", &id[..8.min(id.len())]));
+            TemporalViewAction::ExploreRelations(id, relation) => {
+                // Search for related concepts with temporal relationships
+                let results = self.storage.text_search(&format!("{:?}", relation).to_lowercase(), 10);
+                if !results.is_empty() {
+                    // Update temporal view with related events
+                    let events = self.load_temporal_events();
+                    self.temporal_view.load_events(events);
+                }
+                self.status_bar.set_activity(format!("Found {} related concepts", results.len()));
             }
             TemporalViewAction::RefreshData => {
-                self.status_bar.set_activity("Temporal data refreshed");
+                // Load temporal events from storage
+                let events = self.load_temporal_events();
+                let event_count = events.len();
+                self.temporal_view.load_events(events);
+                self.status_bar.set_activity(format!("Loaded {} temporal events", event_count));
             }
         }
     }
@@ -354,15 +586,30 @@ impl SutraApp {
                 self.causal_view.is_analyzing = true;
                 self.status_bar.set_activity(format!("Analyzing causes for '{}'...", effect));
                 
-                // Search for effect concept
-                let results = self.storage.text_search(&effect, 1);
+                let storage = self.storage.clone();
+                let tx = self.tx.clone();
+                let effect_clone = effect.clone();
                 
-                if let Some((effect_id, _, _)) = results.first() {
-                    self.causal_view.analyze(&self.storage, *effect_id, max_hops);
-                    self.status_bar.set_activity("Causal analysis complete");
-                } else {
-                    self.causal_view.set_error("Could not find effect concept".to_string());
-                }
+                std::thread::spawn(move || {
+                    // Search for effect concept
+                    let results = storage.text_search(&effect_clone, 1);
+                    
+                    if let Some((effect_id, _, _)) = results.first() {
+                        let (chains, root_causes) = CausalView::analyze_static(&storage, *effect_id, max_hops);
+                        
+                        let _ = tx.send(AppMessage::CausalAnalysisComplete {
+                            chains,
+                            root_causes,
+                            error: None,
+                        });
+                    } else {
+                        let _ = tx.send(AppMessage::CausalAnalysisComplete {
+                            chains: vec![],
+                            root_causes: vec![],
+                            error: Some("Could not find effect concept".to_string()),
+                        });
+                    }
+                });
             }
             CausalViewAction::ExploreNode(id) => {
                 // Use from_string which parses hex strings into ConceptId
@@ -371,7 +618,59 @@ impl SutraApp {
                 self.sidebar.current_view = SidebarView::Graph;
             }
             CausalViewAction::ExportChains => {
-                self.status_bar.set_activity("Export chains not yet implemented");
+                // Export causal chains as JSON
+                let chains = &self.causal_view.causal_chains;
+                let root_causes = &self.causal_view.root_causes;
+                
+                let chains_export: Vec<serde_json::Value> = chains.iter().enumerate().map(|(idx, chain)| {
+                    let nodes: Vec<serde_json::Value> = chain.nodes.iter().map(|node| {
+                        serde_json::json!({
+                            "id": node.id,
+                            "label": node.label,
+                            "confidence": node.confidence,
+                            "is_root_cause": node.is_root_cause,
+                            "relation_type": format!("{:?}", node.relation_type)
+                        })
+                    }).collect();
+                    
+                    serde_json::json!({
+                        "chain_index": idx,
+                        "confidence": chain.confidence,
+                        "depth": chain.depth,
+                        "nodes": nodes
+                    })
+                }).collect();
+                
+                let root_causes_export: Vec<serde_json::Value> = root_causes.iter().map(|cause| {
+                    serde_json::json!({
+                        "id": cause.id,
+                        "label": cause.label,
+                        "confidence": cause.confidence,
+                        "relation_type": format!("{:?}", cause.relation_type)
+                    })
+                }).collect();
+                
+                let export_data = serde_json::json!({
+                    "chains": chains_export,
+                    "root_causes": root_causes_export
+                });
+                
+                let json_str = serde_json::to_string_pretty(&export_data).unwrap_or_default();
+                
+                // Write to file
+                if let Some(home) = dirs::home_dir() {
+                    let path = home.join("sutra_causal_analysis.json");
+                    match std::fs::write(&path, json_str) {
+                        Ok(_) => {
+                            self.status_bar.set_activity(format!("Causal analysis exported to {:?}", path));
+                        }
+                        Err(e) => {
+                            self.status_bar.set_activity(format!("Export failed: {}", e));
+                        }
+                    }
+                } else {
+                    self.status_bar.set_activity("Could not determine home directory");
+                }
             }
         }
     }
@@ -383,7 +682,45 @@ impl SutraApp {
     fn handle_analytics_action(&mut self, action: AnalyticsAction) {
         match action {
             AnalyticsAction::ExportReport => {
-                self.status_bar.set_activity("Export report not yet implemented");
+                // Export analytics report as JSON
+                let stats = self.storage.stats();
+                
+                let export_data = serde_json::json!({
+                    "report_generated": chrono::Local::now().to_rfc3339(),
+                    "storage_stats": {
+                        "total_concepts": stats.snapshot.concept_count,
+                        "total_edges": stats.snapshot.edge_count,
+                        "snapshot_sequence": stats.snapshot.sequence
+                    },
+                    "performance": {
+                        "history_count": self.analytics.history.len(),
+                        "activity_log_count": self.analytics.activity_log.len()
+                    },
+                    "recent_activities": self.analytics.activity_log.iter().take(100).map(|entry| {
+                        serde_json::json!({
+                            "activity_type": format!("{:?}", entry.activity_type),
+                            "description": entry.description,
+                            "duration_ms": entry.duration_ms
+                        })
+                    }).collect::<Vec<_>>()
+                });
+                
+                let json_str = serde_json::to_string_pretty(&export_data).unwrap_or_default();
+                
+                // Write to file
+                if let Some(home) = dirs::home_dir() {
+                    let path = home.join("sutra_analytics_report.json");
+                    match std::fs::write(&path, json_str) {
+                        Ok(_) => {
+                            self.status_bar.set_activity(format!("Analytics report exported to {:?}", path));
+                        }
+                        Err(e) => {
+                            self.status_bar.set_activity(format!("Export failed: {}", e));
+                        }
+                    }
+                } else {
+                    self.status_bar.set_activity("Could not determine home directory");
+                }
             }
             AnalyticsAction::ClearHistory => {
                 self.analytics.history.clear();
@@ -401,29 +738,66 @@ impl SutraApp {
         match action {
             QueryBuilderAction::RunQuery { query_type, query, filters } => {
                 self.query_builder.is_searching = true;
-                let start = Instant::now();
+                let storage = self.storage.clone();
+                let tx = self.tx.clone();
+                let query_clone = query.clone();
+                let filters_clone = filters.clone();
                 
-                let results: Vec<ConceptInfo> = {
-                    let search_results = self.storage.text_search(&query, filters.max_results);
-                    search_results.into_iter()
-                        .filter_map(|(id, _, conf)| {
-                            if conf >= filters.min_confidence {
-                                let snapshot = self.storage.get_snapshot();
-                                snapshot.get_concept(&id)
-                                    .map(|node| node_to_concept_info(&node, &self.storage))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect()
-                };
-                
-                let elapsed_ms = start.elapsed().as_millis() as u64;
-                self.query_builder.set_results(results, elapsed_ms);
-                self.status_bar.set_activity(format!("Query completed in {}ms", elapsed_ms));
+                std::thread::spawn(move || {
+                    let start = Instant::now();
+                    
+                    let results: Vec<ConceptInfo> = {
+                        let search_results = storage.text_search(&query_clone, filters_clone.max_results);
+                        search_results.into_iter()
+                            .filter_map(|(id, _, conf)| {
+                                if conf >= filters_clone.min_confidence {
+                                    let snapshot = storage.get_snapshot();
+                                    snapshot.get_concept(&id)
+                                        .map(|node| node_to_concept_info(&node, &storage))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect()
+                    };
+                    
+                    let elapsed_ms = start.elapsed().as_millis() as u64;
+                    let _ = tx.send(AppMessage::QueryBuilderResults {
+                        results,
+                        duration_ms: elapsed_ms,
+                    });
+                });
             }
             QueryBuilderAction::ExportResults => {
-                self.status_bar.set_activity("Export results not yet implemented");
+                // Export query results as JSON
+                let results = &self.query_builder.results;
+                
+                let export_data: Vec<serde_json::Value> = results.iter().map(|result| {
+                    serde_json::json!({
+                        "id": result.id,
+                        "content": result.content,
+                        "confidence": result.confidence,
+                        "strength": result.strength,
+                        "neighbor_count": result.neighbors.len()
+                    })
+                }).collect();
+                
+                let json_str = serde_json::to_string_pretty(&export_data).unwrap_or_default();
+                
+                // Write to file
+                if let Some(home) = dirs::home_dir() {
+                    let path = home.join("sutra_query_results.json");
+                    match std::fs::write(&path, json_str) {
+                        Ok(_) => {
+                            self.status_bar.set_activity(format!("Query results exported to {:?}", path));
+                        }
+                        Err(e) => {
+                            self.status_bar.set_activity(format!("Export failed: {}", e));
+                        }
+                    }
+                } else {
+                    self.status_bar.set_activity("Could not determine home directory");
+                }
             }
             QueryBuilderAction::VisualizeResults => {
                 self.sidebar.current_view = SidebarView::Graph;
@@ -439,20 +813,189 @@ impl SutraApp {
         match action {
             ExportImportAction::Export(path) => {
                 self.status_bar.set_activity(format!("Exporting to {}...", path));
-                // TODO: Implement actual export
-                self.status_bar.set_activity("Export completed");
+                
+                // Generate export content
+                match self.export_import.generate_export(&self.storage) {
+                    Ok(content) => {
+                        // Expand ~ to home directory
+                        let expanded_path = if path.starts_with('~') {
+                            if let Some(home) = dirs::home_dir() {
+                                path.replacen("~", &home.display().to_string(), 1)
+                            } else {
+                                path.clone()
+                            }
+                        } else {
+                            path.clone()
+                        };
+                        
+                        // Write to file
+                        match std::fs::write(&expanded_path, &content) {
+                            Ok(_) => {
+                                let stats = self.storage.stats();
+                                self.export_import.set_export_result(
+                                    true,
+                                    &expanded_path,
+                                    stats.snapshot.concept_count,
+                                    stats.snapshot.edge_count,
+                                    &format!("Successfully exported to {}", expanded_path)
+                                );
+                                self.status_bar.set_activity(format!("Exported {} concepts", stats.snapshot.concept_count));
+                                info!("Exported to {}", expanded_path);
+                            }
+                            Err(e) => {
+                                self.export_import.set_export_result(
+                                    false, &path, 0, 0,
+                                    &format!("Failed to write file: {}", e)
+                                );
+                                self.status_bar.set_activity("Export failed");
+                                error!("Export failed: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        self.export_import.set_export_result(false, &path, 0, 0, &e);
+                        self.status_bar.set_activity("Export failed");
+                        error!("Export generation failed: {}", e);
+                    }
+                }
             }
             ExportImportAction::Import(path) => {
                 self.status_bar.set_activity(format!("Importing from {}...", path));
-                // TODO: Implement actual import
-                self.refresh_stats();
-                self.status_bar.set_activity("Import completed");
+                
+                // Expand ~ to home directory
+                let expanded_path = if path.starts_with('~') {
+                    if let Some(home) = dirs::home_dir() {
+                        path.replacen("~", &home.display().to_string(), 1)
+                    } else {
+                        path.clone()
+                    }
+                } else {
+                    path.clone()
+                };
+                
+                // Read and parse file
+                match std::fs::read_to_string(&expanded_path) {
+                    Ok(content) => {
+                        match self.import_json_data(&content) {
+                            Ok((concepts, edges)) => {
+                                self.export_import.set_import_result(
+                                    true, concepts, edges, 0,
+                                    &format!("Successfully imported {} concepts, {} edges", concepts, edges)
+                                );
+                                self.refresh_stats();
+                                self.status_bar.set_activity(format!("Imported {} concepts", concepts));
+                                info!("Imported {} concepts from {}", concepts, expanded_path);
+                            }
+                            Err(e) => {
+                                self.export_import.set_import_result(false, 0, 0, 1, &e);
+                                self.status_bar.set_activity("Import failed");
+                                error!("Import parsing failed: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        self.export_import.set_import_result(
+                            false, 0, 0, 1,
+                            &format!("Failed to read file: {}", e)
+                        );
+                        self.status_bar.set_activity("Import failed");
+                        error!("Import failed: {}", e);
+                    }
+                }
             }
             ExportImportAction::BatchImport(path) => {
                 self.status_bar.set_activity(format!("Batch importing from {}...", path));
+                
+                // Expand path
+                let expanded_path = if path.starts_with('~') {
+                    if let Some(home) = dirs::home_dir() {
+                        path.replacen("~", &home.display().to_string(), 1)
+                    } else {
+                        path.clone()
+                    }
+                } else {
+                    path.clone()
+                };
+                
+                let storage = self.storage.clone();
+                let tx = self.tx.clone();
+                
+                self.export_import.batch_progress.is_running = true;
+                self.export_import.batch_progress.completed = 0;
+                self.export_import.batch_progress.errors = 0;
+                
+                std::thread::spawn(move || {
+                    // Read CSV file
+                    match std::fs::read_to_string(&expanded_path) {
+                        Ok(content) => {
+                            let lines: Vec<&str> = content.lines().collect();
+                            let total = lines.len().saturating_sub(1); // Skip header
+                            
+                            let _ = tx.send(AppMessage::BatchImportProgress {
+                                completed: 0,
+                                total,
+                                errors: 0,
+                            });
+                            
+                            let mut errors = 0;
+                            let mut last_update = Instant::now();
+                            
+                            for (i, line) in lines.iter().skip(1).enumerate() {
+                                let parts: Vec<&str> = line.split(',').collect();
+                                if let Some(content) = parts.first() {
+                                    let content = content.trim().trim_matches('"');
+                                    if !content.is_empty() {
+                                        let confidence: f32 = parts.get(1)
+                                            .and_then(|s| s.trim().parse().ok())
+                                            .unwrap_or(1.0);
+                                        
+                                        let hash = md5::compute(content.as_bytes());
+                                        let concept_id = ConceptId::from_bytes(hash.0);
+                                        
+                                        if storage.learn_concept(
+                                            concept_id,
+                                            content.as_bytes().to_vec(),
+                                            None,
+                                            1.0,
+                                            confidence,
+                                        ).is_err() {
+                                            errors += 1;
+                                        }
+                                    }
+                                }
+                                
+                                // Send progress update every 100ms
+                                if last_update.elapsed().as_millis() > 100 {
+                                    let _ = tx.send(AppMessage::BatchImportProgress {
+                                        completed: i + 1,
+                                        total,
+                                        errors,
+                                    });
+                                    last_update = Instant::now();
+                                }
+                            }
+                            
+                            let _ = tx.send(AppMessage::BatchImportComplete {
+                                completed: total,
+                                errors,
+                                error: None,
+                            });
+                        }
+                        Err(e) => {
+                            let _ = tx.send(AppMessage::BatchImportComplete {
+                                completed: 0,
+                                errors: 0,
+                                error: Some(format!("Failed to read file: {}", e)),
+                            });
+                        }
+                    }
+                });
             }
             ExportImportAction::CancelBatch => {
-                self.status_bar.set_activity("Batch operation cancelled");
+                // Note: This doesn't actually stop the thread, just updates UI
+                // To properly stop, we'd need an atomic flag or channel
+                self.export_import.batch_progress.is_running = false;
+                self.status_bar.set_activity("Batch operation cancelled (background task may continue)");
             }
         }
     }
@@ -481,12 +1024,160 @@ impl SutraApp {
                 self.sidebar.current_view = SidebarView::Export;
             }
             SettingsAction::ClearData => {
-                warn!("Clear data not yet implemented");
-                self.status_bar.set_activity("Clear data not yet implemented");
+                // Clear all data by removing the storage directory contents
+                warn!("Clearing all data from: {:?}", self.data_dir);
+                
+                // Remove all files in data directory (but keep directory itself)
+                if let Ok(entries) = std::fs::read_dir(&self.data_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_file() {
+                            let _ = std::fs::remove_file(&path);
+                        } else if path.is_dir() {
+                            let _ = std::fs::remove_dir_all(&path);
+                        }
+                    }
+                }
+                
+                // Reinitialize storage
+                let config = ConcurrentConfig {
+                    storage_path: self.data_dir.clone(),
+                    memory_threshold: 10_000,
+                    vector_dimension: 256,
+                    adaptive_reconciler_config: AdaptiveReconcilerConfig {
+                        base_interval_ms: 100,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                
+                let new_storage = ConcurrentMemory::new(config);
+                self.storage = Arc::new(new_storage);
+                
+                // Reset UI state
+                self.knowledge.concepts.clear();
+                self.graph_view.nodes.clear();
+                self.graph_view.edges.clear();
+                self.chat.messages.clear();
+                self.chat.add_response("🗑️ All data has been cleared. Starting fresh!".to_string());
+                
+                self.refresh_stats();
+                self.status_bar.set_activity("All data cleared");
+                info!("Storage cleared and reinitialized");
             }
         }
     }
     
+    // ========================================================================
+    // Async Message Handling
+    // ========================================================================
+    
+    fn handle_async_messages(&mut self) {
+        while let Ok(msg) = self.rx.try_recv() {
+            match msg {
+                AppMessage::LearnResult { content, concept_id, error, duration_ms } => {
+                    self.chat.is_processing = false;
+                    if let Some(err) = error {
+                        self.chat.add_response(format!("❌ Failed to learn: {}", err));
+                        error!("Learn failed: {}", err);
+                    } else if let Some(id) = concept_id {
+                        self.chat.add_response(format!(
+                            "✅ Learned! Stored as concept `{}`.\n\nYou can now ask me questions about this.",
+                            &id.to_hex()[..8]
+                        ));
+                        let preview = if content.len() > 30 { &content[..30] } else { &content };
+                        self.status_bar.set_activity(format!("Learned: {}... ({}ms)", preview, duration_ms));
+                        self.refresh_stats();
+                    }
+                }
+                
+                AppMessage::SearchResults { query, results, duration_ms } => {
+                    self.chat.is_processing = false;
+                    if results.is_empty() {
+                        self.chat.add_response(
+                            "🤔 I don't have knowledge about that yet.\n\nTeach me with: `/learn <your knowledge>`".to_string()
+                        );
+                    } else {
+                        let mut response = String::from("Based on my knowledge:\n\n");
+                        for (i, (_id, content, confidence)) in results.iter().enumerate() {
+                            response.push_str(&format!("{}. {} (relevance: {:.0}%)\n", i + 1, content, confidence * 100.0));
+                        }
+                        self.chat.add_response(response);
+                    }
+                    
+                    let preview = if query.len() > 30 { &query[..30] } else { &query };
+                    self.status_bar.set_activity(format!("Searched: {} ({}ms)", preview, duration_ms));
+                }
+                
+                AppMessage::KnowledgeLoaded { concepts } => {
+                    self.knowledge.is_loading = false;
+                    self.knowledge.set_concepts(concepts);
+                    self.status_bar.set_activity("Knowledge refreshed");
+                }
+                
+                AppMessage::GraphLoaded { nodes, edges } => {
+                    self.graph_view.load_from_data(nodes, edges);
+                    self.status_bar.set_activity("Graph refreshed");
+                }
+                
+                AppMessage::ReasoningPathsFound { paths, consensus, error } => {
+                    self.reasoning_paths.is_loading = false;
+                    if let Some(err) = error {
+                        self.reasoning_paths.error_message = Some(err);
+                        self.status_bar.set_activity("Reasoning path search failed");
+                    } else {
+                        self.reasoning_paths.paths = paths;
+                        self.reasoning_paths.consensus = consensus;
+                        self.status_bar.set_activity(format!("Found {} paths", self.reasoning_paths.paths.len()));
+                    }
+                }
+                
+                AppMessage::CausalAnalysisComplete { chains, root_causes, error } => {
+                    self.causal_view.is_analyzing = false;
+                    if let Some(err) = error {
+                        self.causal_view.set_error(err);
+                        self.status_bar.set_activity("Causal analysis failed");
+                    } else {
+                        self.causal_view.set_results(chains, root_causes);
+                        self.status_bar.set_activity("Causal analysis complete");
+                    }
+                }
+                
+                AppMessage::QueryBuilderResults { results, duration_ms } => {
+                    self.query_builder.is_searching = false;
+                    self.query_builder.set_results(results, duration_ms);
+                    self.status_bar.set_activity(format!("Query completed in {}ms", duration_ms));
+                }
+                
+                AppMessage::BatchImportProgress { completed, total, errors } => {
+                    self.export_import.batch_progress.completed = completed;
+                    self.export_import.batch_progress.total = total;
+                    self.export_import.batch_progress.errors = errors;
+                    self.status_bar.set_activity(format!("Importing: {}/{} ({} errors)", completed, total, errors));
+                }
+                
+                AppMessage::BatchImportComplete { completed, errors, error } => {
+                    self.export_import.batch_progress.is_running = false;
+                    if let Some(err) = error {
+                        self.status_bar.set_activity(format!("Batch import failed: {}", err));
+                        error!("Batch import failed: {}", err);
+                    } else {
+                        self.export_import.batch_progress.completed = completed;
+                        self.export_import.batch_progress.errors = errors;
+                        self.refresh_stats();
+                        self.status_bar.set_activity(format!(
+                            "Batch import complete: {} imported, {} errors",
+                            completed - errors,
+                            errors
+                        ));
+                    }
+                }
+                
+                _ => {}
+            }
+        }
+    }
+
     // ========================================================================
     // Helper Methods
     // ========================================================================
@@ -506,15 +1197,117 @@ impl SutraApp {
         self.settings.update_stats(convert_to_ui_stats(&stats));
         self.analytics.update(&self.storage);
     }
+    
+    /// Import data from JSON format
+    fn import_json_data(&self, content: &str) -> Result<(usize, usize), String> {
+        let data: serde_json::Value = serde_json::from_str(content)
+            .map_err(|e| format!("Invalid JSON: {}", e))?;
+        
+        let concepts = data.get("concepts")
+            .and_then(|c| c.as_array())
+            .ok_or("Missing 'concepts' array in JSON")?;
+        
+        let mut imported_concepts = 0;
+        let mut imported_edges = 0;
+        
+        for concept in concepts {
+            let content = concept.get("content")
+                .and_then(|c| c.as_str())
+                .ok_or("Concept missing 'content' field")?;
+            
+            let confidence = concept.get("confidence")
+                .and_then(|c| c.as_f64())
+                .unwrap_or(1.0) as f32;
+            
+            let strength = concept.get("strength")
+                .and_then(|s| s.as_f64())
+                .unwrap_or(1.0) as f32;
+            
+            // Generate concept ID from content hash
+            let hash = md5::compute(content.as_bytes());
+            let concept_id = ConceptId::from_bytes(hash.0);
+            
+            // Learn the concept
+            if self.storage.learn_concept(
+                concept_id,
+                content.as_bytes().to_vec(),
+                None,
+                strength,
+                confidence,
+            ).is_ok() {
+                imported_concepts += 1;
+            }
+            
+            // Count neighbors as edges
+            if let Some(neighbors) = concept.get("neighbors").and_then(|n| n.as_array()) {
+                imported_edges += neighbors.len();
+            }
+        }
+        
+        Ok((imported_concepts, imported_edges))
+    }
+    
+    /// Load temporal events from storage concepts
+    pub fn load_temporal_events(&self) -> Vec<crate::types::TimelineEvent> {
+        let snapshot = self.storage.get_snapshot();
+        let concepts = snapshot.all_concepts();
+        
+        let temporal_keywords = ["before", "after", "during", "when", "then", "until", "since", "while"];
+        
+        concepts.iter()
+            .filter_map(|node| {
+                let content = std::str::from_utf8(&node.content).ok()?;
+                let content_lower = content.to_lowercase();
+                
+                // Check if content has temporal markers
+                let has_temporal = temporal_keywords.iter().any(|kw| content_lower.contains(kw));
+                
+                // Check semantic type for temporal classification
+                let is_semantic_temporal = node.semantic.as_ref()
+                    .map(|s| s.semantic_type == SemanticType::Temporal || s.semantic_type == SemanticType::Event)
+                    .unwrap_or(false);
+                
+                if has_temporal || is_semantic_temporal {
+                    // Determine relative time based on keywords
+                    let relative_time = if content_lower.contains("before") || content_lower.contains("earlier") {
+                        -1
+                    } else if content_lower.contains("after") || content_lower.contains("later") || content_lower.contains("then") {
+                        1
+                    } else {
+                        0
+                    };
+                    
+                    Some(crate::types::TimelineEvent {
+                        concept_id: node.id.to_hex(),
+                        label: if content.len() > 50 { format!("{}...", &content[..50]) } else { content.to_string() },
+                        description: content.to_string(),
+                        timestamp: format!("Created: {}", node.created),
+                        relative_time,
+                        confidence: node.confidence,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 impl eframe::App for SutraApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Handle async messages
+        self.handle_async_messages();
+
         // Initial data load
         if !self.initialized {
             self.handle_knowledge_action(KnowledgeAction::Refresh);
             self.graph_view.load_from_storage(&self.storage);
             self.analytics.update(&self.storage);
+            
+            // Load temporal events from storage
+            let events = self.load_temporal_events();
+            self.temporal_view.load_events(events);
+            
             self.initialized = true;
         }
         
@@ -609,16 +1402,6 @@ impl eframe::App for SutraApp {
 // ============================================================================
 // Helper types and functions
 // ============================================================================
-
-/// Concept info for UI display
-#[derive(Debug, Clone)]
-pub struct ConceptInfo {
-    pub id: String,
-    pub content: String,
-    pub strength: f32,
-    pub confidence: f32,
-    pub neighbors: Vec<String>,
-}
 
 /// Convert ConceptNode to ConceptInfo
 fn node_to_concept_info(node: &ConceptNode, storage: &ConcurrentMemory) -> ConceptInfo {

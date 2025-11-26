@@ -716,6 +716,106 @@ impl CausalView {
         }
     }
     
+    /// Analyze causal chains for an effect (Static version)
+    pub fn analyze_static(storage: &sutra_storage::ConcurrentMemory, effect_id: sutra_storage::ConceptId, max_hops: usize) -> (Vec<CausalChain>, Vec<CausalNode>) {
+        let mut causal_chains = Vec::new();
+        let mut root_causes = Vec::new();
+        
+        // Build causal chain by traversing backwards from effect
+        let mut visited = HashSet::new();
+        let mut chain_nodes = Vec::new();
+        let mut current_id = effect_id;
+        
+        // Get concept content for effect
+        let snapshot = storage.get_snapshot();
+        {
+            if let Some(node) = snapshot.get_concept(&effect_id) {
+                let content = String::from_utf8_lossy(&node.content).to_string();
+                chain_nodes.push(CausalNode {
+                    id: format!("{:?}", effect_id),
+                    label: content.chars().take(50).collect::<String>(),
+                    content: content,
+                    confidence: 1.0,
+                    relation_type: CausalRelationType::DirectCause,
+                    is_root_cause: false,
+                });
+            }
+            
+            // Walk backwards through neighbors (simplified causal analysis)
+            for hop in 0..max_hops {
+                if visited.contains(&current_id) {
+                    break;
+                }
+                visited.insert(current_id);
+                
+                let neighbors = storage.query_neighbors_weighted(&current_id);
+                if neighbors.is_empty() {
+                    // This is a root cause
+                    if let Some(last) = chain_nodes.last_mut() {
+                        last.is_root_cause = true;
+                    }
+                    break;
+                }
+                
+                // Take strongest neighbor as cause (simplified)
+                if let Some((neighbor_id, weight)) = neighbors.into_iter()
+                    .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+                {
+                    if let Some(node) = snapshot.get_concept(&neighbor_id) {
+                        let is_root = hop == max_hops - 1;
+                        let relation = if hop == 0 {
+                            CausalRelationType::DirectCause
+                        } else if weight > 0.7 {
+                            CausalRelationType::IndirectCause
+                        } else {
+                            CausalRelationType::Contributing
+                        };
+                        
+                        let content = String::from_utf8_lossy(&node.content).to_string();
+                        chain_nodes.push(CausalNode {
+                            id: format!("{:?}", neighbor_id),
+                            label: content.chars().take(50).collect::<String>(),
+                            content: content,
+                            confidence: weight,
+                            relation_type: relation,
+                            is_root_cause: is_root,
+                        });
+                        
+                        current_id = neighbor_id;
+                    }
+                }
+            }
+            
+            // Mark terminal node as root cause
+            if chain_nodes.len() > 1 {
+                if let Some(last) = chain_nodes.last_mut() {
+                    last.is_root_cause = true;
+                }
+            }
+            
+            // Create chain
+            if !chain_nodes.is_empty() {
+                // Calculate overall confidence
+                let avg_confidence = chain_nodes.iter()
+                    .map(|n| n.confidence)
+                    .sum::<f32>() / chain_nodes.len() as f32;
+                    
+                causal_chains.push(CausalChain {
+                    nodes: chain_nodes.clone(),
+                    confidence: avg_confidence,
+                    depth: chain_nodes.len(),
+                });
+                
+                // Extract root causes
+                root_causes = chain_nodes.into_iter()
+                    .filter(|n| n.is_root_cause)
+                    .collect();
+            }
+        }
+        
+        (causal_chains, root_causes)
+    }
+    
     /// Set error message
     pub fn set_error(&mut self, message: String) {
         self.error_message = Some(message);

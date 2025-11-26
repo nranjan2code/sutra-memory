@@ -162,6 +162,13 @@ impl GraphView {
         
         self.simulation_running = true;
     }
+
+    /// Load graph data from pre-computed nodes and edges
+    pub fn load_from_data(&mut self, nodes: HashMap<ConceptId, GraphNode>, edges: Vec<GraphEdge>) {
+        self.nodes = nodes;
+        self.edges = edges;
+        self.simulation_running = true;
+    }
     
     /// Infer edge type from content (simple heuristic)
     fn infer_edge_type(&self, content: &[u8]) -> EdgeType {
@@ -499,7 +506,7 @@ impl GraphView {
                 .rounding(Rounding::same(10.0))
                 .inner_margin(egui::Margin::symmetric(8.0, 2.0))
                 .show(ui, |ui| {
-                    ui.label(RichText::new(format!("{} nodes", self.nodes.len())).size(11.0).color(TEXT_SECONDARY));
+                    ui.label(RichText::new(format!("{} nodes", self.nodes.len())).size(12.0).color(TEXT_SECONDARY));
                 });
             
             // Edge count
@@ -508,12 +515,12 @@ impl GraphView {
                 .rounding(Rounding::same(10.0))
                 .inner_margin(egui::Margin::symmetric(8.0, 2.0))
                 .show(ui, |ui| {
-                    ui.label(RichText::new(format!("{} edges", self.edges.len())).size(11.0).color(TEXT_SECONDARY));
+                    ui.label(RichText::new(format!("{} edges", self.edges.len())).size(12.0).color(TEXT_SECONDARY));
                 });
             
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 // Refresh button
-                if ui.button(RichText::new("↻ Refresh").size(12.0)).clicked() {
+                if ui.button(RichText::new("↻ Refresh").size(13.0)).clicked() {
                     *action = Some(GraphAction::Refresh);
                 }
                 
@@ -563,7 +570,7 @@ impl GraphView {
                 Pos2::new(legend_rect.min.x + 38.0, y),
                 egui::Align2::LEFT_TOP,
                 name,
-                egui::FontId::proportional(10.0),
+                egui::FontId::proportional(11.0),
                 TEXT_SECONDARY,
             );
         }
@@ -572,7 +579,7 @@ impl GraphView {
     fn render_controls(&mut self, ui: &mut egui::Ui, action: &mut Option<GraphAction>) {
         ui.horizontal(|ui| {
             // Center button
-            if ui.button(RichText::new("⌖ Center").size(12.0)).clicked() {
+            if ui.button(RichText::new("⌖ Center").size(13.0)).clicked() {
                 self.camera.offset = Vec2::ZERO;
                 self.camera.zoom = 1.0;
             }
@@ -582,7 +589,7 @@ impl GraphView {
             if ui.button(RichText::new("−").size(14.0)).clicked() {
                 self.camera.zoom = (self.camera.zoom * 0.8).max(0.1);
             }
-            ui.label(RichText::new(format!("{:.0}%", self.camera.zoom * 100.0)).size(11.0).color(TEXT_SECONDARY));
+            ui.label(RichText::new(format!("{:.0}%", self.camera.zoom * 100.0)).size(12.0).color(TEXT_SECONDARY));
             if ui.button(RichText::new("+").size(14.0)).clicked() {
                 self.camera.zoom = (self.camera.zoom * 1.25).min(5.0);
             }
@@ -590,7 +597,7 @@ impl GraphView {
             ui.add_space(16.0);
             
             // Layout selector
-            ui.label(RichText::new("Layout:").size(11.0).color(TEXT_MUTED));
+            ui.label(RichText::new("Layout:").size(12.0).color(TEXT_MUTED));
             egui::ComboBox::from_id_salt("layout_type")
                 .selected_text(match self.layout_type {
                     LayoutType::ForceDirected => "Force",
@@ -616,7 +623,7 @@ impl GraphView {
             // Simulation toggle
             ui.add_space(16.0);
             let sim_text = if self.simulation_running { "⏸ Pause" } else { "▶ Run" };
-            if ui.button(RichText::new(sim_text).size(12.0)).clicked() {
+            if ui.button(RichText::new(sim_text).size(13.0)).clicked() {
                 self.simulation_running = !self.simulation_running;
             }
             
@@ -628,7 +635,7 @@ impl GraphView {
                             &node.label[..node.label.len().min(30)],
                             node.neighbor_count,
                             node.confidence * 100.0
-                        )).size(11.0).color(TEXT_SECONDARY));
+                        )).size(12.0).color(TEXT_SECONDARY));
                     }
                 }
             });

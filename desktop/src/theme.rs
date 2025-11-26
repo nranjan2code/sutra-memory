@@ -20,10 +20,10 @@ pub const BG_WIDGET: Color32 = Color32::from_rgb(35, 35, 55);     // Inputs/card
 pub const BG_HOVER: Color32 = Color32::from_rgb(45, 45, 70);      // Hover state
 pub const BG_ELEVATED: Color32 = Color32::from_rgb(40, 40, 62);   // Elevated cards
 
-// Text colors - High contrast
-pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(248, 250, 252);   // Almost white
-pub const TEXT_SECONDARY: Color32 = Color32::from_rgb(148, 163, 184); // Slate
-pub const TEXT_MUTED: Color32 = Color32::from_rgb(100, 116, 139);     // Dimmed
+// Text colors - High contrast (WCAG AA Compliant)
+pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(248, 250, 252);   // Almost white (~15:1 contrast)
+pub const TEXT_SECONDARY: Color32 = Color32::from_rgb(160, 174, 192); // Lighter Slate (~7:1 contrast)
+pub const TEXT_MUTED: Color32 = Color32::from_rgb(125, 140, 165);     // Lightened Dimmed (~5:1 contrast)
 
 /// Apply custom theme to egui context
 pub fn setup_custom_theme(ctx: &egui::Context) {

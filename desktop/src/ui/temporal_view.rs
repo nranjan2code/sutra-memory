@@ -6,7 +6,7 @@
 use eframe::egui::{self, Color32, RichText, Rounding, ScrollArea, Stroke, Vec2, Pos2, Rect};
 use crate::theme::*;
 use crate::types::{TimeRange, TimelineEvent, TemporalRelation};
-use crate::app::ConceptInfo;
+use crate::types::ConceptInfo;
 use std::collections::HashMap;
 
 /// Temporal View Panel

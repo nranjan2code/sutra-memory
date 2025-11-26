@@ -122,6 +122,11 @@ pub enum ChatAction {
 | `/clear` | `/c` | Clear chat |
 | `/stats` | `/status` | Show statistics |
 
+**Async Processing:**
+- Non-blocking message handling
+- Typing indicator ("Sutra is thinking...") during heavy operations
+- Immediate UI feedback for user actions
+
 **Autocomplete:**
 - Triggered when input starts with `/`
 - Keyboard navigation: ↑/↓ arrows

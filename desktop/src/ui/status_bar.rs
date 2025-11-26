@@ -51,7 +51,7 @@ impl StatusBar {
                     ui.add_space(12.0);
                     
                     // Last activity
-                    ui.label(RichText::new(&self.last_activity).size(11.0).color(TEXT_MUTED));
+                    ui.label(RichText::new(&self.last_activity).size(12.0).color(TEXT_MUTED));
                     
                     // Right side
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -61,14 +61,14 @@ impl StatusBar {
                             .rounding(Rounding::same(4.0))
                             .inner_margin(egui::Margin::symmetric(6.0, 2.0))
                             .show(ui, |ui| {
-                                ui.label(RichText::new(&self.version).size(10.0).color(TEXT_MUTED).monospace());
+                                ui.label(RichText::new(&self.version).size(11.0).color(TEXT_MUTED).monospace());
                             });
                         
                         ui.add_space(8.0);
                         
                         // Storage type indicator
-                        ui.label(RichText::new("Local Storage").size(10.0).color(TEXT_MUTED));
-                        ui.label(RichText::new("💾").size(10.0));
+                        ui.label(RichText::new("Local Storage").size(11.0).color(TEXT_MUTED));
+                        ui.label(RichText::new("💾").size(11.0));
                     });
                 });
             });
@@ -99,15 +99,15 @@ impl StatusBar {
                     ui.painter().circle_filled(center, 3.0, icon_color);
                     
                     ui.add_space(4.0);
-                    ui.label(RichText::new(text).size(10.0).color(icon_color));
+                    ui.label(RichText::new(text).size(11.0).color(icon_color));
                 });
             });
     }
     
     fn stat_pill(&self, ui: &mut egui::Ui, icon: &str, value: &str, _label: &str) {
         ui.horizontal(|ui| {
-            ui.label(RichText::new(icon).size(11.0));
-            ui.label(RichText::new(value).size(11.0).color(TEXT_SECONDARY).strong());
+            ui.label(RichText::new(icon).size(12.0));
+            ui.label(RichText::new(value).size(12.0).color(TEXT_SECONDARY).strong());
         });
     }
     

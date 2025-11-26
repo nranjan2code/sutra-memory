@@ -7,7 +7,7 @@ use eframe::egui::{self, Color32, RichText, Rounding, ScrollArea, Stroke, Vec2};
 use sutra_storage::ConceptId;
 use crate::theme::*;
 use crate::types::{QueryType, QueryFilters};
-use crate::app::ConceptInfo;
+use crate::types::ConceptInfo;
 
 /// Query Builder Panel
 pub struct QueryBuilder {

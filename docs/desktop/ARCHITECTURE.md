@@ -30,11 +30,12 @@ Using **egui** (immediate mode GUI), the UI is:
 - Highly responsive with no layout thrashing
 - Memory efficient with minimal allocations
 
-### 3. Single-Threaded UI with Background Storage
+### 3. Asynchronous Architecture
 
-- **UI Thread**: All egui rendering and user interaction
-- **Storage Operations**: Most operations are synchronous but fast (<10ms)
-- **Future**: Long operations (bulk import, export) will use tokio for async
+- **UI Thread**: Handles all rendering and user interaction (60 FPS).
+- **Background Threads**: Heavy operations (learning, graph layout, pathfinding) run in dedicated threads.
+- **Message Passing**: Communication via `std::sync::mpsc` channels.
+- **Non-blocking**: The UI never freezes, even during complex reasoning tasks.
 
 ---
 
@@ -49,7 +50,7 @@ desktop/
     ├── main.rs             # Entry point, window setup
     ├── app.rs              # Main application controller
     ├── theme.rs            # Color palette and styling
-    ├── types.rs            # Shared data types
+    ├── types.rs            # Shared data types & AppMessage
     └── ui/
         ├── mod.rs          # Module exports
         ├── sidebar.rs      # Navigation sidebar
@@ -93,160 +94,107 @@ Responsibilities:
 pub struct SutraApp {
     // Storage engine (from sutra-storage crate)
     storage: Arc<ConcurrentMemory>,
-    data_dir: PathBuf,
+    
+    // Async communication
+    sender: Sender<AppMessage>,
+    receiver: Receiver<AppMessage>,
     
     // Core UI panels
     sidebar: Sidebar,
     chat: ChatPanel,
-    knowledge: KnowledgePanel,
-    settings: SettingsPanel,
-    status_bar: StatusBar,
-    
-    // Enhanced UI panels
-    graph_view: GraphView,
-    reasoning_paths: ReasoningPathsPanel,
-    temporal_view: TemporalView,
-    causal_view: CausalView,
-    analytics: AnalyticsDashboard,
-    query_builder: QueryBuilder,
-    export_import: ExportImportPanel,
-    
-    // State
-    initialized: bool,
+    // ... other panels
 }
 ```
 
 Key methods:
-- `new()` - Initialize storage and all panels
+- `new()` - Initialize storage, channels, and panels
 - `update()` - egui frame update (called 60x/sec)
-- `handle_*_action()` - Action handlers for each panel
-- `on_exit()` - Flush storage on shutdown
+- `handle_async_messages()` - Process results from background threads
+- `spawn_task()` - Helper to run closures in background threads
 
 ### theme.rs - Visual Design System
 
-Color palette following modern dark theme principles:
+Color palette following modern dark theme principles and **WCAG AA compliance**:
 
 ```rust
 // Primary colors
 pub const PRIMARY: Color32 = Color32::from_rgb(167, 139, 250);     // Vibrant Purple
-pub const SECONDARY: Color32 = Color32::from_rgb(96, 165, 250);    // Sky Blue
-pub const ACCENT: Color32 = Color32::from_rgb(251, 191, 36);       // Amber
-pub const SUCCESS: Color32 = Color32::from_rgb(52, 211, 153);      // Emerald
-pub const WARNING: Color32 = Color32::from_rgb(251, 146, 60);      // Orange
-pub const ERROR: Color32 = Color32::from_rgb(248, 113, 113);       // Red
 
-// Backgrounds
-pub const BG_DARK: Color32 = Color32::from_rgb(15, 15, 25);        // Darkest
-pub const BG_PANEL: Color32 = Color32::from_rgb(22, 22, 35);       // Panels
-pub const BG_WIDGET: Color32 = Color32::from_rgb(35, 35, 55);      // Inputs/cards
+// Text colors - High contrast
+pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(248, 250, 252);   // ~15:1 contrast
+pub const TEXT_SECONDARY: Color32 = Color32::from_rgb(160, 174, 192); // ~7:1 contrast
+pub const TEXT_MUTED: Color32 = Color32::from_rgb(125, 140, 165);     // ~5:1 contrast
 ```
-
-Helper functions:
-- `setup_custom_theme()` - Apply theme to egui context
-- `card_frame()` - Styled card component
-- `elevated_card()` - More prominent card variant
-- `button_frame()` - Styled button container
 
 ### types.rs - Shared Data Structures
 
-Types used across multiple panels:
+Types used across multiple panels, including async messages:
 
 ```rust
+// Async Messages
+pub enum AppMessage {
+    LearnResult { content, concept_id, ... },
+    GraphLoaded { nodes, edges },
+    ReasoningPathsFound { paths, consensus },
+    // ...
+}
+
 // Graph visualization
 pub struct GraphNode { id, label, content, confidence, x, y, vx, vy }
-pub struct GraphEdge { from, to, strength, edge_type }
-pub enum EdgeType { Semantic, Causal, Temporal, Hierarchical, Similar }
-
-// Reasoning paths (MPPA)
-pub struct ReasoningPath { path: Vec<PathStep>, confidence, depth }
-pub struct ConsensusResult { primary_cluster, alternatives, total_paths }
-
-// Temporal analysis
-pub struct TimelineEvent { concept_id, label, timestamp, relative_time }
-pub enum TemporalRelation { Before, After, During, Concurrent }
-
-// Causal analysis
-pub struct CausalChain { nodes: Vec<CausalNode>, confidence, depth }
-pub enum CausalRelationType { DirectCause, IndirectCause, Contributing, Correlation }
-
-// Analytics
-pub struct AnalyticsMetrics { total_concepts, total_edges, query_latency_ms, ... }
-
-// Query builder
-pub struct QueryFilters { min_confidence, max_results, has_causal, has_temporal, ... }
-
-// Export/import
-pub enum ExportFormat { Json, Csv, GraphML, Cypher }
+// ...
 ```
 
 ---
 
 ## Data Flow
 
-### Action-Handler Pattern
+### Async Command-Event Pattern
 
-Each UI panel communicates through a typed action enum:
+The application uses a non-blocking command-event pattern:
+
+1.  **UI Action**: User clicks a button (e.g., "Learn").
+2.  **State Update**: UI updates to "Processing" state immediately.
+3.  **Task Spawn**: `SutraApp` spawns a background thread with a clone of `storage` and `sender`.
+4.  **Background Work**: Thread performs heavy storage operation.
+5.  **Message Send**: Thread sends `AppMessage::LearnResult` via channel.
+6.  **Message Handle**: Main thread's `update()` loop receives message via `handle_async_messages()`.
+7.  **UI Refresh**: App state is updated with results, and UI re-renders.
 
 ```rust
-// Panel returns optional action
-pub fn ui(&mut self, ui: &mut egui::Ui) -> Option<ChatAction> {
-    // ... render UI ...
-    if button_clicked {
-        return Some(ChatAction::Learn(content));
-    }
-    None
+// 1. UI triggers action
+if ui.button("Learn").clicked() {
+    self.chat.is_processing = true;
+    let storage = self.storage.clone();
+    let sender = self.sender.clone();
+    
+    // 3. Spawn background task
+    std::thread::spawn(move || {
+        // 4. Heavy work
+        let result = storage.learn_concept(...);
+        
+        // 5. Send result
+        sender.send(AppMessage::LearnResult { ... }).unwrap();
+    });
 }
 
-// App controller handles actions
-fn handle_chat_action(&mut self, action: ChatAction) {
-    match action {
-        ChatAction::Learn(content) => {
-            self.storage.learn_concept(...);
-            self.refresh_stats();
+// 6. Main loop handles message
+fn handle_async_messages(&mut self) {
+    while let Ok(msg) = self.receiver.try_recv() {
+        match msg {
+            AppMessage::LearnResult { ... } => {
+                // 7. Update UI state
+                self.chat.add_response(...);
+                self.chat.is_processing = false;
+            }
         }
-        // ...
     }
 }
 ```
 
 Benefits:
-- Clear separation of UI and logic
-- Type-safe communication
-- Easy to test handlers independently
-- Consistent pattern across all panels
-
-### Storage Integration
-
-The app uses `sutra-storage::ConcurrentMemory` directly:
-
-```rust
-// Initialization
-let config = ConcurrentConfig {
-    storage_path: data_dir.clone(),
-    memory_threshold: 10_000,
-    vector_dimension: 256,
-    // ...
-};
-let storage = ConcurrentMemory::new(config);
-
-// Learning
-let concept_id = ConceptId::from_bytes(md5_hash);
-storage.learn_concept(concept_id, content.as_bytes().to_vec(), None, 1.0, 1.0)?;
-
-// Searching
-let results = storage.text_search(&query, limit);
-
-// Graph operations
-let neighbors = storage.query_neighbors(&concept_id);
-let weighted = storage.query_neighbors_weighted(&concept_id);
-
-// Pathfinding
-let pathfinder = ParallelPathFinder::new(confidence_decay);
-let paths = pathfinder.find_paths_parallel(snapshot, from, to, max_depth, max_paths);
-
-// Persistence
-storage.flush()?;
-```
+- **Responsiveness**: UI remains interactive (60 FPS) during heavy loads.
+- **Simplicity**: No complex async runtime (tokio) needed for UI logic.
+- **Safety**: `Arc<ConcurrentMemory>` handles thread-safe storage access.
 
 ---
 

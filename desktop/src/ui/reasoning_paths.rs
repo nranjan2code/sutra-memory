@@ -110,6 +110,35 @@ impl ReasoningPathsPanel {
         }
     }
     
+    /// Convert PathResult to ReasoningPath with content (Static version)
+    pub fn convert_path_static(path: &PathResult, snapshot: &std::sync::Arc<sutra_storage::GraphSnapshot>, decay: f32) -> ReasoningPath {
+        let steps: Vec<PathStep> = path.path
+            .iter()
+            .enumerate()
+            .map(|(i, id)| {
+                let content = snapshot.get_concept(id)
+                    .map(|c| String::from_utf8_lossy(&c.content).to_string())
+                    .unwrap_or_else(|| format!("Concept {}", id.to_hex()[..8].to_string()));
+                
+                let confidence = decay.powi(i as i32);
+                let relation = if i == 0 { "Start".to_string() } else { "→".to_string() };
+                
+                PathStep {
+                    concept_id: *id,
+                    content,
+                    confidence,
+                    relation,
+                }
+            })
+            .collect();
+        
+        ReasoningPath {
+            confidence: path.confidence,
+            depth: path.depth,
+            path: steps,
+        }
+    }
+
     /// Run MPPA-style consensus analysis
     fn analyze_consensus(&self) -> ConsensusResult {
         if self.paths.is_empty() {
@@ -150,6 +179,85 @@ impl ReasoningPathsPanel {
                 // Calculate consensus weight (MPPA formula)
                 let consensus_bonus = if support_ratio >= self.consensus_threshold {
                     1.0 + (support_ratio - self.consensus_threshold)
+                } else {
+                    1.0
+                };
+                let outlier_penalty = if support_ratio < 0.2 { 0.7 } else { 1.0 };
+                let consensus_weight = avg_confidence * support_ratio * consensus_bonus * outlier_penalty;
+                
+                PathCluster {
+                    destination: last_step.concept_id,
+                    destination_content: last_step.content.clone(),
+                    paths,
+                    avg_confidence,
+                    consensus_weight,
+                    support_ratio,
+                }
+            })
+            .collect();
+        
+        // Sort by consensus weight
+        scored_clusters.sort_by(|a, b| b.consensus_weight.partial_cmp(&a.consensus_weight).unwrap());
+        
+        let primary = scored_clusters.remove(0);
+        let primary_support = (primary.support_ratio * 100.0) as usize;
+        
+        let explanation = format!(
+            "Consensus reached with {}% agreement ({}/{} paths). Confidence: {:.0}%.",
+            primary_support,
+            primary.paths.len(),
+            total_paths,
+            primary.avg_confidence * 100.0
+        );
+        
+        ConsensusResult {
+            primary_cluster: primary,
+            alternatives: scored_clusters,
+            total_paths,
+            explanation,
+        }
+    }
+    
+    /// Run MPPA-style consensus analysis (Static version)
+    pub fn analyze_consensus_static(paths: &[ReasoningPath], threshold: f32) -> ConsensusResult {
+        if paths.is_empty() {
+            return ConsensusResult {
+                primary_cluster: PathCluster {
+                    destination: ConceptId::from_bytes([0; 16]),
+                    destination_content: "No paths".to_string(),
+                    paths: vec![],
+                    avg_confidence: 0.0,
+                    consensus_weight: 0.0,
+                    support_ratio: 0.0,
+                },
+                alternatives: vec![],
+                total_paths: 0,
+                explanation: "No paths found.".to_string(),
+            };
+        }
+        
+        // Cluster paths by destination
+        let mut clusters: HashMap<String, Vec<ReasoningPath>> = HashMap::new();
+        
+        for path in paths {
+            if let Some(last_step) = path.path.last() {
+                let key = last_step.concept_id.to_hex();
+                clusters.entry(key).or_default().push(path.clone());
+            }
+        }
+        
+        // Convert to PathCluster and score
+        let total_paths = paths.len();
+        let mut scored_clusters: Vec<PathCluster> = clusters
+            .into_iter()
+            .map(|(_, paths)| {
+                let last_step = paths[0].path.last().unwrap();
+                let support_ratio = paths.len() as f32 / total_paths as f32;
+                let avg_confidence = paths.iter().map(|p| p.confidence).sum::<f32>() / paths.len() as f32;
+                
+                // Calculate consensus weight (MPPA formula)
+                let consensus_bonus = if support_ratio >= threshold {
+                    1.0 + (support_ratio - threshold)
                 } else {
                     1.0
                 };

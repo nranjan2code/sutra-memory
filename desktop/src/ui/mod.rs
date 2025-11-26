@@ -8,6 +8,7 @@
 pub mod sidebar;
 pub mod chat;
 pub mod knowledge;
+pub mod quick_learn;
 pub mod settings;
 pub mod status_bar;
 
@@ -24,6 +25,7 @@ pub mod export_import;
 pub use sidebar::{Sidebar, SidebarView};
 pub use chat::{ChatPanel, ChatAction};
 pub use knowledge::{KnowledgePanel, KnowledgeAction};
+pub use quick_learn::{QuickLearnPanel, QuickLearnAction};
 pub use settings::{SettingsPanel, SettingsAction, StorageStatsUI, StorageStatus};
 pub use status_bar::{StatusBar, ConnectionStatus};
 

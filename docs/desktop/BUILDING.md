@@ -278,6 +278,7 @@ cargo build -p sutra-desktop --release --target x86_64-unknown-linux-musl
 | `rand` | 0.8 | Graph layout |
 | `csv` | 1.3 | CSV export |
 | `quick-xml` | 0.36 | GraphML export |
+| `webbrowser` | 1.0 | Open URLs in browser |
 
 ### macOS-Specific
 

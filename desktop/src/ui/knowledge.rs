@@ -164,21 +164,58 @@ impl KnowledgePanel {
     
     fn empty_state(&self, ui: &mut egui::Ui) {
         ui.vertical_centered(|ui| {
-            ui.add_space(60.0);
+            ui.add_space(40.0);
             
-            // Decorative empty state
+            // Friendly getting started state
             egui::Frame::none()
-                .fill(BG_WIDGET)
+                .fill(ACCENT.gamma_multiply(0.08))
                 .rounding(Rounding::same(16.0))
                 .inner_margin(24.0)
                 .show(ui, |ui| {
-                    ui.label(RichText::new("🧠").size(48.0));
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("💡").size(36.0));
+                            ui.add_space(12.0);
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new("Let's get started!").size(18.0).color(TEXT_PRIMARY).strong());
+                                ui.label(RichText::new("Your knowledge base is empty").size(13.0).color(TEXT_MUTED));
+                            });
+                        });
+                        
+                        ui.add_space(16.0);
+                        
+                        ui.label(RichText::new("Try teaching me something:").size(14.0).color(TEXT_SECONDARY));
+                        ui.add_space(8.0);
+                        
+                        // Learning suggestions
+                        let suggestions = [
+                            "Paris is the capital of France",
+                            "Rust is a systems programming language",
+                            "Machine learning uses data to make predictions",
+                            "The mitochondria is the powerhouse of the cell",
+                        ];
+                        
+                        for suggestion in &suggestions {
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new("•").color(ACCENT));
+                                ui.label(RichText::new(*suggestion).size(12.0).color(TEXT_MUTED));
+                            });
+                        }
+                        
+                        ui.add_space(12.0);
+                        
+                        egui::Frame::none()
+                            .fill(PRIMARY.gamma_multiply(0.15))
+                            .rounding(Rounding::same(8.0))
+                            .inner_margin(12.0)
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(RichText::new("💬").size(14.0));
+                                    ui.label(RichText::new("Go to Chat and type `/learn <your knowledge>`").size(12.0).color(PRIMARY));
+                                });
+                            });
+                    });
                 });
-            
-            ui.add_space(16.0);
-            ui.label(RichText::new("No concepts yet").size(15.0).color(TEXT_SECONDARY));
-            ui.add_space(4.0);
-            ui.label(RichText::new("Start a conversation to teach me!").size(13.0).color(TEXT_MUTED));
         });
     }
     

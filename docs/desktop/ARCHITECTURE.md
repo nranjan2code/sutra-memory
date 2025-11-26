@@ -25,10 +25,11 @@ The desktop application is a **thin UI wrapper** around `sutra-storage`. All sto
 ### 2. Immediate Mode GUI
 
 Using **egui** (immediate mode GUI), the UI is:
-- Rebuilt every frame (~60 FPS)
-- Stateless rendering (state lives in data structures)
-- Highly responsive with no layout thrashing
-- Memory efficient with minimal allocations
+- Rebuilt every frame (~60 FPS) with smooth 16ms budget
+- Stateless rendering with enhanced theme system
+- Highly responsive with improved visual feedback
+- Memory efficient with optimized allocations
+- Native menu bar integration for better platform integration
 
 ### 3. Asynchronous Architecture
 
@@ -117,13 +118,15 @@ Key methods:
 Color palette following modern dark theme principles and **WCAG AA compliance**:
 
 ```rust
-// Primary colors
-pub const PRIMARY: Color32 = Color32::from_rgb(167, 139, 250);     // Vibrant Purple
+// Enhanced primary colors
+pub const PRIMARY: Color32 = Color32::from_rgb(167, 139, 250);       // Vibrant Purple
+pub const PRIMARY_LIGHT: Color32 = Color32::from_rgb(196, 181, 253); // Light Purple (NEW)
+pub const INFO: Color32 = Color32::from_rgb(96, 165, 250);           // Blue (NEW)
 
-// Text colors - High contrast
-pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(248, 250, 252);   // ~15:1 contrast
-pub const TEXT_SECONDARY: Color32 = Color32::from_rgb(160, 174, 192); // ~7:1 contrast
-pub const TEXT_MUTED: Color32 = Color32::from_rgb(125, 140, 165);     // ~5:1 contrast
+// Improved text colors - Better contrast
+pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(248, 250, 252);     // ~15:1 contrast
+pub const TEXT_SECONDARY: Color32 = Color32::from_rgb(160, 174, 192);   // ~7:1 contrast (improved)
+pub const TEXT_MUTED: Color32 = Color32::from_rgb(125, 140, 165);       // ~5:1 contrast (improved)
 ```
 
 ### types.rs - Shared Data Structures

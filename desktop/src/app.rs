@@ -14,7 +14,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, mpsc};
 use std::time::Instant;
-use eframe::egui;
+use eframe::egui::{self, RichText};
 use tracing::{info, error, warn};
 use directories::ProjectDirs;
 
@@ -35,8 +35,8 @@ use sutra_storage::{
 
 // Core UI imports
 use crate::ui::{
-    Sidebar, SidebarView, ChatPanel, KnowledgePanel, SettingsPanel, StatusBar,
-    ChatAction, KnowledgeAction, SettingsAction, ConnectionStatus,
+    Sidebar, SidebarView, ChatPanel, KnowledgePanel, QuickLearnPanel, SettingsPanel, StatusBar,
+    ChatAction, KnowledgeAction, QuickLearnAction, SettingsAction, ConnectionStatus,
     StorageStatsUI, StorageStatus,
 };
 
@@ -75,6 +75,7 @@ pub struct SutraApp {
     sidebar: Sidebar,
     chat: ChatPanel,
     knowledge: KnowledgePanel,
+    quick_learn: QuickLearnPanel,
     settings: SettingsPanel,
     status_bar: StatusBar,
     
@@ -144,6 +145,7 @@ impl SutraApp {
             sidebar: Sidebar::default(),
             chat: ChatPanel::default(),
             knowledge: KnowledgePanel::default(),
+            quick_learn: QuickLearnPanel::default(),
             settings,
             status_bar,
             // Enhanced panels
@@ -312,6 +314,130 @@ impl SutraApp {
             
             KnowledgeAction::SelectConcept(id) => {
                 self.knowledge.selected_concept = Some(id);
+            }
+        }
+    }
+    
+    // ========================================================================
+    // Quick Learn Actions
+    // ========================================================================
+    
+    fn handle_quick_learn_action(&mut self, action: QuickLearnAction) {
+        match action {
+            QuickLearnAction::Learn(content) => {
+                use crate::ui::quick_learn::LearnStatus;
+                
+                self.quick_learn.is_processing = true;
+                self.quick_learn.add_learn_entry(content.clone(), LearnStatus::Processing);
+                
+                let storage = self.storage.clone();
+                let tx = self.tx.clone();
+                let content_clone = content.clone();
+                
+                std::thread::spawn(move || {
+                    let start = Instant::now();
+                    let hash = md5::compute(content_clone.as_bytes());
+                    let concept_id = ConceptId::from_bytes(hash.0);
+                    
+                    let result = storage.learn_concept(
+                        concept_id,
+                        content_clone.as_bytes().to_vec(),
+                        None, // No vector provided
+                        1.0,  // Default strength
+                        0.8,  // Default confidence
+                    );
+                    
+                    let elapsed = start.elapsed();
+                    let message = match result {
+                        Ok(_) => AppMessage::QuickLearnCompleted { 
+                            content: content_clone,
+                            success: true,
+                            error: None,
+                            elapsed_ms: elapsed.as_millis() as u64,
+                        },
+                        Err(e) => AppMessage::QuickLearnCompleted { 
+                            content: content_clone,
+                            success: false,
+                            error: Some(e.to_string()),
+                            elapsed_ms: elapsed.as_millis() as u64,
+                        },
+                    };
+                    
+                    let _ = tx.send(message);
+                });
+            }
+            
+            QuickLearnAction::BatchLearn(batch_content) => {
+                use crate::ui::quick_learn::LearnStatus;
+                
+                let lines: Vec<String> = batch_content
+                    .lines()
+                    .filter(|line| !line.trim().is_empty())
+                    .map(|line| line.trim().to_string())
+                    .collect();
+                
+                if lines.is_empty() {
+                    return;
+                }
+                
+                self.quick_learn.is_processing = true;
+                
+                // Add all entries as processing
+                for line in &lines {
+                    self.quick_learn.add_learn_entry(line.clone(), LearnStatus::Processing);
+                }
+                
+                let storage = self.storage.clone();
+                let tx = self.tx.clone();
+                
+                std::thread::spawn(move || {
+                    let start = Instant::now();
+                    let mut successes = 0;
+                    let mut failures = Vec::new();
+                    
+                    for content in lines {
+                        let hash = md5::compute(content.as_bytes());
+                        let concept_id = ConceptId::from_bytes(hash.0);
+                        
+                        match storage.learn_concept(
+                            concept_id,
+                            content.as_bytes().to_vec(),
+                            None, // No vector provided
+                            1.0,  // Default strength
+                            0.8,  // Default confidence
+                        ) {
+                            Ok(_) => {
+                                successes += 1;
+                                let _ = tx.send(AppMessage::QuickLearnCompleted { 
+                                    content: content.clone(),
+                                    success: true,
+                                    error: None,
+                                    elapsed_ms: 0, // Individual timing not tracked in batch
+                                });
+                            }
+                            Err(e) => {
+                                failures.push((content.clone(), e.to_string()));
+                                let _ = tx.send(AppMessage::QuickLearnCompleted { 
+                                    content: content.clone(),
+                                    success: false,
+                                    error: Some(e.to_string()),
+                                    elapsed_ms: 0,
+                                });
+                            }
+                        }
+                        
+                        // Brief pause between operations
+                        std::thread::sleep(std::time::Duration::from_millis(50));
+                    }
+                    
+                    let elapsed = start.elapsed();
+                    let _ = tx.send(AppMessage::BatchLearnCompleted { 
+                        total: successes + failures.len(),
+                        successes,
+                        failures,
+                        elapsed_ms: elapsed.as_millis() as u64,
+                    });
+                });
             }
         }
     }
@@ -1115,6 +1241,62 @@ impl SutraApp {
                     self.status_bar.set_activity("Knowledge refreshed");
                 }
                 
+                AppMessage::QuickLearnCompleted { content, success, error, elapsed_ms } => {
+                    // Find and update the processing entry instead of adding a new one
+                    if let Some(entry) = self.quick_learn.recent_learns
+                        .iter_mut()
+                        .find(|e| e.content == content && matches!(e.status, crate::ui::quick_learn::LearnStatus::Processing)) {
+                        
+                        entry.status = if success {
+                            crate::ui::quick_learn::LearnStatus::Success
+                        } else {
+                            crate::ui::quick_learn::LearnStatus::Failed(error.clone().unwrap_or_else(|| "Unknown error".to_string()))
+                        };
+                        
+                        // Check if this was the last processing item
+                        let still_processing = self.quick_learn.recent_learns
+                            .iter()
+                            .any(|e| matches!(e.status, crate::ui::quick_learn::LearnStatus::Processing));
+                        
+                        if !still_processing {
+                            self.quick_learn.is_processing = false;
+                            if success {
+                                self.quick_learn.clear_input();
+                            }
+                        }
+                    }
+                    
+                    // Update app state
+                    if success {
+                        self.refresh_stats();
+                        if elapsed_ms > 0 {
+                            let preview = if content.len() > 30 { &content[..30] } else { &content };
+                            self.status_bar.set_activity(format!("Learned: {}... ({}ms)", preview, elapsed_ms));
+                        }
+                    } else {
+                        warn!("Quick learn failed: {}", error.unwrap_or_else(|| "Unknown error".to_string()));
+                    }
+                }
+                
+                AppMessage::BatchLearnCompleted { total, successes, failures, elapsed_ms } => {
+                    self.quick_learn.is_processing = false;
+                    
+                    // Clear batch input on successful completion
+                    if failures.is_empty() {
+                        self.quick_learn.clear_input();
+                    }
+                    
+                    // Update status
+                    let status_msg = if failures.is_empty() {
+                        format!("Batch complete: {}/{} learned ({}ms)", successes, total, elapsed_ms)
+                    } else {
+                        format!("Batch partial: {}/{} learned, {} failed ({}ms)", successes, total, failures.len(), elapsed_ms)
+                    };
+                    
+                    self.status_bar.set_activity(status_msg);
+                    self.refresh_stats();
+                }
+                
                 AppMessage::GraphLoaded { nodes, edges } => {
                     self.graph_view.load_from_data(nodes, edges);
                     self.status_bar.set_activity("Graph refreshed");
@@ -1178,6 +1360,123 @@ impl SutraApp {
         }
     }
 
+    // ========================================================================
+    // Menu Bar
+    // ========================================================================
+    
+    fn render_menu_bar(&mut self, ctx: &egui::Context) {
+        use crate::theme::{BG_PANEL, TEXT_PRIMARY, TEXT_SECONDARY, BG_HOVER, PRIMARY};
+        
+        egui::TopBottomPanel::top("menu_bar")
+            .exact_height(36.0)
+            .frame(egui::Frame::none().fill(BG_PANEL).inner_margin(egui::Margin::symmetric(12.0, 6.0)))
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.menu_button(RichText::new("File").size(13.0).color(TEXT_PRIMARY), |ui| {
+                        if ui.button("📥 Import Data...").clicked() {
+                            self.sidebar.current_view = SidebarView::Export;
+                            ui.close_menu();
+                        }
+                        if ui.button("📤 Export Data...").clicked() {
+                            self.sidebar.current_view = SidebarView::Export;
+                            ui.close_menu();
+                        }
+                        ui.separator();
+                        if ui.button("⚙️ Settings").clicked() {
+                            self.sidebar.current_view = SidebarView::Settings;
+                            ui.close_menu();
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        {
+                            ui.separator();
+                            if ui.button("❌ Quit").clicked() {
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                            }
+                        }
+                    });
+                    
+                    ui.menu_button(RichText::new("View").size(13.0).color(TEXT_PRIMARY), |ui| {
+                        if ui.button("💬 Chat").clicked() {
+                            self.sidebar.current_view = SidebarView::Chat;
+                            ui.close_menu();
+                        }
+                        if ui.button("📚 Knowledge").clicked() {
+                            self.sidebar.current_view = SidebarView::Knowledge;
+                            ui.close_menu();
+                        }
+                        if ui.button("🔍 Search").clicked() {
+                            self.sidebar.current_view = SidebarView::Search;
+                            ui.close_menu();
+                        }
+                        ui.separator();
+                        ui.label(RichText::new("Analysis").size(11.0).color(TEXT_SECONDARY));
+                        if ui.button("🕸️ Graph View").clicked() {
+                            self.sidebar.current_view = SidebarView::Graph;
+                            ui.close_menu();
+                        }
+                        if ui.button("🛤️ Reasoning Paths").clicked() {
+                            self.sidebar.current_view = SidebarView::Paths;
+                            ui.close_menu();
+                        }
+                        if ui.button("⏱️ Timeline").clicked() {
+                            self.sidebar.current_view = SidebarView::Timeline;
+                            ui.close_menu();
+                        }
+                        if ui.button("🔗 Causality").clicked() {
+                            self.sidebar.current_view = SidebarView::Causal;
+                            ui.close_menu();
+                        }
+                        ui.separator();
+                        ui.label(RichText::new("Tools").size(11.0).color(TEXT_SECONDARY));
+                        if ui.button("📊 Analytics").clicked() {
+                            self.sidebar.current_view = SidebarView::Analytics;
+                            ui.close_menu();
+                        }
+                        if ui.button("🔎 Query Builder").clicked() {
+                            self.sidebar.current_view = SidebarView::Query;
+                            ui.close_menu();
+                        }
+                    });
+                    
+                    ui.menu_button(RichText::new("Help").size(13.0).color(TEXT_PRIMARY), |ui| {
+                        if ui.button("📖 Documentation").clicked() {
+                            let _ = webbrowser::open("https://github.com/sutraworks/sutra-memory/tree/main/docs/desktop");
+                            ui.close_menu();
+                        }
+                        if ui.button("💡 Quick Start Guide").clicked() {
+                            let _ = webbrowser::open("https://github.com/sutraworks/sutra-memory/blob/main/docs/desktop/README.md");
+                            ui.close_menu();
+                        }
+                        ui.separator();
+                        if ui.button("ℹ️ About Sutra").clicked() {
+                            self.show_about_dialog();
+                            ui.close_menu();
+                        }
+                    });
+                    
+                    // Right side - breadcrumb showing current view
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let (icon, label, _) = self.sidebar.current_view.info();
+                        ui.label(RichText::new(format!("{} {}", icon, label)).size(12.0).color(TEXT_SECONDARY));
+                    });
+                });
+            });
+    }
+    
+    fn show_about_dialog(&mut self) {
+        self.chat.add_response(format!(
+            "🧠 **Sutra AI Desktop v{}**\n\n\
+            Your personal knowledge reasoning engine.\n\n\
+            • **Temporal Reasoning** - Understand time relationships\n\
+            • **Causal Analysis** - Discover root causes\n\
+            • **Semantic Understanding** - 9 types of knowledge\n\
+            • **Complete Privacy** - All data stays local\n\n\
+            Built with ❤️ by Sutra Works",
+            env!("CARGO_PKG_VERSION")
+        ));
+        self.sidebar.current_view = SidebarView::Chat;
+    }
+    
     // ========================================================================
     // Helper Methods
     // ========================================================================
@@ -1314,6 +1613,9 @@ impl eframe::App for SutraApp {
         // Request repaint for animations
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
         
+        // Menu bar at the top
+        self.render_menu_bar(ctx);
+        
         // Sidebar
         egui::SidePanel::left("sidebar")
             .resizable(false)
@@ -1326,7 +1628,7 @@ impl eframe::App for SutraApp {
         // Status bar
         egui::TopBottomPanel::bottom("status_bar")
             .resizable(false)
-            .exact_height(28.0)
+            .exact_height(32.0)
             .show(ctx, |ui| {
                 self.status_bar.ui(ui);
             });
@@ -1342,9 +1644,14 @@ impl eframe::App for SutraApp {
                             self.handle_chat_action(action);
                         }
                     }
-                    SidebarView::Knowledge | SidebarView::Search => {
+                    SidebarView::Knowledge => {
                         if let Some(action) = self.knowledge.ui(ui) {
                             self.handle_knowledge_action(action);
+                        }
+                    }
+                    SidebarView::Search => {
+                        if let Some(action) = self.quick_learn.ui(ui) {
+                            self.handle_quick_learn_action(action);
                         }
                     }
                     SidebarView::Settings => {

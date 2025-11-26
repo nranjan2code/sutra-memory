@@ -39,13 +39,14 @@ fn main() -> Result<()> {
 
     info!("Starting {} Desktop v{}", APP_NAME, VERSION);
 
-    // Configure native options for modern look
+    // Configure native options for modern look with native decorations
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(format!("{} - Desktop Edition", APP_NAME))
             .with_inner_size([1200.0, 800.0])
             .with_min_inner_size([800.0, 600.0])
-            .with_icon(load_icon()),
+            .with_icon(load_icon())
+            .with_active(true),
         centered: true,
         ..Default::default()
     };
@@ -61,9 +62,20 @@ fn main() -> Result<()> {
             // Enable image loading
             egui_extras::install_image_loaders(&cc.egui_ctx);
             
+            // Setup native menu bar (macOS)
+            setup_menu_bar(&cc.egui_ctx);
+            
             Ok(Box::new(SutraApp::new(cc)))
         }),
     ).map_err(|e| anyhow::anyhow!("Failed to start application: {}", e))
+}
+
+/// Setup native menu bar for better macOS integration
+fn setup_menu_bar(ctx: &egui::Context) {
+    // Note: egui doesn't support native menu bars directly yet,
+    // but we can prepare for it and add a menu bar in the UI
+    // For now, we'll add a custom menu bar in the app UI
+    let _ = ctx; // Use to avoid warning
 }
 
 /// Load application icon

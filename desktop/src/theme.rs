@@ -6,11 +6,13 @@ use eframe::egui::{self, Color32, Frame, Margin, Rounding, Stroke, Visuals};
 // Primary palette - Vibrant and modern
 pub const PRIMARY: Color32 = Color32::from_rgb(167, 139, 250);    // Vibrant Purple
 pub const PRIMARY_DIM: Color32 = Color32::from_rgb(139, 92, 246); // Deep Purple
+pub const PRIMARY_LIGHT: Color32 = Color32::from_rgb(196, 181, 253); // Light Purple
 pub const SECONDARY: Color32 = Color32::from_rgb(96, 165, 250);   // Sky Blue
 pub const ACCENT: Color32 = Color32::from_rgb(251, 191, 36);      // Amber/Gold
 pub const SUCCESS: Color32 = Color32::from_rgb(52, 211, 153);     // Emerald
 pub const WARNING: Color32 = Color32::from_rgb(251, 146, 60);     // Orange
 pub const ERROR: Color32 = Color32::from_rgb(248, 113, 113);      // Red
+pub const INFO: Color32 = Color32::from_rgb(96, 165, 250);        // Blue
 
 // Background colors - Deep, rich tones
 pub const BG_DARK: Color32 = Color32::from_rgb(15, 15, 25);       // Darkest

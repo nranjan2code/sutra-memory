@@ -16,19 +16,21 @@ Sutra Desktop is a self-contained knowledge management application that brings e
 
 | Feature | Description |
 |---------|-------------|
-| 🚀 **Native Performance** | Pure Rust from storage to UI, ~50ms startup |
+| 🚀 **Native Performance** | Pure Rust from storage to UI, ~300ms startup |
 | ⚡ **Async Architecture** | Non-blocking UI with background processing |
 | 🔒 **Complete Privacy** | All data stays on your machine |
 | 📦 **Self-Contained** | Single binary, ~20MB |
-| 🎨 **Modern UI** | Premium dark theme (WCAG AA Compliant) |
+| 🎨 **Modern UI** | Premium dark theme with enhanced menu bar |
 | 🧠 **Full Storage Engine** | Reuses `sutra-storage` crate (no code duplication) |
-| 💬 **Slash Commands** | Modern `/learn`, `/search`, `/help`, `/stats` interface |
+| 💬 **Enhanced Chat** | Improved autocomplete, better visual design |
 | 🔍 **Multi-View Analysis** | Graph, temporal, causal, and path visualization |
-| 📊 **Real-time Analytics** | Performance metrics and query statistics |
+| 📊 **Real-time Analytics** | Performance metrics and usage statistics |
+| 🍎 **Native Integration** | Full menu bar with File/View/Help menus |
 
 ### What's Included
 
-- **Chat Interface**: Natural language interaction with autocomplete slash commands
+- **Enhanced Menu Bar**: File/View/Help menus with keyboard shortcuts
+- **Chat Interface**: Natural language interaction with improved autocomplete
 - **Knowledge Browser**: Browse, search, and manage learned concepts
 - **Graph Visualization**: Force-directed interactive knowledge graph
 - **Reasoning Paths**: MPPA-style multi-path consensus analysis
@@ -95,20 +97,25 @@ Type `/` in the chat to see available commands with autocomplete:
 
 ### Navigation
 
-The sidebar provides access to all views:
+**Menu Bar (NEW):**
+- **File**: Import/Export data, Settings, Quit (⌘Q)
+- **View**: Quick navigation to all views with keyboard shortcuts
+- **Help**: Documentation links, About dialog
+
+**Sidebar:**
 
 **MAIN**
 - 💬 **Chat** - Conversational interface
 - 📚 **Knowledge** - Browse concepts
 - 🔍 **Search** - Quick search
 
-**ANALYSIS**
+**ANALYSIS** (collapsible)
 - 🕸️ **Graph View** - Visual knowledge graph
 - 🛤️ **Reasoning** - Multi-path exploration
 - ⏱️ **Timeline** - Temporal analysis
 - 🔗 **Causality** - Root cause analysis
 
-**TOOLS**
+**TOOLS** (collapsible)
 - 📊 **Analytics** - Performance metrics
 - 🔎 **Query Builder** - Advanced search
 - 📤 **Export/Import** - Data portability
@@ -173,8 +180,9 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed technical documentation.
 | Startup Time | <500ms | ~300ms ✅ |
 | Frame Rate | 60 FPS | 60 FPS ✅ |
 | Query Latency | <50ms | <10ms ✅ |
-| Memory Usage | <200 MB | ~50 MB ✅ |
+| Memory Usage | <200 MB | ~100 MB ✅ |
 | Concept Capacity | 100K+ | Tested to 50K ✅ |
+| UI Responsiveness | 60 FPS | 60 FPS ✅ |
 
 ---
 

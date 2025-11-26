@@ -28,6 +28,18 @@ pub enum AppMessage {
     KnowledgeLoaded {
         concepts: Vec<ConceptInfo>,
     },
+    QuickLearnCompleted {
+        content: String,
+        success: bool,
+        error: Option<String>,
+        elapsed_ms: u64,
+    },
+    BatchLearnCompleted {
+        total: usize,
+        successes: usize,
+        failures: Vec<(String, String)>, // (content, error)
+        elapsed_ms: u64,
+    },
     GraphLoaded {
         nodes: HashMap<ConceptId, GraphNode>,
         edges: Vec<GraphEdge>,

@@ -1,7 +1,7 @@
 //! Sidebar navigation - Premium design with animated elements
 
 use eframe::egui::{self, Color32, RichText, Rounding, Sense, Stroke, Vec2};
-use crate::theme::{PRIMARY, PRIMARY_DIM, SECONDARY, ACCENT, SUCCESS, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BG_HOVER, BG_WIDGET, BG_SIDEBAR, BG_ELEVATED};
+use crate::theme::{PRIMARY, PRIMARY_DIM, PRIMARY_LIGHT, SECONDARY, ACCENT, SUCCESS, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BG_HOVER, BG_WIDGET, BG_SIDEBAR, BG_ELEVATED};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SidebarView {
@@ -27,7 +27,7 @@ impl SidebarView {
         match self {
             SidebarView::Chat => ("💬", "Chat", "Have a conversation"),
             SidebarView::Knowledge => ("📚", "Knowledge", "Browse concepts"),
-            SidebarView::Search => ("🔍", "Search", "Find information"),
+            SidebarView::Search => ("⚡", "Quick Learn", "Fast knowledge entry"),
             SidebarView::Graph => ("🕸️", "Graph View", "Visualize connections"),
             SidebarView::Paths => ("🛤️", "Reasoning", "Explore paths"),
             SidebarView::Timeline => ("⏱️", "Timeline", "Temporal analysis"),
@@ -280,7 +280,7 @@ impl Sidebar {
         
         let margin_h = 12.0;
         let item_width = ui.available_width() - margin_h * 2.0;
-        let item_height = 52.0;
+        let item_height = 56.0; // Slightly taller for better touch targets
         
         ui.horizontal(|ui| {
             ui.add_space(margin_h);
@@ -288,20 +288,21 @@ impl Sidebar {
             let (rect, response) = ui.allocate_exact_size(Vec2::new(item_width, item_height), Sense::click());
             let is_hovered = response.hovered();
             
-            // Background - selected has gradient-like fill
+            // Background with smooth transition
             let bg_color = if is_selected {
-                PRIMARY.gamma_multiply(0.18)
+                PRIMARY.gamma_multiply(0.20)
             } else if is_hovered {
-                BG_ELEVATED
+                BG_ELEVATED.gamma_multiply(1.1)
             } else {
                 Color32::TRANSPARENT
             };
             
-            // Border for selected/hovered
+            // Border for selected/hovered - more prominent
+            let border_width = if is_selected { 1.5 } else if is_hovered { 1.0 } else { 0.0 };
             let border_color = if is_selected {
-                PRIMARY.gamma_multiply(0.4)
+                PRIMARY.gamma_multiply(0.5)
             } else if is_hovered {
-                Color32::from_rgb(55, 55, 80)
+                Color32::from_rgb(60, 60, 90)
             } else {
                 Color32::TRANSPARENT
             };
@@ -311,59 +312,106 @@ impl Sidebar {
                 rect,
                 Rounding::same(12.0),
                 bg_color,
-                Stroke::new(1.0, border_color)
+                Stroke::new(border_width, border_color)
             );
             
-            // Left accent bar for selected
+            // Left accent bar for selected - thicker and more prominent
             if is_selected {
                 let indicator = egui::Rect::from_min_size(
-                    rect.min + Vec2::new(0.0, 10.0),
-                    Vec2::new(3.0, rect.height() - 20.0)
+                    rect.min + Vec2::new(0.0, 12.0),
+                    Vec2::new(4.0, rect.height() - 24.0)
                 );
                 ui.painter().rect_filled(indicator, Rounding::same(2.0), PRIMARY);
+                
+                // Add subtle glow effect
+                let glow_indicator = egui::Rect::from_min_size(
+                    rect.min + Vec2::new(-1.0, 12.0),
+                    Vec2::new(6.0, rect.height() - 24.0)
+                );
+                ui.painter().rect_filled(glow_indicator, Rounding::same(3.0), PRIMARY.gamma_multiply(0.15));
             }
             
-            // Icon with background circle
-            let icon_pos = rect.min + Vec2::new(16.0, (item_height - 28.0) / 2.0);
+            // Icon with background circle - enhanced
+            let icon_pos = rect.min + Vec2::new(18.0, (item_height - 32.0) / 2.0);
             let icon_bg_color = if is_selected {
-                PRIMARY.gamma_multiply(0.25)
+                PRIMARY.gamma_multiply(0.30)
+            } else if is_hovered {
+                BG_WIDGET.gamma_multiply(1.2)
             } else {
                 BG_WIDGET
             };
+            
+            // Icon background with subtle shadow for selected
+            if is_selected {
+                ui.painter().rect_filled(
+                    egui::Rect::from_min_size(icon_pos - Vec2::splat(1.0), Vec2::splat(34.0)),
+                    Rounding::same(10.0),
+                    PRIMARY.gamma_multiply(0.10)
+                );
+            }
+            
             ui.painter().rect_filled(
-                egui::Rect::from_min_size(icon_pos, Vec2::splat(28.0)),
-                Rounding::same(8.0),
+                egui::Rect::from_min_size(icon_pos, Vec2::splat(32.0)),
+                Rounding::same(9.0),
                 icon_bg_color
             );
+            
+            // Icon with better contrast
+            let icon_color = if is_selected { 
+                PRIMARY_LIGHT 
+            } else if is_hovered { 
+                TEXT_PRIMARY 
+            } else { 
+                TEXT_SECONDARY 
+            };
+            
             ui.painter().text(
-                icon_pos + Vec2::new(14.0, 14.0),
+                icon_pos + Vec2::new(16.0, 16.0),
                 egui::Align2::CENTER_CENTER,
                 icon,
-                egui::FontId::proportional(15.0),
-                if is_selected { PRIMARY } else { TEXT_SECONDARY },
+                egui::FontId::proportional(16.0),
+                icon_color,
             );
             
-            // Label and hint
-            let text_color = if is_selected { TEXT_PRIMARY } else { TEXT_SECONDARY };
+            // Label with better typography
+            let text_color = if is_selected { 
+                TEXT_PRIMARY 
+            } else if is_hovered { 
+                TEXT_PRIMARY 
+            } else { 
+                TEXT_SECONDARY 
+            };
+            
             ui.painter().text(
-                rect.min + Vec2::new(52.0, 11.0),
+                rect.min + Vec2::new(58.0, 12.0),
                 egui::Align2::LEFT_TOP,
                 label,
                 egui::FontId::proportional(14.0),
                 text_color,
             );
             
-            // Always show hint for clarity
+            // Hint with better visibility
+            let hint_color = if is_selected || is_hovered {
+                TEXT_SECONDARY
+            } else {
+                TEXT_MUTED
+            };
+            
             ui.painter().text(
-                rect.min + Vec2::new(52.0, 29.0),
+                rect.min + Vec2::new(58.0, 32.0),
                 egui::Align2::LEFT_TOP,
                 hint,
-                egui::FontId::proportional(12.0),
-                TEXT_MUTED,
+                egui::FontId::proportional(11.5),
+                hint_color,
             );
             
             if response.clicked() {
                 self.current_view = view;
+            }
+            
+            // Tooltip on hover for additional context
+            if is_hovered {
+                response.on_hover_text_at_pointer(format!("{} - {}", label, hint));
             }
         });
     }

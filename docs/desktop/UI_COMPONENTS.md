@@ -11,6 +11,7 @@ This document provides a detailed reference for all UI panels and components in 
 
 | Panel | File | Purpose | Action Type |
 |-------|------|---------|-------------|
+| Menu Bar | `app.rs` | Native menu integration | Direct navigation |
 | Sidebar | `sidebar.rs` | Navigation | Direct state update |
 | Chat | `chat.rs` | Conversational learning | `ChatAction` |
 | Knowledge | `knowledge.rs` | Concept browser | `KnowledgeAction` |
@@ -23,6 +24,49 @@ This document provides a detailed reference for all UI panels and components in 
 | Analytics | `analytics.rs` | Performance metrics | `AnalyticsAction` |
 | Query Builder | `query_builder.rs` | Advanced search | `QueryBuilderAction` |
 | Export/Import | `export_import.rs` | Data portability | `ExportImportAction` |
+
+---
+
+## Menu Bar (`app.rs`)
+
+### Purpose
+Native menu bar integration providing quick access to core functionality.
+
+### Structure
+The menu bar is rendered as part of the main application update loop.
+
+### Features
+
+**File Menu:**
+- Import Data... (⌘I) - Open import dialog
+- Export Data... (⌘E) - Open export dialog  
+- Settings (⌘,) - Open settings panel
+- Quit (⌘Q) - Close application (macOS/Linux)
+
+**View Menu:**
+- Chat (⌘1) - Switch to chat panel
+- Knowledge (⌘2) - Switch to knowledge browser
+- Search (⌘3) - Switch to search
+- Analysis submenu:
+  - Graph View (⌘G) - Visual knowledge graph
+  - Reasoning Paths (⌘R) - MPPA analysis
+  - Timeline (⌘T) - Temporal analysis
+  - Causality (⌘C) - Root cause analysis
+- Tools submenu:
+  - Analytics (⌘A) - Performance metrics
+  - Query Builder (⌘Q) - Advanced search
+
+**Help Menu:**
+- Documentation - Open GitHub docs
+- Quick Start Guide - Open getting started
+- About Sutra - Show version and info
+
+### Layout
+```
+┌─────────────────────────────────────────────────┐
+│ File  View  Help         💬 Chat (breadcrumb)  │
+└─────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -52,11 +96,13 @@ pub enum SidebarView {
 ```
 
 ### Visual Design
-- Logo with neural/brain icon and glow effect
-- Version badge (pill style)
-- Section headers in uppercase with collapsible arrows
-- Navigation items with icon backgrounds, labels, and hints
-- Selected state shows left accent bar and highlighted background
+- Logo with enhanced neural/brain icon and glow effect
+- Version badge in pill style with PRIMARY_LIGHT color
+- Section headers in uppercase with smooth collapsible arrows
+- Navigation items with enhanced icon backgrounds and hover states
+- Selected state shows thicker left accent bar (4px) with glow effect
+- Improved hover states with better color transitions
+- Tooltips on hover for additional context
 - Subtle right border separating from main content
 
 ### Layout
@@ -90,7 +136,7 @@ pub enum SidebarView {
 ## Chat Panel (`chat.rs`)
 
 ### Purpose
-Primary conversational interface for learning and querying knowledge.
+Primary conversational interface for learning and querying knowledge with enhanced visual design.
 
 ### Structure
 ```rust
@@ -111,7 +157,14 @@ pub enum ChatAction {
 }
 ```
 
-### Features
+### Enhanced Features
+
+**Modern Header Design:**
+- Card-style elevated header with subtle borders
+- Icon in colored background pill
+- Vertical layout for title and message count
+- Enhanced Clear button with tooltip
+- Better visual hierarchy
 
 **Slash Commands:**
 | Command | Shortcut | Description |
@@ -760,11 +813,21 @@ pub enum ConnectionStatus {
 
 ### Layout
 ```
-┌──────────────────────────────────────────────────┐
-│ [●] Active │ 🧠 1,247 │ Searched: memory (12ms) │
-│                           💾 Local Storage v3.3.0│
-└──────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ [●] Active │ 🧠 1,247 concepts │ ⚡ Searched: memory (12ms) │
+│                             💾 Local Storage      v3.3.0    │
+└──────────────────────────────────────────────────────────────┘
 ```
+
+### Enhanced Features
+
+**Visual Improvements:**
+- Increased height (32px) for better spacing
+- Concept count in highlighted PRIMARY badge
+- Activity indicator with lightning bolt icon
+- Storage type in SUCCESS color badge
+- Version badge with PRIMARY_LIGHT color
+- Consistent 16px separators between sections
 
 ---
 
@@ -774,25 +837,28 @@ pub enum ConnectionStatus {
 
 ```rust
 // Primary colors
-PRIMARY:    #A78BFA  // Vibrant Purple
-SECONDARY:  #60A5FA  // Sky Blue
-ACCENT:     #FBBF24  // Amber
-SUCCESS:    #34D399  // Emerald
-WARNING:    #FB923C  // Orange
-ERROR:      #F87171  // Red
+PRIMARY:      #A78BFA  // Vibrant Purple
+PRIMARY_DIM:  #8B5CF6  // Deep Purple  
+PRIMARY_LIGHT:#C4B5FD  // Light Purple (NEW)
+SECONDARY:    #60A5FA  // Sky Blue
+ACCENT:       #FBBF24  // Amber
+SUCCESS:      #34D399  // Emerald
+WARNING:      #FB923C  // Orange
+ERROR:        #F87171  // Red
+INFO:         #60A5FA  // Blue (NEW)
 
 // Backgrounds
-BG_DARK:    #0F0F19  // Darkest
-BG_PANEL:   #161623  // Panels
-BG_SIDEBAR: #12121E  // Sidebar
-BG_WIDGET:  #232337  // Inputs/cards
-BG_HOVER:   #2D2D46  // Hover state
-BG_ELEVATED:#28283E  // Elevated cards
+BG_DARK:      #0F0F19  // Darkest
+BG_PANEL:     #161623  // Panels
+BG_SIDEBAR:   #12121E  // Sidebar
+BG_WIDGET:    #232337  // Inputs/cards
+BG_HOVER:     #2D2D46  // Hover state
+BG_ELEVATED:  #28283E  // Elevated cards
 
 // Text
 TEXT_PRIMARY:   #F8FAFC  // Almost white
-TEXT_SECONDARY: #94A3B8  // Slate
-TEXT_MUTED:     #64748B  // Dimmed
+TEXT_SECONDARY: #A0AEC0  // Improved contrast (NEW)
+TEXT_MUTED:     #7D8CAD  // Better visibility (NEW)
 ```
 
 ### Common Styles

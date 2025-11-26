@@ -2,7 +2,7 @@
 
 use eframe::egui::{self, Color32, RichText, Rounding, ScrollArea, Stroke, TextEdit, Vec2, Key};
 use chrono::{DateTime, Local};
-use crate::theme::{PRIMARY, SECONDARY, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BG_WIDGET, BG_DARK, BG_ELEVATED, SUCCESS};
+use crate::theme::{PRIMARY, SECONDARY, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BG_WIDGET, BG_DARK, BG_ELEVATED, SUCCESS, PRIMARY_LIGHT};
 
 /// Command definition for autocomplete
 #[derive(Debug, Clone)]
@@ -125,41 +125,55 @@ impl ChatPanel {
     }
     
     fn render_header(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            // Title with icon
-            ui.label(RichText::new("💬").size(20.0));
-            ui.add_space(4.0);
-            ui.label(RichText::new("Chat").size(22.0).color(TEXT_PRIMARY).strong());
-            
-            // Message count badge
-            let msg_count = self.messages.len();
-            if msg_count > 0 {
-                ui.add_space(8.0);
-                egui::Frame::none()
-                    .fill(BG_WIDGET)
-                    .rounding(Rounding::same(10.0))
-                    .inner_margin(egui::Margin::symmetric(8.0, 2.0))
-                    .show(ui, |ui| {
-                        ui.label(RichText::new(format!("{}", msg_count)).size(11.0).color(TEXT_SECONDARY));
+        egui::Frame::none()
+            .fill(BG_ELEVATED)
+            .rounding(Rounding::same(12.0))
+            .inner_margin(egui::Margin::symmetric(16.0, 10.0))
+            .stroke(Stroke::new(1.0, Color32::from_rgb(60, 60, 90)))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    // Icon with subtle background
+                    egui::Frame::none()
+                        .fill(PRIMARY.gamma_multiply(0.15))
+                        .rounding(Rounding::same(8.0))
+                        .inner_margin(egui::Margin::same(6.0))
+                        .show(ui, |ui| {
+                            ui.label(RichText::new("💬").size(18.0));
+                        });
+                    
+                    ui.add_space(8.0);
+                    
+                    // Title and badge in vertical stack
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("Chat").size(22.0).color(TEXT_PRIMARY).strong());
+                        
+                        // Subtitle
+                        let msg_count = self.messages.len();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(format!("{} messages", msg_count)).size(12.0).color(TEXT_MUTED));
+                        });
                     });
-            }
-            
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                // Clear button with icon
-                let clear_btn = egui::Button::new(RichText::new("🗑 Clear").size(12.0).color(TEXT_SECONDARY))
-                    .fill(Color32::TRANSPARENT)
-                    .stroke(Stroke::new(1.0, BG_WIDGET));
-                
-                if ui.add(clear_btn).clicked() {
-                    self.messages.clear();
-                    self.messages.push(Message {
-                        role: MessageRole::System,
-                        content: "🧹 Chat cleared. Ready for new conversations!".into(),
-                        timestamp: Local::now(),
+                    
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        // Clear button with better styling
+                        let clear_btn = egui::Button::new(
+                            RichText::new("🗑 Clear").size(13.0).color(TEXT_SECONDARY)
+                        )
+                        .fill(Color32::TRANSPARENT)
+                        .stroke(Stroke::new(1.0, BG_WIDGET))
+                        .rounding(Rounding::same(8.0));
+                        
+                        if ui.add(clear_btn).on_hover_text("Clear all messages").clicked() {
+                            self.messages.clear();
+                            self.messages.push(Message {
+                                role: MessageRole::System,
+                                content: "🧹 Chat cleared. Ready for new conversations!".into(),
+                                timestamp: Local::now(),
+                            });
+                        }
                     });
-                }
+                });
             });
-        });
     }
     
     fn render_typing_indicator(&self, ui: &mut egui::Ui) {

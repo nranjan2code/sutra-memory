@@ -68,7 +68,8 @@ objc = "0.2"
 # ============================================================================
 # AI / ML (Local)
 # ============================================================================
-fastembed = "4.4"          # Local embedding generation (ONNX)
+# fastembed = "4.4"          # Local embedding generation (ONNX)
+sutra-embedder = { git = "https://github.com/nranjan2code/sutra-embedder", branch = "main" }
 async-trait = "0.1"        # Async traits for embedding provider
 
 [[bin]]

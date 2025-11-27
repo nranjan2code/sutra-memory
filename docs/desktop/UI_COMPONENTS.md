@@ -820,6 +820,12 @@ pub enum ConnectionStatus {
 ```
 
 ### Enhanced Features
+- **Connection indicator**: Always shows "Connected" for local storage
+- **Concept count**: Live count from storage engine
+- **Activity tracker**: Shows recent operations (learn, search, etc.)
+- **AI Model status**: Indicates if real ONNX models are loaded vs fallback
+- **Performance metrics**: Query latency, memory usage
+- **Model download progress**: Shows download status during first launch
 
 **Visual Improvements:**
 - Increased height (32px) for better spacing

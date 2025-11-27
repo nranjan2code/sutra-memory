@@ -140,7 +140,9 @@ impl SutraApp {
         status_bar.set_concept_count(stats.snapshot.concept_count);
         // Initialize local AI pipeline
         info!("Initializing local AI pipeline...");
-        let pipeline = match LocalEmbeddingProvider::new() {
+        let pipeline = match tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(LocalEmbeddingProvider::new_async()) {
             Ok(provider) => {
                 let provider = Arc::new(provider);
                 // We need to block here because LearningPipeline::new_with_provider is async

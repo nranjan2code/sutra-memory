@@ -17,10 +17,10 @@ Sutra Desktop is a self-contained knowledge management application that brings e
 | Feature | Description |
 |---------|-------------|
 | 🚀 **Native Performance** | Pure Rust from storage to UI, ~300ms startup |
-| 🧠 **Local AI** | Built-in ONNX embedding models (fastembed) - no API keys needed |
+| 🧠 **Local AI** | Real ONNX neural networks with auto-download (~90MB) - no API keys needed |
 | ⚡ **Async Architecture** | Non-blocking UI with background processing |
 | 🔒 **Complete Privacy** | All data stays on your machine |
-| 📦 **Self-Contained** | Single binary, ~20MB |
+| 📦 **Self-Contained** | Single binary + auto-downloaded AI models (~90MB) |
 | 🎨 **Modern UI** | Premium dark theme with enhanced menu bar |
 | 💾 **Full Storage Engine** | Reuses `sutra-storage` crate (no code duplication) |
 | 💬 **Enhanced Chat** | Improved autocomplete, better visual design |
@@ -55,8 +55,17 @@ Sutra Desktop is a self-contained knowledge management application that brings e
 ### Build and Run
 
 ```bash
-# Development build
+# Development build (models auto-download on first run)
 cargo run -p sutra-desktop
+
+# Release build
+cargo build -p sutra-desktop --release
+
+# Create macOS app bundle
+cd desktop && ./scripts/build-macos.sh
+```
+
+**First Launch:** The app automatically downloads AI models (~90MB all-MiniLM-L6-v2) on first run for real neural network embeddings.
 
 # Release build (optimized)
 cargo build -p sutra-desktop --release
@@ -215,6 +224,20 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed technical documentation.
 - **[BUILDING.md](./BUILDING.md)** - Build instructions and configuration
 - **[UI_COMPONENTS.md](./UI_COMPONENTS.md)** - UI panel reference
 - **[ENHANCED_UI_DESIGN.md](./ENHANCED_UI_DESIGN.md)** - Original design specifications
+
+---
+
+## Data Storage
+
+**Application Data:**
+- Location: `~/Library/Application Support/ai.sutra.SutraDesktop/` (macOS)
+- Contents: Knowledge graphs, user settings, query logs
+
+**AI Models:**
+- Location: `models/` directory (in project root)
+- Size: ~90MB (all-MiniLM-L6-v2 ONNX model + tokenizer)
+- Download: Automatic on first launch
+- Optimization: Apple Silicon CoreML with FP16 precision
 
 ---
 

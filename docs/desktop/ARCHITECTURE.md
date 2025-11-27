@@ -22,13 +22,15 @@ The desktop application is a **thin UI wrapper** around `sutra-storage`. All sto
 - Single source of truth for storage logic
 - Automatic updates when storage crate improves
 
-### 2. Local AI Pipeline (NEW)
+### 2. Local AI Pipeline (PRODUCTION)
 
-The desktop edition integrates **local AI models** directly into the binary:
-- **Engine**: `fastembed` crate (ONNX Runtime wrapper)
-- **Model**: `nomic-embed-text-v1.5` (same as server edition)
-- **Execution**: Runs on CPU (AVX2 optimized) or Metal (macOS)
-- **Privacy**: No data leaves the machine; no API keys required
+The desktop edition integrates **real neural networks** directly into the binary:
+- **Engine**: `sutra-embedder` crate with ONNX Runtime (optimized Rust)
+- **Model**: `all-MiniLM-L6-v2` neural network (384D, 90MB)
+- **Auto-Download**: Models downloaded automatically on first launch
+- **Hardware Optimized**: CoreML (Apple Silicon) + FP16 mixed precision
+- **Privacy**: Complete offline operation after initial model download
+- **Platform Strategy**: Same crate powers both server (microservice) and desktop (linked library)
 
 ### 3. Immediate Mode GUI
 
@@ -58,7 +60,7 @@ desktop/
 └── src/
     ├── main.rs             # Entry point, window setup
     ├── app.rs              # Main application controller
-    ├── local_embedding.rs  # Local AI provider (fastembed)
+    ├── local_embedding.rs  # Local AI provider (sutra-embedder)
     ├── theme.rs            # Color palette and styling
     ├── types.rs            # Shared data types & AppMessage
     └── ui/

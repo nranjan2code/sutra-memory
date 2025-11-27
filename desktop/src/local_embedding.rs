@@ -1,33 +1,47 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use fastembed::{TextEmbedding, InitOptions, EmbeddingModel};
+use sutra_embedder::{Embedder, EmbedderConfig};
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use sutra_storage::embedding_provider::EmbeddingProvider;
 use tracing::{info, warn};
 
-/// Local embedding provider using ONNX Runtime via fastembed
+/// Local embedding provider using sutra-embedder
 pub struct LocalEmbeddingProvider {
-    model: Arc<TextEmbedding>,
+    model: Arc<Mutex<Embedder>>,
 }
 
 impl LocalEmbeddingProvider {
     /// Create a new local embedding provider
     /// 
     /// This will download the model if it doesn't exist.
-    /// Uses "nomic-embed-text-v1.5" by default to match server edition.
+    /// Uses efficient preset (384D) for better compatibility.
+    pub async fn new_async() -> Result<Self> {
+        info!("Initializing LocalEmbeddingProvider (sutra-embedder) with auto-download...");
+        
+        // Use async version that can auto-download models
+        let config = EmbedderConfig::from_name("efficient")?;
+        let model = Embedder::new_async(config).await?;
+        
+        info!("Local embedding model loaded successfully with auto-download");
+        
+        Ok(Self {
+            model: Arc::new(Mutex::new(model)),
+        })
+    }
+    
+    /// Synchronous fallback constructor
     pub fn new() -> Result<Self> {
-        info!("Initializing LocalEmbeddingProvider (fastembed)...");
+        info!("Initializing LocalEmbeddingProvider (sutra-embedder)...");
         
-        let mut options = InitOptions::default();
-        options.model_name = EmbeddingModel::NomicEmbedTextV15;
-        options.show_download_progress = true;
-        
-        let model = TextEmbedding::try_new(options)?;
+        // Use "efficient" preset which uses smaller all-MiniLM-L6-v2 model (384D)
+        let config = EmbedderConfig::from_name("efficient")?;
+        let model = Embedder::new(config)?;
         
         info!("Local embedding model loaded successfully");
         
         Ok(Self {
-            model: Arc::new(model),
+            model: Arc::new(Mutex::new(model)),
         })
     }
 }
@@ -35,20 +49,24 @@ impl LocalEmbeddingProvider {
 #[async_trait]
 impl EmbeddingProvider for LocalEmbeddingProvider {
     async fn generate(&self, text: &str, _normalize: bool) -> Result<Vec<f32>> {
-        // fastembed handles normalization by default for most models
-        let embeddings = self.model.embed(vec![text], None)?;
-        
-        embeddings.into_iter().next()
-            .ok_or_else(|| anyhow::anyhow!("Failed to generate embedding"))
+        let mut model = self.model.lock().await;
+        // sutra-embedder handles normalization
+        model.embed(text)
     }
 
     async fn generate_batch(&self, texts: &[String], _normalize: bool) -> Vec<Option<Vec<f32>>> {
-        match self.model.embed(texts.to_vec(), None) {
-            Ok(embeddings) => embeddings.into_iter().map(Some).collect(),
-            Err(e) => {
-                warn!("Batch embedding failed: {}", e);
-                vec![None; texts.len()]
+        let mut model = self.model.lock().await;
+        let mut results = Vec::with_capacity(texts.len());
+        
+        for text in texts {
+            match model.embed(text) {
+                Ok(embedding) => results.push(Some(embedding)),
+                Err(e) => {
+                    warn!("Embedding failed for text: {}", e);
+                    results.push(None);
+                }
             }
         }
+        results
     }
 }

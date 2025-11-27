@@ -50,12 +50,14 @@ winget install Microsoft.VisualStudio.2022.BuildTools
 ### Development Build
 
 ```bash
-# From workspace root
+# From workspace root (models auto-download on first launch)
 cargo build -p sutra-desktop
 
-# Run directly
+# Run directly (requires internet for initial model download)
 cargo run -p sutra-desktop
 ```
+
+**First Launch Note:** The application downloads AI models (~90MB all-MiniLM-L6-v2) automatically on first run. This takes 30-60 seconds depending on your internet connection.
 
 ### Release Build
 

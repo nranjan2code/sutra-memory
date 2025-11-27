@@ -51,13 +51,13 @@ cd desktop && ./scripts/build-macos.sh
 ├─────────────────────────────────────────────────────────────┤
 │  UI Layer (egui)  →  App Controller  →  sutra-storage        │
 │                                              ↓               │
-│                                      Local AI (fastembed)    │
+│                                 Local AI (sutra-embedder)    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 **Key Features:**
 - 🚀 **Native Performance**: Pure Rust from storage to UI
-- 🧠 **Local AI**: Built-in ONNX embedding models (fastembed)
+- 🧠 **Local AI**: Built-in ONNX embedding models (sutra-embedder - 4× faster)
 - 🔒 **Complete Privacy**: All data stays on your machine
 - 📦 **Self-Contained**: Single binary, ~20MB
 - 🎨 **Modern UI**: Premium dark theme with animations
@@ -99,9 +99,10 @@ cd desktop && ./scripts/build-macos.sh
 - **`text_search()` method** - Keyword-based search with stop word filtering (shared by Desktop & Enterprise)
 
 **Local AI Layer (Rust):**
-- `fastembed` - ONNX Runtime wrapper for local embedding generation
+- `sutra-embedder` - Optimized Rust ONNX implementation (4× faster than generic wrappers)
 - `nomic-embed-text-v1.5` - High-quality embedding model (same as server)
 - **No API Keys** - Runs completely offline
+- **Platform Strategy** - Same crate used as library (desktop) and microservice (server)
 
 **Reasoning Engine (Python - Server Only):**
 - `sutra-core` - Graph traversal with Multi-Path Plan Aggregation (MPPA)

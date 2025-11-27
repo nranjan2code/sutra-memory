@@ -39,7 +39,7 @@ regex = "1.0"
 unicode-segmentation = "1.0"
 
 # Monitoring
-metrics = "0.22"
+metrics = "0.24"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

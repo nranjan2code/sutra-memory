@@ -55,7 +55,7 @@ once_cell = "1.19"                 # Lazy static initialization
 sha2 = "0.10"                      # SHA-256 hashing
 hmac = "0.12"                      # HMAC authentication
 base64 = "0.21"                    # Base64 encoding for tokens
-tokio-rustls = "0.24"              # TLS for TCP connections
+tokio-rustls = "0.26"              # TLS for TCP connections
 rustls = "0.21"                    # Rust TLS implementation
 rustls-pemfile = "1.0"             # PEM certificate parsing
 

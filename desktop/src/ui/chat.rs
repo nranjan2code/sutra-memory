@@ -200,19 +200,21 @@ impl ChatPanel {
         egui::Frame::none()
             .fill(BG_DARK)
             .rounding(Rounding::same(12.0))
-            .inner_margin(egui::Margin::same(8.0))
+            .inner_margin(egui::Margin::symmetric(12.0, 8.0))
             .stroke(Stroke::new(1.0, BG_WIDGET))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_top(|ui| {
                     // Text input with custom styling
-                    let input_width = ui.available_width() - 90.0;
+                    let input_width = ui.available_width() - 70.0;
                     
-                    let text_edit = TextEdit::singleline(&mut self.input)
-                        .hint_text("Type a question, or / for commands...")
+                    let text_edit = TextEdit::multiline(&mut self.input)
+                        .hint_text("Type a question, or / for commands... (Shift+Enter for new line)")
                         .frame(false)
-                        .font(egui::FontId::proportional(14.0));
+                        .font(egui::FontId::proportional(14.0))
+                        .desired_rows(1)
+                        .desired_width(input_width);
                     
-                    let resp = ui.add_sized(Vec2::new(input_width, 36.0), text_edit);
+                    let resp = ui.add(text_edit);
                     
                     // Handle keyboard navigation for autocomplete
                     let mut submit = false;
@@ -260,7 +262,7 @@ impl ChatPanel {
                             if i.key_pressed(Key::Enter) {
                                 if self.show_autocomplete && self.autocomplete_index >= 0 && has_suggestions {
                                     accept_selection = true;
-                                } else if !self.input.trim().is_empty() && !self.is_processing {
+                                } else if !i.modifiers.shift && !self.input.trim().is_empty() && !self.is_processing {
                                     submit = true;
                                 }
                             }
@@ -277,6 +279,9 @@ impl ChatPanel {
                         };
                         self.show_autocomplete = false;
                         self.autocomplete_index = -1;
+                        
+                        // Focus back on input
+                        resp.request_focus();
                     }
                     
                     // Update autocomplete visibility based on input
@@ -300,18 +305,26 @@ impl ChatPanel {
                     let btn_text_color = if can_send { Color32::WHITE } else { TEXT_MUTED };
                     
                     let send_btn = egui::Button::new(
-                        RichText::new(if self.is_processing { "..." } else { "Send →" })
+                        RichText::new(if self.is_processing { "..." } else { "Send" })
                             .size(13.0)
                             .color(btn_text_color)
                     )
                     .fill(btn_fill)
                     .rounding(Rounding::same(8.0))
-                    .min_size(Vec2::new(70.0, 36.0));
+                    .min_size(Vec2::new(60.0, 32.0));
                     
-                    let btn_resp = ui.add_enabled(can_send, send_btn);
+                    // Align button to bottom of input area if it grows
+                    ui.with_layout(egui::Layout::bottom_up(egui::Align::Max), |ui| {
+                        let btn_resp = ui.add_enabled(can_send, send_btn);
+                        
+                        // Handle send click
+                        if btn_resp.clicked() {
+                            submit = true;
+                        }
+                    });
                     
-                    // Handle send
-                    if btn_resp.clicked() || submit {
+                    // Handle submit
+                    if submit {
                         let content = self.input.trim().to_string();
                         self.input.clear();
                         self.show_autocomplete = false;
@@ -324,6 +337,9 @@ impl ChatPanel {
                         });
                         
                         action = self.parse_command(&content);
+                        
+                        // Keep focus
+                        resp.request_focus();
                     }
                 });
             });

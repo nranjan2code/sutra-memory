@@ -23,17 +23,17 @@ Sutra Desktop is a self-contained knowledge management application that brings e
 | 📦 **Self-Contained** | Single binary + auto-downloaded AI models (~90MB) |
 | 🎨 **Modern UI** | Premium dark theme with enhanced menu bar |
 | 💾 **Full Storage Engine** | Reuses `sutra-storage` crate (no code duplication) |
-| 💬 **Enhanced Chat** | Improved autocomplete, better visual design |
+| 💬 **Enhanced Chat** | Multiline input, improved autocomplete, better visual design |
 | 🔍 **Multi-View Analysis** | Graph, temporal, causal, and path visualization |
 | 📊 **Real-time Analytics** | Performance metrics and usage statistics |
-| 🗑️ **Knowledge Management** | Delete concepts across multiple screens |
+| 🗑️ **Knowledge Management** | Safe deletion with confirmation across multiple screens |
 | 🍎 **Native Integration** | Full menu bar with File/View/Help menus |
 
 ### What's Included
 
 - **Enhanced Menu Bar**: File/View/Help menus with keyboard shortcuts
-- **Chat Interface**: Natural language interaction with improved autocomplete
-- **Knowledge Browser**: Browse, search, delete, and manage learned concepts
+- **Chat Interface**: Natural language interaction with multiline input and autocomplete
+- **Knowledge Browser**: Responsive grid view to browse, search, and safely delete concepts
 - **Graph Visualization**: Force-directed interactive knowledge graph
 - **Reasoning Paths**: MPPA-style multi-path consensus analysis
 - **Temporal View**: Timeline and matrix visualization of temporal relationships
@@ -103,7 +103,8 @@ Type `/` in the chat to see available commands with autocomplete:
 ### Keyboard Shortcuts
 
 - **↑/↓ arrows**: Navigate autocomplete suggestions
-- **Enter**: Accept selection or send message
+- **Enter**: Send message
+- **Shift+Enter**: Insert new line
 - **Tab**: Accept autocomplete suggestion
 - **Esc**: Close autocomplete
 
@@ -118,7 +119,7 @@ Type `/` in the chat to see available commands with autocomplete:
 
 **MAIN**
 - 💬 **Chat** - Conversational interface
-- 📚 **Knowledge** - Browse concepts (🗑️ delete available)
+- 📚 **Knowledge** - Browse concepts (responsive grid)
 - 🔍 **Search** - Quick search with deletion options
 
 **ANALYSIS** (collapsible)
@@ -137,8 +138,9 @@ Type `/` in the chat to see available commands with autocomplete:
 Concepts can be permanently deleted from multiple screens:
 
 **Knowledge Panel:**
-- Click the **🗑️ button** next to any concept card
-- Concept is immediately removed from storage with full cleanup
+- Click the **🗑️ button** on any concept card
+- **Safety:** A confirmation dialog appears to prevent accidental deletion
+- Concept is immediately removed from storage with full cleanup upon confirmation
 
 **Quick Learn Panel:**  
 - Click the **🗑️ button** next to any successful "Recent learns" entry

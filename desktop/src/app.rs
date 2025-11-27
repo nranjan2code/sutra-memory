@@ -366,6 +366,10 @@ impl SutraApp {
                     }
                 });
             }
+            
+            KnowledgeAction::SwitchToChat => {
+                self.sidebar.current_view = SidebarView::Chat;
+            }
         }
     }
     

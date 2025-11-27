@@ -175,10 +175,10 @@ pub enum ChatAction {
 | `/clear` | `/c` | Clear chat |
 | `/stats` | `/status` | Show statistics |
 
-**Async Processing:**
-- Non-blocking message handling
-- Typing indicator ("Sutra is thinking...") during heavy operations
-- Immediate UI feedback for user actions
+**Input Features:**
+- **Multiline Support**: Auto-expanding text area for long content
+- **Smart Keys**: `Enter` to send, `Shift+Enter` for new line
+- **Async Processing**: Non-blocking message handling with typing indicator
 
 **Autocomplete:**
 - Triggered when input starts with `/`
@@ -230,42 +230,44 @@ pub struct KnowledgePanel {
     pub selected_concept: Option<String>,
     pub search_query: String,
     pub is_loading: bool,
+    pub delete_confirmation: Option<String>,
 }
 
 pub enum KnowledgeAction {
     Search(String),
     Refresh,
     SelectConcept(String),
+    DeleteConcept(String),
+    SwitchToChat,
 }
 ```
 
 ### Features
-- Real-time search filtering
-- Concept cards with preview, ID, strength, and connection count
-- Detail panel showing full content, confidence, and relationships
-- Loading and empty states with visual feedback
+- **Responsive Grid**: Masonry-style layout adapting to window width
+- **Real-time Search**: Instant filtering of concepts
+- **Concept Cards**: Compact view with preview, confidence, and stats
+- **Safe Deletion**: Confirmation modal to prevent accidental data loss
+- **Interactive Empty State**: "Start Learning" button guides users to chat
 
 ### Layout
 ```
 ┌──────────────────┬─────────────────────────┐
-│ 🧠 Knowledge Base│  📋 Concept Details     │
-│  Explore learned │                         │
-├──────────────────┤  Identifier             │
-│ 🔍 [Search...]   │  a3f2e8c1...            │
-├──────────────────┤                         │
-│ 47 concepts   ↻  │  Content                │
-├──────────────────┤  ┌─────────────────────┐│
-│ ┌──────────────┐ │  │ Memory leak in...   ││
-│ │ Concept 1    │ │  └─────────────────────┘│
-│ │ a3f2... ⚡92%│ │                         │
-│ │        🔗 3  │ │  [Strength]  [Confidence]│
-│ └──────────────┘ │  │ 88.0% │  │  92.0%  │ │
-│                  │                         │
-│ ┌──────────────┐ │  Connections (3)        │
-│ │ Concept 2    │ │  → b8e4...              │
-│ │ ...          │ │  → c9f1...              │
-│ └──────────────┘ │                         │
-└──────────────────┴─────────────────────────┘
+│ 🧠 Knowledge Base│  [Refresh] [Count]      │
+├──────────────────┴─────────────────────────┤
+│ 🔍 [Search concepts...]                    │
+├────────────────────────────────────────────┤
+│                                            │
+│ ┌──────────────┐  ┌──────────────┐         │
+│ │ Concept 1    │  │ Concept 2    │         │
+│ │ Content...   │  │ Content...   │         │
+│ │ ⚡92% 🔗 3   │  │ ⚡88% 🔗 5   │         │
+│ └──────────────┘  └──────────────┘         │
+│                                            │
+│ ┌──────────────┐  ┌──────────────┐         │
+│ │ Concept 3    │  │ Concept 4    │         │
+│ │ ...          │  │ ...          │         │
+│ └──────────────┘  └──────────────┘         │
+└────────────────────────────────────────────┘
 ```
 
 ---

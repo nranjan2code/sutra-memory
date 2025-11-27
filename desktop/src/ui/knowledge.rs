@@ -9,6 +9,7 @@ pub struct KnowledgePanel {
     pub selected_concept: Option<String>,
     pub search_query: String,
     pub is_loading: bool,
+    pub delete_confirmation: Option<String>,
 }
 
 impl Default for KnowledgePanel {
@@ -18,6 +19,7 @@ impl Default for KnowledgePanel {
             selected_concept: None,
             search_query: String::new(),
             is_loading: false,
+            delete_confirmation: None,
         }
     }
 }
@@ -68,7 +70,9 @@ impl KnowledgePanel {
                     ui.label(RichText::new("Loading...").color(TEXT_MUTED));
                 });
             } else if self.concepts.is_empty() {
-                self.empty_state(ui);
+                if let Some(act) = self.empty_state(ui) {
+                    action = Some(act);
+                }
             } else {
                 // Concepts grid
                 ScrollArea::vertical()
@@ -78,41 +82,84 @@ impl KnowledgePanel {
                     });
             }
         });
+
+        // Delete confirmation modal
+        if let Some(concept_id) = &self.delete_confirmation {
+            let mut should_close = false;
+            let mut confirmed = false;
+            let id_to_delete = concept_id.clone();
+
+            egui::Window::new("Delete Concept")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
+                .show(ui.ctx(), |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(8.0);
+                        ui.label(RichText::new("Are you sure you want to delete this concept?").size(16.0));
+                        ui.label(RichText::new("This action cannot be undone.").size(12.0).color(TEXT_MUTED));
+                        ui.add_space(16.0);
+                        
+                        ui.horizontal(|ui| {
+                            if ui.button("Cancel").clicked() {
+                                should_close = true;
+                            }
+                            
+                            let delete_btn = egui::Button::new(RichText::new("Delete").color(Color32::WHITE))
+                                .fill(crate::theme::ERROR);
+                            
+                            if ui.add(delete_btn).clicked() {
+                                confirmed = true;
+                                should_close = true;
+                            }
+                        });
+                        ui.add_space(8.0);
+                    });
+                });
+
+            if should_close {
+                self.delete_confirmation = None;
+            }
+            if confirmed {
+                action = Some(KnowledgeAction::DeleteConcept(id_to_delete));
+            }
+        }
         
         action
     }
     
     fn concepts_grid(&mut self, ui: &mut egui::Ui, action: &mut Option<KnowledgeAction>) {
-        // Simple vertical list with delete functionality
-        let concepts_clone = self.concepts.clone();
-        for concept in &concepts_clone {
-            ui.horizontal(|ui| {
-                // Main concept card area
-                let card_width = ui.available_width() - 40.0;
-                ui.allocate_ui_with_layout(
-                    Vec2::new(card_width, 60.0),
-                    egui::Layout::left_to_right(egui::Align::Center),
-                    |ui| {
-                        if self.render_concept_card(ui, concept) {
-                            *action = Some(KnowledgeAction::SelectConcept(concept.id.clone()));
-                        }
+        let available_width = ui.available_width();
+        let card_width = 300.0;
+        let spacing = 12.0;
+        let columns = ((available_width + spacing) / (card_width + spacing)).floor().max(1.0) as usize;
+        
+        egui::Grid::new("concepts_grid")
+            .min_col_width(card_width)
+            .spacing(Vec2::splat(spacing))
+            .show(ui, |ui| {
+                for (i, concept) in self.concepts.iter().enumerate() {
+                    if i > 0 && i % columns == 0 {
+                        ui.end_row();
                     }
-                );
-                
-                // Delete button
-                let delete_btn = egui::Button::new(
-                    RichText::new("🗑").size(16.0).color(Color32::from_rgb(220, 80, 80))
-                )
-                .fill(Color32::TRANSPARENT)
-                .frame(false)
-                .rounding(Rounding::same(6.0));
-                
-                if ui.add(delete_btn).on_hover_text("Delete concept").clicked() {
-                    *action = Some(KnowledgeAction::DeleteConcept(concept.id.clone()));
+                    
+                    // Render card
+                    let response = self.compact_concept_card(ui, concept);
+                    
+                    // Handle click
+                    if response.clicked() {
+                        *action = Some(KnowledgeAction::SelectConcept(concept.id.clone()));
+                    }
+                    
+                    // Context menu for delete
+                    response.context_menu(|ui| {
+                        if ui.button(RichText::new("🗑 Delete").color(crate::theme::ERROR)).clicked() {
+                            self.delete_confirmation = Some(concept.id.clone());
+                            ui.close_menu();
+                        }
+                    });
                 }
             });
-            ui.add_space(8.0);
-        }
     }
     
     fn render_concept_card(&self, ui: &mut egui::Ui, concept: &ConceptInfo) -> bool {
@@ -207,7 +254,8 @@ impl KnowledgePanel {
             }).response
     }
     
-    fn empty_state(&self, ui: &mut egui::Ui) {
+    fn empty_state(&self, ui: &mut egui::Ui) -> Option<KnowledgeAction> {
+        let mut action = None;
         ui.vertical_centered(|ui| {
             ui.add_space(40.0);
             
@@ -229,7 +277,20 @@ impl KnowledgePanel {
                 .show(ui, |ui| {
                     ui.label(RichText::new("/learn The sky is blue").size(12.0).color(TEXT_PRIMARY).monospace());
                 });
+                
+            ui.add_space(20.0);
+            
+            // Start Learning button
+            let btn = egui::Button::new(RichText::new("Start Learning").color(Color32::WHITE))
+                .fill(PRIMARY)
+                .rounding(Rounding::same(8.0))
+                .min_size(Vec2::new(120.0, 32.0));
+                
+            if ui.add(btn).clicked() {
+                action = Some(KnowledgeAction::SwitchToChat);
+            }
         });
+        action
     }
     
     pub fn set_concepts(&mut self, concepts: Vec<ConceptInfo>) {
@@ -244,4 +305,5 @@ pub enum KnowledgeAction {
     Refresh,
     SelectConcept(String),
     DeleteConcept(String),
+    SwitchToChat,
 }

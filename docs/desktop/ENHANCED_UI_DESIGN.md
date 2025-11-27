@@ -2,7 +2,7 @@
 
 **Version:** 3.3.0  
 **Status:** ✅ FULLY IMPLEMENTED  
-**Updated:** November 26, 2025
+**Updated:** November 27, 2025
 
 > **✨ Note:** This design has been completely implemented as of November 26, 2025.  
 > Key improvements include:
@@ -1145,7 +1145,7 @@ New files to create:
 
 ## Future Enhancements (v3.0+)
 
-1. **Local Embeddings**: ONNX Runtime integration for offline vector generation
+1. ✅ **Local Embeddings**: ONNX Runtime via vendored `sutra-embedder` (all-mpnet-base-v2, 768D)
 2. **Multi-Window**: Detachable panels (egui viewports)
 3. **Themes**: Light mode, high contrast, custom color schemes
 4. **Plugins**: Rust-based extension system

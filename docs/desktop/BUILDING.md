@@ -1,7 +1,7 @@
 # Building Sutra Desktop
 
 **Version:** 3.3.0  
-**Updated:** November 26, 2025
+**Updated:** November 27, 2025
 
 This guide covers building Sutra Desktop from source, including platform-specific configurations and optimization options.
 
@@ -57,7 +57,7 @@ cargo build -p sutra-desktop
 cargo run -p sutra-desktop
 ```
 
-**First Launch Note:** The application downloads AI models (~500MB all-mpnet-base-v2) automatically on first run. This takes 1-3 minutes depending on your internet connection.
+**First Launch Note:** The application downloads AI models (~420MB all-mpnet-base-v2) automatically on first run. This takes 1-3 minutes depending on your internet connection.
 
 **Vendored AI Dependencies:** The desktop app uses `sutra-embedder` and `sutraworks-model` which are vendored directly in the workspace at `packages/sutra-embedder` and `packages/sutraworks-model`. No external git repositories or submodules required.
 
@@ -268,8 +268,8 @@ cargo build -p sutra-desktop --release --target x86_64-unknown-linux-musl
 
 | Crate | Version | Purpose |
 |-------|---------|---------|
-| `sutra-storage` | workspace | Core storage engine |
-| `eframe` | 0.29 | Native windowing framework |
+| `sutra-storage` | workspace | Core storage engine || `sutra-embedder` | workspace | ONNX embedding (vendored) |
+| `sutraworks-model` | workspace | NLG/text generation (vendored) || `eframe` | 0.29 | Native windowing framework |
 | `egui` | 0.29 | Immediate mode GUI |
 | `egui_extras` | 0.29 | Additional widgets |
 | `tokio` | workspace | Async runtime |

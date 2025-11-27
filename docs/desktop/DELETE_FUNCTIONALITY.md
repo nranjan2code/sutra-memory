@@ -1,7 +1,7 @@
 # Delete Functionality in Sutra Desktop
 
 **Version:** 3.3.0  
-**Added:** November 26, 2025
+**Updated:** November 27, 2025
 
 This document describes the comprehensive delete functionality implemented across Sutra Desktop's user interface.
 

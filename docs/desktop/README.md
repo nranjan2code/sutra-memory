@@ -69,13 +69,6 @@ cd desktop && ./scripts/build-macos.sh
 
 **Vendored Dependencies:** The desktop app uses `sutra-embedder` and `sutraworks-model` which are embedded directly in the workspace at `packages/sutra-embedder` and `packages/sutraworks-model`. No external git repositories or submodules required.
 
-# Release build (optimized)
-cargo build -p sutra-desktop --release
-
-# Run release build
-./target/release/sutra-desktop
-```
-
 ### macOS App Bundle
 
 ```bash

@@ -1,9 +1,23 @@
 # Sutra Desktop UI Components
 
 **Version:** 3.3.0  
-**Updated:** November 26, 2025
+**Updated:** November 27, 2025
 
 This document provides a detailed reference for all UI panels and components in Sutra Desktop.
+
+---
+
+## Architecture Overview
+
+**Vendored AI Dependencies:**
+- `packages/sutra-embedder` - ONNX embedding library (all-mpnet-base-v2, 768D)
+- `packages/sutraworks-model` - NLG/text generation library with RWKV support
+- Both packages embedded in workspace, no external git dependencies
+
+**Key Files:**
+- `desktop/src/local_embedding.rs` - Integration with vendored `sutra-embedder`
+- `desktop/src/local_nlg.rs` - Integration with vendored `sutraworks-model`
+- First launch downloads AI models (~420MB) automatically
 
 ---
 

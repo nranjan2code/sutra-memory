@@ -18,7 +18,7 @@ setup(
         "sutra-core==1.0.0",
         "sutra-hybrid==1.0.0",
         "fastapi==0.115.0",
-        "uvicorn[standard]==0.30.6",
+        "uvicorn[standard]==0.38.0",
         "pydantic==2.9.2",
         "python-multipart==0.0.12",
     ],

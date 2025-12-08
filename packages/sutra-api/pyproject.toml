@@ -23,7 +23,7 @@ classifiers = [
 ]
 dependencies = [
   "fastapi==0.115.0",  # ✅ Pinned for security
-  "uvicorn[standard]==0.30.6",  # ✅ Pinned for security
+  "uvicorn[standard]==0.38.0",  # ✅ Pinned for security
   "pydantic==2.9.2",  # ✅ Pinned for security
   "pydantic-settings==2.5.2",  # ✅ Pinned for security
   "python-multipart==0.0.12",  # ✅ Pinned for security

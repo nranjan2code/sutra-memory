@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
 use tracing::{debug, info, warn};
 
@@ -46,7 +46,15 @@ impl BenchmarkDataGenerator {
         generator.initialize_test_data();
         generator
     }
+}
 
+impl Default for BenchmarkDataGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BenchmarkDataGenerator {
     fn initialize_test_data(&mut self) {
         // Short queries (typical search/QA)
         let short_queries = vec![

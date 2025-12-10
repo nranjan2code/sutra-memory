@@ -2,7 +2,6 @@
 /// 
 /// Domain-aware semantic understanding built into storage layer.
 /// No fallbacks, no compromises - deterministic semantic classification.
-
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -272,7 +271,7 @@ impl SemanticMetadata {
     pub fn is_valid_at(&self, timestamp: i64) -> bool {
         self.temporal_bounds
             .as_ref()
-            .map_or(true, |bounds| bounds.contains(timestamp))
+            .is_none_or(|bounds| bounds.contains(timestamp))
     }
     
     /// Check if this concept conflicts with another

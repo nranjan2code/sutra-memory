@@ -2,7 +2,6 @@
 /// 
 /// Filters and query operations for semantic-aware graph traversal.
 /// Zero overhead - all filters are inline predicates.
-
 use super::types::*;
 use crate::types::ConceptId;
 use std::collections::HashSet;
@@ -82,7 +81,7 @@ impl SemanticFilter {
     
     /// Builder: Set minimum confidence
     pub fn with_min_confidence(mut self, confidence: f32) -> Self {
-        self.min_confidence = confidence.max(0.0).min(1.0);
+        self.min_confidence = confidence.clamp(0.0, 1.0);
         self
     }
     
@@ -192,20 +191,20 @@ impl TemporalConstraint {
     pub fn matches(&self, bounds: &Option<TemporalBounds>) -> bool {
         match self {
             Self::ValidAt(timestamp) => {
-                bounds.as_ref().map_or(true, |b| b.contains(*timestamp))
+                bounds.as_ref().is_none_or(|b| b.contains(*timestamp))
             },
             Self::After(timestamp) => {
-                bounds.as_ref().map_or(false, |b| {
-                    b.start.map_or(false, |s| s > *timestamp)
+                bounds.as_ref().is_some_and(|b| {
+                    b.start.is_some_and(|s| s > *timestamp)
                 })
             },
             Self::Before(timestamp) => {
-                bounds.as_ref().map_or(false, |b| {
-                    b.start.map_or(false, |s| s < *timestamp)
+                bounds.as_ref().is_some_and(|b| {
+                    b.start.is_some_and(|s| s < *timestamp)
                 })
             },
             Self::During { start, end } => {
-                bounds.as_ref().map_or(false, |b| {
+                bounds.as_ref().is_some_and(|b| {
                     b.overlaps(&TemporalBounds::new(Some(*start), Some(*end), TemporalRelation::During))
                 })
             },

@@ -12,11 +12,11 @@
 //! - Export/Import functionality
 
 mod app;
-mod ui;
+mod local_embedding; // 🔥 NEW: Local AI provider
+mod local_nlg;
 mod theme;
 mod types;
-mod local_embedding; // 🔥 NEW: Local AI provider
-mod local_nlg;       // 🔥 NEW: Local NLG provider
+mod ui; // 🔥 NEW: Local NLG provider
 
 pub use app::SutraApp;
 
@@ -60,16 +60,17 @@ fn main() -> Result<()> {
         Box::new(|cc| {
             // Apply custom theme
             theme::setup_custom_theme(&cc.egui_ctx);
-            
+
             // Enable image loading
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            
+
             // Setup native menu bar (macOS)
             setup_menu_bar(&cc.egui_ctx);
-            
+
             Ok(Box::new(SutraApp::new(cc)))
         }),
-    ).map_err(|e| anyhow::anyhow!("Failed to start application: {}", e))
+    )
+    .map_err(|e| anyhow::anyhow!("Failed to start application: {}", e))
 }
 
 /// Setup native menu bar for better macOS integration
@@ -84,14 +85,14 @@ fn setup_menu_bar(ctx: &egui::Context) {
 fn load_icon() -> egui::IconData {
     let size = 64;
     let mut rgba = vec![0u8; size * size * 4];
-    
+
     for y in 0..size {
         for x in 0..size {
             let idx = (y * size + x) * 4;
             let cx = (x as f32 - size as f32 / 2.0) / (size as f32 / 2.0);
             let cy = (y as f32 - size as f32 / 2.0) / (size as f32 / 2.0);
             let dist = (cx * cx + cy * cy).sqrt();
-            
+
             if dist < 0.9 {
                 let t = dist / 0.9;
                 rgba[idx] = (138.0 + (59.0 - 138.0) * t) as u8;
@@ -101,7 +102,7 @@ fn load_icon() -> egui::IconData {
             }
         }
     }
-    
+
     egui::IconData {
         rgba,
         width: size as u32,

@@ -7,7 +7,6 @@
 /// - Automatic detection and fallback
 /// 
 /// Reference: Flash Attention (Dao et al., 2022) https://arxiv.org/abs/2205.14135
-
 use anyhow::Result;
 use ort::session::builder::SessionBuilder;
 use tracing::{debug, info, warn};
@@ -89,9 +88,10 @@ impl FlashAttentionOptimizer {
         #[cfg(target_os = "macos")]
         {
             // Metal doesn't support Flash Attention yet
-            return false;
+            false
         }
         
+        #[cfg(not(target_arch = "aarch64"))]
         false
     }
     

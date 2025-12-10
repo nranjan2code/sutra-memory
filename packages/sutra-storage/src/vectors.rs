@@ -2,7 +2,6 @@
 ///
 /// Stores float32 vectors efficiently with optional Product Quantization.
 /// Supports incremental updates and persistence.
-
 use anyhow::{Context, Result};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};

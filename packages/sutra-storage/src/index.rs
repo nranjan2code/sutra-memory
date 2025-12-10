@@ -5,7 +5,6 @@
 /// - Adjacency Index: ConceptId → Vec<ConceptId> for fast neighbor queries
 /// - Inverted Index: Word → Set<ConceptId> for text search
 /// - Temporal Index: Timestamp → Vec<ConceptId> for time-travel queries
-
 use crate::types::ConceptId;
 use dashmap::DashMap;
 use parking_lot::RwLock;
@@ -78,7 +77,7 @@ impl GraphIndex {
         let mut temporal = self.temporal_index.write();
         temporal
             .entry(created_at)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(concept_id);
         drop(temporal);
         
@@ -111,13 +110,13 @@ impl GraphIndex {
         // Add forward edge
         self.adjacency_index
             .entry(source)
-            .or_insert_with(SmallVec::new)
+            .or_default()
             .push(target);
         
         // Add backward edge (for bidirectional queries)
         self.adjacency_index
             .entry(target)
-            .or_insert_with(SmallVec::new)
+            .or_default()
             .push(source);
         
         *self.total_edges.write() += 1;
@@ -137,7 +136,7 @@ impl GraphIndex {
             let normalized = word.to_lowercase();
             self.inverted_index
                 .entry(normalized)
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(concept_id);
         }
     }
@@ -194,8 +193,7 @@ impl GraphIndex {
     pub fn query_at_time(&self, timestamp_ms: u64) -> Vec<ConceptId> {
         let temporal = self.temporal_index.read();
         temporal
-            .get(&timestamp_ms)
-            .map(|v| v.clone())
+            .get(&timestamp_ms).cloned()
             .unwrap_or_default()
     }
     

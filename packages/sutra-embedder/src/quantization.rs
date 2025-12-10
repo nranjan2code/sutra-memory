@@ -1,5 +1,4 @@
-use ort::environment::{Environment, get_environment};
-use std::sync::Arc;
+use ort::environment::get_environment;
 /// INT8 Quantization Module
 /// 
 /// This module provides utilities for quantizing ONNX models to INT8 precision
@@ -14,7 +13,6 @@ use std::sync::Arc;
 /// - Slight accuracy degradation (~1-3% depending on model)
 /// - Requires calibration data for best results
 /// - Best suited for CPU inference
-
 use anyhow::{anyhow, Result};
 use std::path::Path;
 use tracing::{info, warn};
@@ -146,8 +144,7 @@ fn create_quantized_session(
     model_path: &Path,
     _config: &QuantizationConfig,
 ) -> Result<Session> {
-    use ort::session::{builder::GraphOptimizationLevel, builder::SessionBuilder, Session};
-    
+    use ort::session::{builder::GraphOptimizationLevel, builder::SessionBuilder};
     // Enable maximum graph optimization which includes INT8 transformations
     let _env = get_environment()?;
     let session = SessionBuilder::new()?

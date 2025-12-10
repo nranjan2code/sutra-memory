@@ -1,7 +1,6 @@
 use axum::{
-    extract::Query,
+    extract::Json,
     http::StatusCode,
-    response::Json,
     routing::{get, post},
     Router,
 };
@@ -10,10 +9,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
-use tracing::{info, warn, error};
+use tracing::{info, error};
 
 use crate::embedder::{Embedder, EmbedderConfig};
-use crate::hardware::HardwareProfile;
 
 #[derive(Debug, Serialize)]
 pub struct HealthResponse {
@@ -229,7 +227,7 @@ pub async fn embed_handler(
     drop(embedder); // Release lock early
     
     let processing_time = start.elapsed().as_millis() as f64;
-    let final_dimensions = embeddings.get(0).map(|e| e.len()).unwrap_or(0);
+    let final_dimensions = embeddings.first().map(|e| e.len()).unwrap_or(0);
     
     // Update success stats
     {

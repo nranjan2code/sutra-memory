@@ -1,9 +1,9 @@
-///! Embedding client for Sutra Embedding Service integration
-///!
-///! Production-grade HTTP client for generating embeddings via dedicated
-///! embedding service using nomic-embed-text-v1.5. Supports both single and 
-///! batch embedding generation with retry logic, timeout handling, and 
-///! comprehensive error reporting.
+//! Embedding client for Sutra Embedding Service integration
+//!
+//! Production-grade HTTP client for generating embeddings via dedicated
+//! embedding service using nomic-embed-text-v1.5. Supports both single and 
+//! batch embedding generation with retry logic, timeout handling, and 
+//! comprehensive error reporting.
 
 use anyhow::{Context, Result};
 use reqwest::{Client, StatusCode};

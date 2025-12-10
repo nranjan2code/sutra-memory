@@ -10,7 +10,6 @@
 /// - Consistency: No partial associations
 /// - Isolation: Transactions are serialized via locks
 /// - Durability: WAL ensures recovery
-
 use crate::types::{AssociationType, ConceptId};
 use parking_lot::RwLock;
 use std::collections::HashMap;

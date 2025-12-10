@@ -1,7 +1,9 @@
 //! Status bar component - Modern, informative footer
 
-use eframe::egui::{self, Color32, RichText, Rounding, Vec2};
-use crate::theme::{TEXT_MUTED, TEXT_SECONDARY, SUCCESS, WARNING, BG_DARK, BG_WIDGET, PRIMARY, PRIMARY_LIGHT};
+use crate::theme::{
+    BG_DARK, BG_WIDGET, PRIMARY, PRIMARY_LIGHT, SUCCESS, TEXT_MUTED, TEXT_SECONDARY, WARNING,
+};
+use eframe::egui::{self, RichText, Rounding, Vec2};
 
 #[derive(Clone, PartialEq)]
 pub enum ConnectionStatus {
@@ -38,11 +40,11 @@ impl StatusBar {
                 ui.horizontal(|ui| {
                     // Left: status indicator with animated dot
                     self.status_badge(ui);
-                    
+
                     ui.add_space(16.0);
                     self.separator(ui);
                     ui.add_space(16.0);
-                    
+
                     // Concept count with icon - more prominent
                     egui::Frame::none()
                         .fill(PRIMARY.gamma_multiply(0.08))
@@ -51,21 +53,30 @@ impl StatusBar {
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
                                 ui.label(RichText::new("🧠").size(13.0));
-                                ui.label(RichText::new(format!("{}", self.concept_count)).size(13.0).color(PRIMARY).strong());
+                                ui.label(
+                                    RichText::new(format!("{}", self.concept_count))
+                                        .size(13.0)
+                                        .color(PRIMARY)
+                                        .strong(),
+                                );
                                 ui.label(RichText::new("concepts").size(11.0).color(TEXT_MUTED));
                             });
                         });
-                    
+
                     ui.add_space(16.0);
                     self.separator(ui);
                     ui.add_space(16.0);
-                    
+
                     // Last activity with icon
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("⚡").size(11.0));
-                        ui.label(RichText::new(&self.last_activity).size(12.0).color(TEXT_SECONDARY));
+                        ui.label(
+                            RichText::new(&self.last_activity)
+                                .size(12.0)
+                                .color(TEXT_SECONDARY),
+                        );
                     });
-                    
+
                     // Right side
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Version badge - more prominent
@@ -74,13 +85,18 @@ impl StatusBar {
                             .rounding(Rounding::same(6.0))
                             .inner_margin(egui::Margin::symmetric(8.0, 3.0))
                             .show(ui, |ui| {
-                                ui.label(RichText::new(&self.version).size(11.0).color(PRIMARY_LIGHT).monospace());
+                                ui.label(
+                                    RichText::new(&self.version)
+                                        .size(11.0)
+                                        .color(PRIMARY_LIGHT)
+                                        .monospace(),
+                                );
                             });
-                        
+
                         ui.add_space(12.0);
                         self.separator(ui);
                         ui.add_space(12.0);
-                        
+
                         // Storage type indicator with pill background
                         egui::Frame::none()
                             .fill(SUCCESS.gamma_multiply(0.12))
@@ -96,7 +112,7 @@ impl StatusBar {
                 });
             });
     }
-    
+
     fn status_badge(&self, ui: &mut egui::Ui) {
         let (icon_color, text, pulse) = match &self.status {
             ConnectionStatus::Connected => (SUCCESS, "Active", false),
@@ -104,7 +120,7 @@ impl StatusBar {
             ConnectionStatus::Disconnected => (TEXT_MUTED, "Offline", false),
             ConnectionStatus::Error(e) => (WARNING, e.as_str(), false),
         };
-        
+
         egui::Frame::none()
             .fill(icon_color.gamma_multiply(0.15))
             .rounding(Rounding::same(10.0))
@@ -112,41 +128,48 @@ impl StatusBar {
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     // Animated status dot
-                    let (rect, _) = ui.allocate_exact_size(Vec2::new(8.0, 8.0), egui::Sense::hover());
+                    let (rect, _) =
+                        ui.allocate_exact_size(Vec2::new(8.0, 8.0), egui::Sense::hover());
                     let center = rect.center();
-                    
+
                     // Glow effect
                     if pulse {
-                        ui.painter().circle_filled(center, 5.0, icon_color.gamma_multiply(0.3));
+                        ui.painter()
+                            .circle_filled(center, 5.0, icon_color.gamma_multiply(0.3));
                     }
                     ui.painter().circle_filled(center, 3.0, icon_color);
-                    
+
                     ui.add_space(4.0);
                     ui.label(RichText::new(text).size(11.0).color(icon_color));
                 });
             });
     }
-    
+
     fn stat_pill(&self, ui: &mut egui::Ui, icon: &str, value: &str, _label: &str) {
         ui.horizontal(|ui| {
             ui.label(RichText::new(icon).size(12.0));
-            ui.label(RichText::new(value).size(12.0).color(TEXT_SECONDARY).strong());
+            ui.label(
+                RichText::new(value)
+                    .size(12.0)
+                    .color(TEXT_SECONDARY)
+                    .strong(),
+            );
         });
     }
-    
+
     fn separator(&self, ui: &mut egui::Ui) {
         let (rect, _) = ui.allocate_exact_size(Vec2::new(1.0, 14.0), egui::Sense::hover());
         ui.painter().rect_filled(rect, 0.0, BG_WIDGET);
     }
-    
+
     pub fn set_status(&mut self, status: ConnectionStatus) {
         self.status = status;
     }
-    
+
     pub fn set_concept_count(&mut self, count: usize) {
         self.concept_count = count;
     }
-    
+
     pub fn set_activity(&mut self, activity: impl Into<String>) {
         self.last_activity = activity.into();
     }

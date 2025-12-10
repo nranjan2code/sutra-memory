@@ -5,7 +5,6 @@
 ///
 /// PQ splits vectors into subvectors and quantizes each independently
 /// using k-means clustering.
-
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -33,7 +32,7 @@ impl ProductQuantizer {
     /// Create a new product quantizer
     pub fn new(dimension: usize, num_subvectors: usize, num_centroids: usize) -> Self {
         assert!(
-            dimension % num_subvectors == 0,
+            dimension.is_multiple_of(num_subvectors),
             "Dimension must be divisible by num_subvectors"
         );
         

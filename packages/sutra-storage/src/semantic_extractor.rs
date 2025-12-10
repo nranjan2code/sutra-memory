@@ -58,7 +58,7 @@ impl SemanticExtractor {
         info!("Initializing SemanticExtractor with embedding provider (lazy relation embeddings)");
         
         // Define relation type descriptions for embedding (but don't generate embeddings yet)
-        let relation_descriptions = vec![
+        let relation_descriptions = [
             (
                 AssociationType::Semantic,
                 "is a type of, is an example of, belongs to category, classified as, instance of"
@@ -132,7 +132,7 @@ impl SemanticExtractor {
         info!("Lazily computing relation embeddings...");
         
         // Define relation type descriptions
-        let relation_descriptions = vec![
+        let relation_descriptions = [
             (
                 AssociationType::Semantic,
                 "is a type of, is an example of, belongs to category, classified as, instance of"
@@ -356,7 +356,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     }
     
     // Clamp to [0, 1] range
-    (dot / (norm_a * norm_b)).max(0.0).min(1.0)
+    (dot / (norm_a * norm_b)).clamp(0.0, 1.0)
 }
 
 #[cfg(test)]

@@ -8,7 +8,6 @@
 /// - When Level 0 reaches threshold, compact into Level 1
 /// - When Level N reaches threshold, compact into Level N+1
 /// - Merge overlapping segments to reduce amplification
-
 use crate::index::{ConceptLocation, GraphIndex};
 use crate::manifest::{Manifest, SegmentMetadata};
 use crate::segment::Segment;

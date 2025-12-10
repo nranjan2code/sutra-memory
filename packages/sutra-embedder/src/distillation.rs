@@ -11,7 +11,6 @@
 /// - Hardware-adaptive model creation
 /// 
 /// Reference: DistilBERT (Sanh et al., 2019) https://arxiv.org/abs/1910.01108
-
 use anyhow::{anyhow, Result};
 use ndarray::{Array1, Array2};
 use std::path::Path;
@@ -277,7 +276,7 @@ impl DistillationTrainer {
         
         // Average gradient over batch
         let batch_size = batch_indices.len() as f32;
-        gradient = gradient / batch_size;
+        gradient /= batch_size;
         
         Ok(gradient)
     }

@@ -13,7 +13,6 @@
 /// - 1000+ embeddings/sec on single GPU
 /// - 5000+ embeddings/sec on 4-GPU setup
 /// - 20000+ embeddings/sec on 8-GPU cluster
-
 use anyhow::{anyhow, Result};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, RwLock, Semaphore};
@@ -376,6 +375,7 @@ struct MultiGPUPoolInternal {
     config: MultiGPUConfig,
     workers: Arc<RwLock<Vec<GPUWorker>>>,
     next_worker_idx: Arc<Mutex<usize>>,
+    #[allow(dead_code)]
     stats: Arc<RwLock<MultiGPUStats>>,
 }
 

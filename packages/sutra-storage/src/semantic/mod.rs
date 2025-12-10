@@ -3,7 +3,6 @@
 /// Production-grade semantic analysis built into storage layer.
 /// Provides domain-aware type classification, temporal reasoning,
 /// causal analysis, and negation detection.
-
 pub mod types;
 pub mod analyzer;
 pub mod query;

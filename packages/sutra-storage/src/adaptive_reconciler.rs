@@ -11,7 +11,6 @@
 /// - Predictive queue depth forecasting
 /// - Self-healing interval adjustment
 /// - Comprehensive telemetry via Grid event system
-
 use crate::read_view::{ConceptNode, GraphSnapshot, ReadView};
 use crate::write_log::{WriteEntry, WriteLog};
 use std::collections::VecDeque;
@@ -447,6 +446,7 @@ impl Drop for AdaptiveReconciler {
 }
 
 /// Main adaptive reconciliation loop
+#[allow(clippy::too_many_arguments)]
 fn adaptive_reconcile_loop(
     config: AdaptiveReconcilerConfig,
     write_log: Arc<WriteLog>,
@@ -527,7 +527,7 @@ fn adaptive_reconcile_loop(
             analyzer.update(queue_depth, processing_rate);
             
             // Calculate new optimal interval every 10 cycles
-            if cycle_count % 10 == 0 {
+            if cycle_count.is_multiple_of(10) {
                 let new_interval = analyzer.calculate_optimal_interval(&config, queue_capacity);
                 let old_interval = current_interval_ms.load(Ordering::Relaxed);
                 
@@ -543,7 +543,7 @@ fn adaptive_reconcile_loop(
             }
             
             // Emit telemetry every 100 cycles (~1 second at 10ms interval)
-            if cycle_count % 100 == 0 {
+            if cycle_count.is_multiple_of(100) {
                 let health_score = analyzer.calculate_health_score(queue_capacity);
                 let predicted_queue = analyzer.predict_next_queue_depth();
                 
@@ -624,7 +624,7 @@ fn apply_entry(snapshot: &mut GraphSnapshot, entry: &WriteEntry) {
                 // Remove all edges pointing to this concept from other concepts
                 // Since im::HashMap is immutable-friendly, we need to clone and update
                 let mut updated_concepts = im::HashMap::new();
-                for (other_id, mut other_node) in snapshot.concepts.iter() {
+                for (other_id, other_node) in snapshot.concepts.iter() {
                     if other_id != id {
                         let mut node_clone = other_node.clone();
                         node_clone.neighbors.retain(|neighbor| neighbor != id);

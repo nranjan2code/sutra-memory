@@ -121,6 +121,7 @@ pub struct Embedder {
     session: Option<Session>,
     tokenizer: Option<Tokenizer>,
     model_capabilities: ModelCapabilities,
+    #[allow(dead_code)]
     buffer_pool: BufferPool,
 }
 
@@ -151,11 +152,16 @@ impl Default for ModelCapabilities {
 
 /// Pre-allocated buffer pool for tensor reuse
 struct BufferPool {
+    #[allow(dead_code)]
     max_batch_size: usize,
+    #[allow(dead_code)]
     max_seq_len: usize,
     // Pre-allocated buffers (None until first use)
+    #[allow(dead_code)]
     input_ids_buffer: Option<Vec<i64>>,
+    #[allow(dead_code)]
     attention_mask_buffer: Option<Vec<i64>>,
+    #[allow(dead_code)]
     token_type_ids_buffer: Option<Vec<i64>>,
 }
 
@@ -171,6 +177,7 @@ impl BufferPool {
     }
 
     /// Get or create input_ids buffer
+    #[allow(dead_code)]
     fn get_input_ids_buffer(&mut self, required_size: usize) -> &mut Vec<i64> {
         if self.input_ids_buffer.is_none() || self.input_ids_buffer.as_ref().unwrap().capacity() < required_size {
             self.input_ids_buffer = Some(Vec::with_capacity(required_size * 2));
@@ -181,6 +188,7 @@ impl BufferPool {
     }
 
     /// Get or create attention mask buffer
+    #[allow(dead_code)]
     fn get_attention_mask_buffer(&mut self, required_size: usize) -> &mut Vec<i64> {
         if self.attention_mask_buffer.is_none() || self.attention_mask_buffer.as_ref().unwrap().capacity() < required_size {
             self.attention_mask_buffer = Some(Vec::with_capacity(required_size * 2));
@@ -191,6 +199,7 @@ impl BufferPool {
     }
 
     /// Get or create token_type_ids buffer
+    #[allow(dead_code)]
     fn get_token_type_ids_buffer(&mut self, required_size: usize) -> &mut Vec<i64> {
         if self.token_type_ids_buffer.is_none() || self.token_type_ids_buffer.as_ref().unwrap().capacity() < required_size {
             self.token_type_ids_buffer = Some(Vec::with_capacity(required_size * 2));
@@ -553,6 +562,7 @@ impl Embedder {
     }
 
     /// Real ONNX model inference (DEPRECATED - use embed_batch_internal)
+    #[allow(dead_code)]
     fn create_model_embedding(&mut self, text: &str) -> Result<Vec<f32>> {
         let mut results = self.embed_batch_internal(&[text], false)?;
         Ok(results.pop().unwrap())
@@ -701,14 +711,12 @@ impl Embedder {
         let output_shape_type = self.model_capabilities.output_shape_type.clone();
         let output_shape_type = if output_shape_type != OutputShapeType::Unknown {
             output_shape_type
+        } else if shape.len() == 3 {
+            OutputShapeType::SequenceLevel
+        } else if shape.len() == 2 {
+            OutputShapeType::Pooled
         } else {
-            if shape.len() == 3 {
-                OutputShapeType::SequenceLevel
-            } else if shape.len() == 2 {
-                OutputShapeType::Pooled
-            } else {
-                return Err(anyhow!("Unexpected output shape: {:?}", shape));
-            }
+            return Err(anyhow!("Unexpected output shape: {:?}", shape));
         };
 
         // Process based on output shape
@@ -771,7 +779,7 @@ impl Embedder {
         if apply_postprocessing {
             let requested_dim = self.config.target_dimension.unwrap_or(self.config.dimensions);
             let binary_quant = self.config.binary_quantization;
-            let use_fused = self.config.use_fused_ops;
+            let _use_fused = self.config.use_fused_ops;
             
             embeddings = embeddings
                 .into_iter()
@@ -812,24 +820,26 @@ impl Embedder {
         {
             // NEON is always available on AArch64
             unsafe {
-                return Self::mean_pool_neon(data, seq_len, hidden_dim);
+                Self::mean_pool_neon(data, seq_len, hidden_dim)
             }
         }
 
         // Fallback: scalar implementation
-        let mut pooled = vec![0.0f32; hidden_dim];
-        for i in 0..seq_len {
-            for j in 0..hidden_dim {
-                pooled[j] += data[i * hidden_dim + j];
+        #[cfg(not(target_arch = "aarch64"))]
+        {
+            let mut pooled = vec![0.0f32; hidden_dim];
+            for i in 0..seq_len {
+                for j in 0..hidden_dim {
+                    pooled[j] += data[i * hidden_dim + j];
+                }
             }
-        }
 
-        let scale = 1.0 / seq_len as f32;
-        for val in &mut pooled {
-            *val *= scale;
+            let scale = 1.0 / seq_len as f32;
+            for val in &mut pooled {
+                *val *= scale;
+            }
+            pooled
         }
-
-        pooled
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -929,17 +939,19 @@ impl Embedder {
         #[cfg(target_arch = "aarch64")]
         {
             unsafe {
-                return Self::scale_vector_neon(embedding, scale);
+                Self::scale_vector_neon(embedding, scale)
             }
         }
 
         // Fallback: scalar
-        let mut normalized = vec![0.0f32; embedding.len()];
-        for (i, &val) in embedding.iter().enumerate() {
-            normalized[i] = val * scale;
+        #[cfg(not(target_arch = "aarch64"))]
+        {
+            let mut normalized = vec![0.0f32; embedding.len()];
+            for (i, &val) in embedding.iter().enumerate() {
+                normalized[i] = val * scale;
+            }
+            normalized
         }
-
-        normalized
     }
 
     /// SIMD-optimized dot product
@@ -959,11 +971,12 @@ impl Embedder {
         #[cfg(target_arch = "aarch64")]
         {
             unsafe {
-                return Self::dot_product_neon(a, b);
+                Self::dot_product_neon(a, b)
             }
         }
 
         // Fallback
+        #[cfg(not(target_arch = "aarch64"))]
         a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
     }
 
@@ -1101,6 +1114,7 @@ impl Embedder {
     }
 
     /// Binary quantization: convert float32 to 1-bit (0 or 1)
+    #[allow(dead_code)]
     fn binary_quantize(&self, embedding: &[f32]) -> Vec<f32> {
         Self::binary_quantize_vec(embedding)
     }

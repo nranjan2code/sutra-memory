@@ -236,7 +236,7 @@ impl AuthManager {
             .map_err(|e| anyhow!("HMAC initialization failed: {}", e))?;
         mac.update(payload_b64.as_bytes());
         let signature = mac.finalize().into_bytes();
-        let signature_b64 = URL_SAFE_NO_PAD.encode(&signature);
+        let signature_b64 = URL_SAFE_NO_PAD.encode(signature);
         
         // Token format: payload.signature
         Ok(format!("{}.{}", payload_b64, signature_b64))
@@ -297,7 +297,7 @@ impl AuthManager {
             .map_err(|e| anyhow!("HMAC initialization failed: {}", e))?;
         mac.update(signing_input.as_bytes());
         let signature = mac.finalize().into_bytes();
-        let signature_b64 = URL_SAFE_NO_PAD.encode(&signature);
+        let signature_b64 = URL_SAFE_NO_PAD.encode(signature);
         
         Ok(format!("{}.{}.{}", header_b64, payload_b64, signature_b64))
     }

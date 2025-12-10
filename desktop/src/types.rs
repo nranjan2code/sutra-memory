@@ -3,9 +3,9 @@
 //! Shared data structures used across all UI components.
 //! These types wrap storage engine types for UI presentation.
 
-use std::collections::HashMap;
-use std::time::{Duration, Instant};
 use chrono::{DateTime, Local};
+use std::collections::HashMap;
+use std::time::Instant;
 use sutra_storage::ConceptId;
 
 // ============================================================================
@@ -102,12 +102,12 @@ pub struct GraphNode {
     pub confidence: f32,
     pub strength: f32,
     pub neighbor_count: usize,
-    
+
     // Layout position (updated by force-directed algorithm)
     pub x: f32,
     pub y: f32,
-    pub vx: f32,  // velocity x
-    pub vy: f32,  // velocity y
+    pub vx: f32, // velocity x
+    pub vy: f32, // velocity y
 }
 
 impl GraphNode {
@@ -116,13 +116,13 @@ impl GraphNode {
         let hash = id.to_hex();
         let x = hash_to_float(&hash[0..8]) * 800.0 - 400.0;
         let y = hash_to_float(&hash[8..16]) * 600.0 - 300.0;
-        
+
         let label = if content.len() > 40 {
             format!("{}...", &content[..40])
         } else {
             content.clone()
         };
-        
+
         Self {
             id,
             label,
@@ -150,11 +150,11 @@ pub struct GraphEdge {
 /// Types of edges in the knowledge graph
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EdgeType {
-    Semantic,    // General semantic relationship
-    Causal,      // "causes", "leads to"
-    Temporal,    // "before", "after"
-    Hierarchical,// "is a", "part of"
-    Similar,     // Similar content
+    Semantic,     // General semantic relationship
+    Causal,       // "causes", "leads to"
+    Temporal,     // "before", "after"
+    Hierarchical, // "is a", "part of"
+    Similar,      // Similar content
 }
 
 impl EdgeType {
@@ -167,7 +167,7 @@ impl EdgeType {
             EdgeType::Similar => (251, 191, 36),      // Amber (ACCENT)
         }
     }
-    
+
     pub fn name(&self) -> &'static str {
         match self {
             EdgeType::Semantic => "Semantic",
@@ -197,7 +197,7 @@ impl ReasoningPath {
         if steps.is_empty() {
             return 1.0;
         }
-        
+
         let mut conf = 1.0;
         for (i, step) in steps.iter().enumerate() {
             conf *= step.confidence * decay.powi(i as i32);
@@ -212,7 +212,7 @@ pub struct PathStep {
     pub concept_id: ConceptId,
     pub content: String,
     pub confidence: f32,
-    pub relation: String,  // Relation from previous step
+    pub relation: String, // Relation from previous step
 }
 
 /// Result of MPPA consensus analysis
@@ -232,7 +232,7 @@ pub struct PathCluster {
     pub paths: Vec<ReasoningPath>,
     pub avg_confidence: f32,
     pub consensus_weight: f32,
-    pub support_ratio: f32,  // paths in cluster / total paths
+    pub support_ratio: f32, // paths in cluster / total paths
 }
 
 // ============================================================================
@@ -246,7 +246,7 @@ pub struct TimelineEvent {
     pub label: String,
     pub description: String,
     pub timestamp: String,
-    pub relative_time: i32,  // Relative position (-3, -2, -1, 0, 1, 2, 3)
+    pub relative_time: i32, // Relative position (-3, -2, -1, 0, 1, 2, 3)
     pub confidence: f32,
 }
 
@@ -275,7 +275,7 @@ pub enum TemporalRelation {
 pub struct CausalRelation {
     pub from: ConceptId,
     pub to: ConceptId,
-    pub relation_type: String,  // "causes", "leads to", "triggers"
+    pub relation_type: String, // "causes", "leads to", "triggers"
     pub confidence: f32,
 }
 
@@ -324,13 +324,13 @@ pub struct AnalyticsMetrics {
     pub storage_size_bytes: u64,
     pub hnsw_indexed: usize,
     pub hnsw_coverage: f32,
-    
+
     // Query performance
     pub queries_today: usize,
     pub avg_query_latency_ms: f32,
     pub p95_query_latency_ms: f32,
     pub p99_query_latency_ms: f32,
-    
+
     // Learning activity
     pub concepts_today: usize,
     pub concepts_this_hour: usize,
@@ -389,7 +389,7 @@ pub enum QueryType {
 pub struct QueryFilters {
     pub min_confidence: f32,
     pub max_results: usize,
-    pub ef_search: usize,  // For HNSW
+    pub ef_search: usize, // For HNSW
     pub has_causal: bool,
     pub has_temporal: bool,
     pub min_neighbors: usize,
@@ -443,7 +443,7 @@ impl ExportFormat {
             ExportFormat::Cypher => "cypher",
         }
     }
-    
+
     pub fn name(&self) -> &'static str {
         match self {
             ExportFormat::Json => "JSON",
@@ -517,5 +517,89 @@ pub fn calculate_percentile(values: &[f32], p: f32) -> f32 {
         return 0.0;
     }
     let idx = ((values.len() as f32) * p) as usize;
-    values.get(idx.min(values.len() - 1)).copied().unwrap_or(0.0)
+    values
+        .get(idx.min(values.len() - 1))
+        .copied()
+        .unwrap_or(0.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_percentile() {
+        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+
+        assert_eq!(calculate_percentile(&values, 0.5), 6.0); // 50th percentile (index 5) -> 6.0
+        assert_eq!(calculate_percentile(&values, 0.95), 10.0); // 95th percentile -> last element
+        assert_eq!(calculate_percentile(&values, 0.0), 1.0); // 0th percentile -> first element
+
+        let empty: Vec<f32> = vec![];
+        assert_eq!(calculate_percentile(&empty, 0.5), 0.0);
+    }
+
+    #[test]
+    fn test_batch_progress_percent() {
+        let mut progress = BatchProgress::default();
+        assert_eq!(progress.percent(), 0.0);
+
+        progress.total = 100;
+        progress.completed = 50;
+        assert_eq!(progress.percent(), 50.0);
+
+        progress.completed = 100;
+        assert_eq!(progress.percent(), 100.0);
+
+        // Edge case: total 0
+        progress.total = 0;
+        assert_eq!(progress.percent(), 0.0);
+    }
+
+    #[test]
+    fn test_reasoning_path_confidence() {
+        let steps = vec![
+            PathStep {
+                concept_id: ConceptId::from_string("1"),
+                content: "A".into(),
+                confidence: 1.0,
+                relation: "start".into(),
+            },
+            PathStep {
+                concept_id: ConceptId::from_string("2"),
+                content: "B".into(),
+                confidence: 0.9,
+                relation: "next".into(),
+            },
+            PathStep {
+                concept_id: ConceptId::from_string("3"),
+                content: "C".into(),
+                confidence: 0.8,
+                relation: "next".into(),
+            },
+        ];
+
+        // decay = 1.0 (no decay)
+        // 1.0 * 0.9 * 0.8 = 0.72
+        let conf_no_decay = ReasoningPath::calculate_confidence(&steps, 1.0);
+        assert!((conf_no_decay - 0.72).abs() < 1e-6);
+
+        // decay = 0.5
+        // step 0: 1.0 * (0.5^0) = 1.0
+        // step 1: 0.9 * (0.5^1) = 0.45
+        // step 2: 0.8 * (0.5^2) = 0.2
+        // total: 1.0 * 0.45 * 0.2 = 0.09
+        let conf_decay = ReasoningPath::calculate_confidence(&steps, 0.5);
+        assert!((conf_decay - 0.09).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_edge_type_properties() {
+        let edge = EdgeType::Causal;
+        assert_eq!(edge.name(), "Causal");
+        assert_eq!(edge.color(), (248, 113, 113));
+
+        let edge = EdgeType::Semantic;
+        assert_eq!(edge.name(), "Semantic");
+    }
 }

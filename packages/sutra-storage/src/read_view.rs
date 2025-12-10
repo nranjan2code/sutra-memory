@@ -5,7 +5,6 @@
 /// - Atomic pointer swap (arc-swap for lock-free updates)
 /// - Graph-optimized layout (edges co-located with concepts)
 /// - Zero-copy traversal via indexing
-
 use crate::types::{AssociationRecord, ConceptId};
 use crate::semantic::SemanticMetadata;
 use arc_swap::ArcSwap;
@@ -174,8 +173,8 @@ impl GraphSnapshot {
             
             if let Some(node) = self.concepts.get(&current) {
                 for &neighbor in &node.neighbors {
-                    if !visited.contains_key(&neighbor) {
-                        visited.insert(neighbor, Some(current));
+                    if let std::collections::hash_map::Entry::Vacant(e) = visited.entry(neighbor) {
+                        e.insert(Some(current));
                         
                         if neighbor == end {
                             // Reconstruct path

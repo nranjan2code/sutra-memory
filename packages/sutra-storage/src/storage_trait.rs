@@ -2,7 +2,6 @@
 ///
 /// Both ConcurrentMemory and ShardedStorage implement this trait,
 /// allowing the learning pipeline to work with either storage backend.
-
 use anyhow::Result;
 use crate::types::{ConceptId, AssociationType};
 use crate::semantic::SemanticMetadata;

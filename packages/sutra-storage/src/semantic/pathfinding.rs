@@ -3,7 +3,6 @@
 /// Graph traversal with semantic awareness - filters applied during traversal
 /// for zero memory overhead. Supports temporal constraints, causal chains,
 /// and domain-scoped search.
-
 use super::query::SemanticFilter;
 use super::types::*;
 use crate::read_view::GraphSnapshot;

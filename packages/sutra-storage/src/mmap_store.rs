@@ -12,7 +12,6 @@
 /// - Zero-copy reads via mmap (no deserialization)
 /// - Append-only arenas (bump pointers)
 /// - Bit/byte efficient, aligned
-
 use anyhow::{Context, Result};
 use memmap2::{MmapMut, MmapOptions};
 use std::fs::{File, OpenOptions};
@@ -114,6 +113,7 @@ impl MmapStore {
             .create(true)
             .read(true)
             .write(true)
+            .truncate(false)
             .open(&path)
             .with_context(|| format!("Failed to open storage file: {}", path.display()))?;
 
@@ -208,7 +208,7 @@ impl MmapStore {
     pub fn append_vector(&mut self, vector: &[f32]) -> Result<(u64, u32)> {
         let base = self.header.vector_off;
         let write_off = base + self.header.vector_bytes;
-        let vec_bytes = (vector.len() * size_of::<f32>()) as u64;
+        let vec_bytes = std::mem::size_of_val(vector) as u64;
         let needed = write_off
             .checked_add(4)
             .and_then(|v| v.checked_add(vec_bytes))
@@ -348,7 +348,7 @@ impl MmapStore {
 
         // 1. Write Bloom filter (simple bit array, 2 bits per concept for ~1% FP)
         let bloom_bits = (self.header.concept_count * 2).max(1024) as usize;
-        let bloom_bytes = (bloom_bits + 7) / 8;
+        let bloom_bytes = bloom_bits.div_ceil(8);
         let mut bloom = vec![0u8; bloom_bytes];
 
         for id in self.concept_index.keys() {

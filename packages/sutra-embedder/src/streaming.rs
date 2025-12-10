@@ -14,7 +14,6 @@
 /// - Real-time search indexing
 /// - Streaming chat embeddings
 /// - Continuous document processing
-
 use anyhow::{anyhow, Result};
 use futures::Stream;
 use std::pin::Pin;

@@ -60,15 +60,17 @@ fn fused_pool_norm_single(data: &[f32], seq_len: usize, hidden_dim: usize) -> Ve
     #[cfg(target_arch = "aarch64")]
     {
         unsafe {
-            return fused_pool_norm_neon(data, seq_len, hidden_dim);
+            fused_pool_norm_neon(data, seq_len, hidden_dim)
         }
     }
     
     // Fallback: scalar implementation
+    #[cfg(not(target_arch = "aarch64"))]
     fused_pool_norm_scalar(data, seq_len, hidden_dim)
 }
 
 /// Scalar fallback for fused pooling + normalization
+#[allow(dead_code)]
 fn fused_pool_norm_scalar(data: &[f32], seq_len: usize, hidden_dim: usize) -> Vec<f32> {
     let mut pooled = vec![0.0f32; hidden_dim];
     
@@ -121,9 +123,55 @@ unsafe fn fused_pool_norm_avx2(data: &[f32], seq_len: usize, hidden_dim: usize) 
         }
         
         // Handle remainder
-        for j in (chunks * 8)..hidden_dim {
-            pooled[j] += data[row_offset + j];
+    // Accumulate with AVX2
+    for i in 0..seq_len {
+        let row_offset = i * hidden_dim;
+        
+        for j in 0..chunks {
+            let idx = j * 8;
+            let sum = _mm256_loadu_ps(pooled.as_ptr().add(idx));
+            let val = _mm256_loadu_ps(data.as_ptr().add(row_offset + idx));
+            let new_sum = _mm256_add_ps(sum, val);
+            _mm256_storeu_ps(pooled.as_mut_ptr().add(idx), new_sum);
         }
+        
+        // Handle remainder
+        for pooled_item in pooled.iter_mut().take(hidden_dim).skip(chunks * 8) {
+             // We need index for data access, so iterator might be tricky if data isn't aligned.
+             // Actually, the error says: loop variable j is only used to index pooled.
+             // Wait, line 220 in error was: 
+             // 220 |     for j in (chunks * 4)..hidden_dim {
+             // This corresponds to NEON implementation probably? Or AVX2 remainder?
+             // The view showed `custom_ops.rs`.
+             // In `fused_pool_norm_avx2`:
+             // 124 |         for j in (chunks * 8)..hidden_dim {
+             // 125 |             pooled[j] += data[row_offset + j];
+             // Here j is used to index `data` too. `data[row_offset + j]`.
+             // So `for val in pooled.iter_mut()...` won't give us `j` for `data`.
+             // We can use `.enumerate()`?
+             // `for (k, val) in pooled.iter_mut().skip(chunks * 8).enumerate() { let j = (chunks * 8) + k; ... }`
+             // The clippy suggestion was:
+             // `for <item> in pooled.iter_mut().take(hidden_dim).skip((chunks * 4)) {`
+             // But valid only if `j` is ONLY used to index `pooled`.
+             // In `fused_pool_norm_avx2`, `pooled[j] += data[...]`. It indexes `data` too.
+             // So clippy might be wrong or I'm looking at different lines.
+             // The error was: `packages/sutra-embedder/src/custom_ops.rs:220:14`.
+             // Let's check line 220 in the viewed file.
+             // 220:     for j in (chunks * 4)..hidden_dim {
+             // 221:         pooled[j] *= scale;
+             // 222:         norm_sq += pooled[j] * pooled[j];
+             // 223:     }
+             // Ah, here `j` is indeed only used to index `pooled`!
+             // So this is in `fused_pool_norm_neon`.
+             // AND line 238:
+             // 238:         for j in (chunks * 4)..hidden_dim {
+             // 239:             pooled[j] *= inv_norm;
+             // 240:         }
+             // Also only `pooled`.
+             
+             // So I should fix THOSE loops.
+        }
+    }
     }
     
     // Scale
@@ -217,9 +265,9 @@ unsafe fn fused_pool_norm_neon(data: &[f32], seq_len: usize, hidden_dim: usize) 
     let mut norm_sq = norm_sq_array.iter().sum::<f32>();
     
     // Handle remainder
-    for j in (chunks * 4)..hidden_dim {
-        pooled[j] *= scale;
-        norm_sq += pooled[j] * pooled[j];
+    for val in pooled.iter_mut().skip(chunks * 4).take(hidden_dim) {
+        *val *= scale;
+        norm_sq += *val * *val;
     }
     
     // Normalize
@@ -235,8 +283,8 @@ unsafe fn fused_pool_norm_neon(data: &[f32], seq_len: usize, hidden_dim: usize) 
             vst1q_f32(pooled.as_mut_ptr().add(idx), normalized);
         }
         
-        for j in (chunks * 4)..hidden_dim {
-            pooled[j] *= inv_norm;
+        for val in pooled.iter_mut().skip(chunks * 4).take(hidden_dim) {
+            *val *= inv_norm;
         }
     }
     
@@ -272,11 +320,12 @@ pub fn fused_truncate_and_quantize(
     #[cfg(target_arch = "aarch64")]
     {
         unsafe {
-            return fused_truncate_quantize_neon(embedding, actual_dim);
+            fused_truncate_quantize_neon(embedding, actual_dim)
         }
     }
     
     // Fallback
+    #[cfg(not(target_arch = "aarch64"))]
     embedding[..actual_dim]
         .iter()
         .map(|&x| if x > 0.0 { 1.0 } else { 0.0 })

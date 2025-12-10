@@ -73,6 +73,26 @@ cargo build -p sutra-desktop --release
 
 ---
 
+## Quality & Testing
+
+### Running Tests
+
+Run the unit test suite:
+
+```bash
+cargo test -p sutra-desktop
+```
+
+### Static Analysis
+
+Check for linting errors and code quality issues:
+
+```bash
+cargo clippy -p sutra-desktop -- -D warnings
+```
+
+---
+
 ## Build Options
 
 ### Features

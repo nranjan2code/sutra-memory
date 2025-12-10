@@ -5,46 +5,45 @@
 //! while maintaining a clean, production-grade user experience.
 
 // Core panels (original)
-pub mod sidebar;
 pub mod chat;
 pub mod knowledge;
 pub mod quick_learn;
 pub mod settings;
+pub mod sidebar;
 pub mod status_bar;
 
 // Enhanced panels (new)
+pub mod analytics;
+pub mod causal_view;
+pub mod export_import;
 pub mod graph_view;
+pub mod query_builder;
 pub mod reasoning_paths;
 pub mod temporal_view;
-pub mod causal_view;
-pub mod analytics;
-pub mod query_builder;
-pub mod export_import;
 
 // New UX features (v3.4.0)
+pub mod home;
 pub mod onboarding;
 pub mod undo_redo;
-pub mod home;
 
 // Re-exports for core panels
+pub use chat::{ChatAction, ChatPanel};
+pub use knowledge::{KnowledgeAction, KnowledgePanel};
+pub use quick_learn::{QuickLearnAction, QuickLearnPanel};
+pub use settings::{SettingsAction, SettingsPanel, StorageStatsUI, StorageStatus};
 pub use sidebar::{Sidebar, SidebarView};
-pub use chat::{ChatPanel, ChatAction};
-pub use knowledge::{KnowledgePanel, KnowledgeAction};
-pub use quick_learn::{QuickLearnPanel, QuickLearnAction};
-pub use settings::{SettingsPanel, SettingsAction, StorageStatsUI, StorageStatus};
-pub use status_bar::{StatusBar, ConnectionStatus};
+pub use status_bar::{ConnectionStatus, StatusBar};
 
 // Re-exports for enhanced panels (use actual struct/enum names from modules)
-pub use graph_view::{GraphView, GraphAction};
-pub use reasoning_paths::{ReasoningPathsPanel, ReasoningPathsAction};
-pub use temporal_view::{TemporalView, TemporalViewAction};
+pub use analytics::{AnalyticsAction, AnalyticsDashboard};
 pub use causal_view::{CausalView, CausalViewAction};
-pub use analytics::{AnalyticsDashboard, AnalyticsAction};
+pub use export_import::{ExportImportAction, ExportImportPanel};
+pub use graph_view::{GraphAction, GraphView};
 pub use query_builder::{QueryBuilder, QueryBuilderAction};
-pub use export_import::{ExportImportPanel, ExportImportAction};
+pub use reasoning_paths::{ReasoningPathsAction, ReasoningPathsPanel};
+pub use temporal_view::{TemporalView, TemporalViewAction};
 
 // Re-exports for new UX features
-pub use onboarding::{OnboardingTour, OnboardingAction, is_first_launch, mark_onboarding_complete};
-pub use undo_redo::{CommandHistory, Command, CommandType, UndoRedoResult};
-pub use home::{HomeDashboard, HomeAction, DashboardActivityType};
-
+pub use home::{DashboardActivityType, HomeAction, HomeDashboard};
+pub use onboarding::{is_first_launch, mark_onboarding_complete, OnboardingAction, OnboardingTour};
+pub use undo_redo::{Command, CommandHistory, UndoRedoResult};

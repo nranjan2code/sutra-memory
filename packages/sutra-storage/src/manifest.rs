@@ -3,7 +3,6 @@
 /// The manifest is a simple JSON file that tracks all active segments,
 /// their metadata, and compaction history. It's atomically updated
 /// to ensure consistency.
-
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};

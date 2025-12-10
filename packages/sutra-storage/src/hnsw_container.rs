@@ -10,7 +10,6 @@
 /// - Automatic dirty tracking
 /// - Single-file .usearch format
 /// - 100× faster startup: <50ms load vs 2-5s rebuild
-
 use anyhow::{Context, Result};
 use parking_lot::RwLock;
 use std::collections::HashMap;

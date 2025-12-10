@@ -2,7 +2,6 @@
 /// 
 /// Deterministic pattern-based semantic classification.
 /// No ML models, no fallbacks - pure rule-based system.
-
 use super::types::*;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -128,7 +127,7 @@ impl SemanticAnalyzer {
     
     /// Add custom domain pattern
     pub fn add_domain_pattern(&mut self, domain: DomainContext, pattern: Regex) {
-        self.custom_patterns.entry(domain).or_insert_with(Vec::new).push(pattern);
+        self.custom_patterns.entry(domain).or_default().push(pattern);
     }
     
     /// Analyze text and extract complete semantic metadata

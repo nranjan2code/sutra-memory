@@ -3,9 +3,9 @@
 //! A guided tour that highlights key features on first launch.
 //! Uses overlay-based highlighting with step-by-step navigation.
 
-use eframe::egui::{self, Color32, Pos2, Rect, RichText, Rounding, Sense, Stroke, Vec2};
-use crate::theme::{PRIMARY, PRIMARY_LIGHT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BG_DARK, BG_ELEVATED, SUCCESS};
+use crate::theme::{BG_ELEVATED, PRIMARY, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY};
 use crate::ui::SidebarView;
+use eframe::egui::{self, Color32, Pos2, Rect, RichText, Rounding, Sense, Stroke, Vec2};
 
 /// Onboarding tour state
 pub struct OnboardingTour {
@@ -84,24 +84,24 @@ impl OnboardingTour {
             steps: create_tour_steps(),
         }
     }
-    
+
     /// Check if the tour should show
     pub fn should_show(&self) -> bool {
         self.is_active && self.current_step < self.steps.len()
     }
-    
+
     /// Start the tour
     pub fn start(&mut self) {
         self.is_active = true;
         self.current_step = 0;
     }
-    
+
     /// Skip/dismiss the tour
     pub fn dismiss(&mut self) {
         self.is_active = false;
         self.first_launch = false;
     }
-    
+
     /// Move to the next step
     pub fn next_step(&mut self) {
         if self.current_step < self.steps.len() - 1 {
@@ -110,52 +110,52 @@ impl OnboardingTour {
             self.dismiss();
         }
     }
-    
+
     /// Move to the previous step
     pub fn prev_step(&mut self) {
         if self.current_step > 0 {
             self.current_step -= 1;
         }
     }
-    
+
     /// Get the current target for highlighting
     pub fn current_target(&self) -> Option<TourTarget> {
         self.steps.get(self.current_step).map(|s| s.target)
     }
-    
+
     /// Render the tour overlay
     pub fn render(&mut self, ctx: &egui::Context, screen_rect: Rect) -> Option<OnboardingAction> {
         if !self.should_show() {
             return None;
         }
-        
+
         let mut action = None;
-        
+
         // Get current step
         let step = match self.steps.get(self.current_step) {
             Some(s) => s.clone(),
             None => return None,
         };
-        
+
         // Calculate highlight area based on target
         let highlight_rect = calculate_highlight_rect(step.target, screen_rect);
-        
+
         // Draw overlay
         let painter = ctx.layer_painter(egui::LayerId::new(
             egui::Order::Foreground,
             egui::Id::new("onboarding_overlay"),
         ));
-        
+
         // Semi-transparent background with cutout for highlight
         let overlay_color = Color32::from_rgba_unmultiplied(0, 0, 0, 200);
-        
+
         if step.target == TourTarget::Center {
             // Full overlay for center messages
             painter.rect_filled(screen_rect, 0.0, overlay_color);
         } else {
             // Draw overlay with cutout
             draw_overlay_with_cutout(&painter, screen_rect, highlight_rect, overlay_color);
-            
+
             // Highlight border with glow effect
             painter.rect_filled(
                 highlight_rect.expand(4.0),
@@ -168,94 +168,129 @@ impl OnboardingTour {
                 Stroke::new(3.0, PRIMARY),
             );
         }
-        
+
         // Calculate tooltip position
-        let tooltip_rect = calculate_tooltip_rect(highlight_rect, screen_rect, step.tooltip_position);
-        
+        let tooltip_rect =
+            calculate_tooltip_rect(highlight_rect, screen_rect, step.tooltip_position);
+
         // Draw tooltip card
         painter.rect_filled(tooltip_rect, Rounding::same(16.0), BG_ELEVATED);
-        painter.rect_stroke(tooltip_rect, Rounding::same(16.0), Stroke::new(1.0, PRIMARY.gamma_multiply(0.3)));
-        
+        painter.rect_stroke(
+            tooltip_rect,
+            Rounding::same(16.0),
+            Stroke::new(1.0, PRIMARY.gamma_multiply(0.3)),
+        );
+
         // Draw arrow pointing to highlight
         if step.target != TourTarget::Center {
-            draw_tooltip_arrow(&painter, tooltip_rect, highlight_rect, step.tooltip_position);
+            draw_tooltip_arrow(
+                &painter,
+                tooltip_rect,
+                highlight_rect,
+                step.tooltip_position,
+            );
         }
-        
+
         // Tooltip content using egui Area
         egui::Area::new(egui::Id::new("onboarding_tooltip"))
             .fixed_pos(tooltip_rect.min + Vec2::new(20.0, 16.0))
             .order(egui::Order::Foreground)
             .show(ctx, |ui| {
                 ui.set_max_width(tooltip_rect.width() - 40.0);
-                
+
                 // Icon and title row
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(step.icon).size(28.0));
                     ui.add_space(8.0);
-                    ui.label(RichText::new(step.title).size(18.0).color(TEXT_PRIMARY).strong());
+                    ui.label(
+                        RichText::new(step.title)
+                            .size(18.0)
+                            .color(TEXT_PRIMARY)
+                            .strong(),
+                    );
                 });
-                
+
                 ui.add_space(12.0);
-                
+
                 // Description
-                ui.label(RichText::new(step.description).size(14.0).color(TEXT_SECONDARY));
-                
+                ui.label(
+                    RichText::new(step.description)
+                        .size(14.0)
+                        .color(TEXT_SECONDARY),
+                );
+
                 ui.add_space(20.0);
-                
+
                 // Navigation buttons
                 ui.horizontal(|ui| {
                     // Skip button
-                    if ui.add(
-                        egui::Button::new(RichText::new("Skip Tour").size(13.0).color(TEXT_MUTED))
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("Skip Tour").size(13.0).color(TEXT_MUTED),
+                            )
                             .fill(Color32::TRANSPARENT)
-                            .stroke(Stroke::NONE)
-                    ).clicked() {
+                            .stroke(Stroke::NONE),
+                        )
+                        .clicked()
+                    {
                         action = Some(OnboardingAction::Dismiss);
                     }
-                    
+
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Next/Finish button
                         let is_last = self.current_step >= self.steps.len() - 1;
                         let next_text = if is_last { "Get Started!" } else { "Next →" };
-                        let next_btn = egui::Button::new(RichText::new(next_text).size(14.0).color(Color32::WHITE))
-                            .fill(PRIMARY)
-                            .rounding(Rounding::same(8.0))
-                            .min_size(Vec2::new(100.0, 32.0));
-                        
+                        let next_btn = egui::Button::new(
+                            RichText::new(next_text).size(14.0).color(Color32::WHITE),
+                        )
+                        .fill(PRIMARY)
+                        .rounding(Rounding::same(8.0))
+                        .min_size(Vec2::new(100.0, 32.0));
+
                         if ui.add(next_btn).clicked() {
                             action = Some(OnboardingAction::Next);
                         }
-                        
+
                         ui.add_space(8.0);
-                        
+
                         // Back button (not on first step)
                         if self.current_step > 0 {
-                            let back_btn = egui::Button::new(RichText::new("← Back").size(13.0).color(TEXT_SECONDARY))
-                                .fill(Color32::TRANSPARENT)
-                                .stroke(Stroke::new(1.0, TEXT_MUTED))
-                                .rounding(Rounding::same(8.0));
-                            
+                            let back_btn = egui::Button::new(
+                                RichText::new("← Back").size(13.0).color(TEXT_SECONDARY),
+                            )
+                            .fill(Color32::TRANSPARENT)
+                            .stroke(Stroke::new(1.0, TEXT_MUTED))
+                            .rounding(Rounding::same(8.0));
+
                             if ui.add(back_btn).clicked() {
                                 action = Some(OnboardingAction::Prev);
                             }
                         }
                     });
                 });
-                
+
                 ui.add_space(12.0);
-                
+
                 // Progress dots
                 ui.horizontal(|ui| {
-                    ui.add_space((tooltip_rect.width() - 40.0 - (self.steps.len() as f32 * 12.0)) / 2.0);
+                    ui.add_space(
+                        (tooltip_rect.width() - 40.0 - (self.steps.len() as f32 * 12.0)) / 2.0,
+                    );
                     for i in 0..self.steps.len() {
-                        let color = if i == self.current_step { PRIMARY } else { TEXT_MUTED.gamma_multiply(0.3) };
-                        let (dot_rect, _) = ui.allocate_exact_size(Vec2::splat(8.0), Sense::hover());
+                        let color = if i == self.current_step {
+                            PRIMARY
+                        } else {
+                            TEXT_MUTED.gamma_multiply(0.3)
+                        };
+                        let (dot_rect, _) =
+                            ui.allocate_exact_size(Vec2::splat(8.0), Sense::hover());
                         ui.painter().circle_filled(dot_rect.center(), 4.0, color);
                         ui.add_space(4.0);
                     }
                 });
             });
-        
+
         action
     }
 }
@@ -366,25 +401,21 @@ fn calculate_highlight_rect(target: TourTarget, screen_rect: Rect) -> Rect {
             screen_rect.min + Vec2::new(216.0, screen_rect.height() - 120.0),
             Vec2::new(screen_rect.width() - 232.0, 80.0),
         ),
-        TourTarget::MenuBar => Rect::from_min_size(
-            screen_rect.min,
-            Vec2::new(screen_rect.width(), 36.0),
-        ),
+        TourTarget::MenuBar => {
+            Rect::from_min_size(screen_rect.min, Vec2::new(screen_rect.width(), 36.0))
+        }
         TourTarget::StatusBar => Rect::from_min_size(
             screen_rect.min + Vec2::new(0.0, screen_rect.height() - 32.0),
             Vec2::new(screen_rect.width(), 32.0),
         ),
-        TourTarget::Center => Rect::from_center_size(
-            screen_rect.center(),
-            Vec2::new(0.0, 0.0),
-        ),
+        TourTarget::Center => Rect::from_center_size(screen_rect.center(), Vec2::new(0.0, 0.0)),
     }
 }
 
 /// Calculate tooltip rectangle position
 fn calculate_tooltip_rect(highlight: Rect, screen: Rect, position: TooltipPosition) -> Rect {
     let tooltip_size = Vec2::new(380.0, 260.0);
-    
+
     let pos = match position {
         TooltipPosition::Right => Pos2::new(
             (highlight.right() + 20.0).min(screen.right() - tooltip_size.x - 20.0),
@@ -407,13 +438,13 @@ fn calculate_tooltip_rect(highlight: Rect, screen: Rect, position: TooltipPositi
             screen.center().y - tooltip_size.y / 2.0,
         ),
     };
-    
+
     // Clamp to screen bounds
     let clamped_pos = Pos2::new(
         pos.x.clamp(20.0, screen.right() - tooltip_size.x - 20.0),
         pos.y.clamp(50.0, screen.bottom() - tooltip_size.y - 50.0),
     );
-    
+
     Rect::from_min_size(clamped_pos, tooltip_size)
 }
 
@@ -460,9 +491,14 @@ fn draw_overlay_with_cutout(painter: &egui::Painter, screen: Rect, cutout: Rect,
 }
 
 /// Draw arrow from tooltip to highlight
-fn draw_tooltip_arrow(painter: &egui::Painter, tooltip: Rect, highlight: Rect, position: TooltipPosition) {
+fn draw_tooltip_arrow(
+    painter: &egui::Painter,
+    tooltip: Rect,
+    highlight: Rect,
+    position: TooltipPosition,
+) {
     let arrow_size = 12.0;
-    
+
     let (start, end) = match position {
         TooltipPosition::Right => (
             Pos2::new(tooltip.left(), tooltip.center().y),
@@ -482,15 +518,15 @@ fn draw_tooltip_arrow(painter: &egui::Painter, tooltip: Rect, highlight: Rect, p
         ),
         TooltipPosition::Center => return,
     };
-    
+
     // Draw line
     painter.line_segment([start, end], Stroke::new(2.0, PRIMARY));
-    
+
     // Draw arrowhead
     let dir = (end - start).normalized();
     let perp = Vec2::new(-dir.y, dir.x);
     let arrow_base = end - dir * arrow_size;
-    
+
     painter.add(egui::Shape::convex_polygon(
         vec![
             end,

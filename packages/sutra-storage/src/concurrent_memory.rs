@@ -7,7 +7,7 @@
 /// - Writes → WriteLog (lock-free, never blocks)
 /// - Reads → ReadView (immutable snapshot, never blocks)
 /// - Background reconciler merges continuously
-
+/// - Semantic search integration
 use crate::hnsw_container::{HnswContainer, HnswConfig as HnswContainerConfig};
 use crate::parallel_paths::{ParallelPathFinder, PathResult};
 use crate::read_view::{ConceptNode, ReadView};
@@ -262,6 +262,7 @@ impl ConcurrentMemory {
     }
     
     /// PRODUCTION: Load existing data from storage.dat with complete binary parser including vectors
+    #[allow(clippy::type_complexity)]
     fn load_existing_data(
         storage_file: &std::path::Path,
         vectors: &mut HashMap<ConceptId, Vec<f32>>,

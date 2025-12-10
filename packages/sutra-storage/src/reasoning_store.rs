@@ -5,7 +5,6 @@
 /// - Association-heavy queries
 /// - Batch operations
 /// - Semantic search integration
-
 use crate::types::*;
 use crate::index::GraphIndex;
 use crate::vectors::VectorStore;
@@ -416,7 +415,7 @@ impl ReasoningStore {
         visited.insert(source);
 
         while let Some(path) = queue.pop_front() {
-            if path.len() - 1 >= max_depth { continue; }
+            if path.len() > max_depth { continue; }
             let last = *path.last().unwrap();
             let neighbors = self.get_neighbors(last);
             for n in neighbors {

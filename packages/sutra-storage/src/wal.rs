@@ -9,7 +9,6 @@
 /// - Transaction support (begin/commit/rollback)
 /// - Atomic batch writes
 /// - Automatic log rotation
-
 use crate::types::{AssociationId, ConceptId};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -280,7 +279,7 @@ impl WriteAheadLog {
                     if let Some(txn_id) = entry.transaction_id {
                         // Add to transaction buffer
                         transaction_ops.entry(txn_id)
-                            .or_insert_with(Vec::new)
+                            .or_default()
                             .push(entry.clone());
                     } else {
                         // Non-transactional operation, immediately committed

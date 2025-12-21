@@ -86,14 +86,41 @@ impl PluginRegistry {
     
     #[cfg(feature = "python-plugins")]
     fn load_python_adapter(&self, path: &Path) -> Result<Box<dyn IngestionAdapter + Send + Sync>> {
-        use crate::adapters::python::PythonAdapter;
-        use std::fs;
-        
-        // For now, create a mock Python adapter
-        // In a real implementation, this would use PyO3:
+        // Check if mock mode is explicitly allowed
+        let allow_mock = std::env::var("SUTRA_ALLOW_MOCK_MODE")
+            .unwrap_or_else(|_| "0".to_string()) == "1";
+
+        if !allow_mock {
+            // PRODUCTION: Python plugins not yet implemented
+            return Err(anyhow::anyhow!(
+                "Python plugin support is not yet fully implemented.\n\
+                 \n\
+                 To enable PyO3-based Python plugins:\n\
+                 1. Uncomment PyO3 implementation in src/plugins.rs\n\
+                 2. Add pyo3 dependency to Cargo.toml\n\
+                 3. Rebuild with: cargo build --features python-plugins\n\
+                 \n\
+                 For testing ONLY, set SUTRA_ALLOW_MOCK_MODE=1 to use mock adapter.\n\
+                 WARNING: Mock adapter returns fake data!"
+            ));
+        }
+
+        // Mock implementation for testing ONLY
+        warn!("⚠️  Using MockPythonAdapter - Python plugins not fully implemented!");
+        warn!("⚠️  Set SUTRA_ALLOW_MOCK_MODE=0 to disable mock mode");
+
+        let plugin_name = path.file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("python")
+            .to_string();
+
+        Ok(Box::new(MockPythonAdapter::new(plugin_name)))
+
+        // TODO: Real PyO3 implementation when ready:
         /*
         use pyo3::prelude::*;
-        
+        use std::fs;
+
         Python::with_gil(|py| {
             let code = fs::read_to_string(path)?;
             let module = PyModule::from_code(py, &code, path.to_str().unwrap(), "adapter")?;
@@ -102,14 +129,6 @@ impl PluginRegistry {
             Ok(Box::new(PythonAdapter::new(adapter_instance.into(), path.file_stem().unwrap().to_str().unwrap().to_string())))
         })
         */
-        
-        // Mock implementation for now
-        let plugin_name = path.file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("python")
-            .to_string();
-            
-        Ok(Box::new(MockPythonAdapter::new(plugin_name)))
     }
     
     pub fn has_adapter(&self, name: &str) -> bool {
@@ -125,7 +144,11 @@ impl PluginRegistry {
     }
 }
 
-// Mock Python adapter for testing when PyO3 is not available
+/// Mock Python adapter for testing ONLY
+///
+/// ⚠️  WARNING: This adapter returns FAKE DATA for testing!
+/// ⚠️  Only enabled when SUTRA_ALLOW_MOCK_MODE=1
+/// ⚠️  Never use in production!
 #[cfg(feature = "python-plugins")]
 struct MockPythonAdapter {
     name: String,
@@ -159,7 +182,8 @@ impl crate::adapters::IngestionAdapter for MockPythonAdapter {
     }
     
     async fn create_stream(&self, _config: &serde_json::Value) -> Result<Box<dyn crate::adapters::DataStream>> {
-        // Return a mock stream
+        warn!("⚠️  MockPythonAdapter: Returning FAKE DATA stream!");
+        warn!("⚠️  This is for testing ONLY (SUTRA_ALLOW_MOCK_MODE=1)");
         Ok(Box::new(MockDataStream::new()))
     }
     

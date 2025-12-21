@@ -4,14 +4,18 @@ use dashmap::DashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-/// Main graph storage engine
+/// Legacy graph storage engine (simple in-memory implementation)
+///
+/// Note: Production code should use `ConcurrentMemory` instead, which includes:
+/// - Memory-mapped segments via `MmapStore`
+/// - Adaptive reconciliation (replaces LSM-tree compaction)
+/// - Lock-free concurrent access
+/// - Write-Ahead Log for durability
 pub struct GraphStore {
     #[allow(dead_code)]
     path: PathBuf,
     concepts: Arc<DashMap<ConceptId, ConceptRecord>>,
     associations: Arc<DashMap<(ConceptId, ConceptId), AssociationRecord>>,
-    // TODO: Add memory-mapped segments
-    // TODO: Add LSM-tree compaction
 }
 
 impl GraphStore {

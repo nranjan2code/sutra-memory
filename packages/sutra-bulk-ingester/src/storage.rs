@@ -112,9 +112,13 @@ struct StorageClientWrapper {
 }
 
 impl TcpStorageClient {
+    /// Create new TCP storage client
+    ///
+    /// **Production Mode**: Connection failure is FATAL (fail-fast)
+    /// **Test Mode**: Set SUTRA_ALLOW_MOCK_MODE=1 to enable mock fallback
     pub async fn new(server_address: &str) -> Result<Self> {
         info!("Connecting to TCP storage server: {}", server_address);
-        
+
         // Try to connect to the storage server
         match Self::try_connect(server_address).await {
             Ok(client) => {
@@ -125,12 +129,35 @@ impl TcpStorageClient {
                 })
             }
             Err(e) => {
-                warn!("Failed to connect to storage server: {}", e);
-                warn!("Running in mock mode for testing");
-                Ok(Self {
-                    server_address: server_address.to_string(),
-                    client: None,
-                })
+                // Check if mock mode is explicitly allowed (for testing only)
+                let allow_mock = std::env::var("SUTRA_ALLOW_MOCK_MODE")
+                    .unwrap_or_else(|_| "0".to_string()) == "1";
+
+                if allow_mock {
+                    warn!("⚠️  Failed to connect to storage server: {}", e);
+                    warn!("⚠️  Running in MOCK MODE (SUTRA_ALLOW_MOCK_MODE=1)");
+                    warn!("⚠️  DATA WILL NOT BE PERSISTED!");
+                    Ok(Self {
+                        server_address: server_address.to_string(),
+                        client: None,
+                    })
+                } else {
+                    // PRODUCTION: Connection failure is FATAL
+                    Err(anyhow::anyhow!(
+                        "Failed to connect to storage server at {}: {}\n\
+                         \n\
+                         This is a FATAL error in production mode.\n\
+                         \n\
+                         To fix:\n\
+                         1. Ensure storage server is running: cargo run --bin storage-server\n\
+                         2. Check network connectivity to {}\n\
+                         3. Verify firewall settings\n\
+                         \n\
+                         For testing ONLY, set SUTRA_ALLOW_MOCK_MODE=1 to enable mock fallback.\n\
+                         WARNING: Mock mode DISCARDS all data!",
+                        server_address, e, server_address
+                    ))
+                }
             }
         }
     }
@@ -197,17 +224,25 @@ impl TcpStorageClient {
         }
     }
     
+    /// Mock storage for testing ONLY
+    ///
+    /// ⚠️  WARNING: This method DISCARDS all data!
+    /// ⚠️  Only enabled when SUTRA_ALLOW_MOCK_MODE=1
+    /// ⚠️  Never use in production!
     async fn batch_learn_mock(&mut self, concepts: Vec<Concept>) -> Result<Vec<String>> {
-        warn!("Using mock storage - concepts not persisted!");
-        
+        warn!("⚠️  ⚠️  ⚠️  MOCK STORAGE: DISCARDING {} CONCEPTS ⚠️  ⚠️  ⚠️", concepts.len());
+        warn!("⚠️  DATA WILL NOT BE PERSISTED!");
+        warn!("⚠️  Set SUTRA_ALLOW_MOCK_MODE=0 and ensure storage server is running");
+
         let concept_ids: Vec<String> = concepts
             .iter()
             .map(|concept| self.generate_concept_id(&concept.content))
             .collect();
-            
+
         // Simulate processing time
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        
+
+        warn!("⚠️  Mock storage returned {} fake concept IDs (data discarded)", concept_ids.len());
         Ok(concept_ids)
     }
     

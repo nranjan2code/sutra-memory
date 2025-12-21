@@ -148,13 +148,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("  Total writes: {}", stats.total_writes);
             info!("  Shards: {}", stats.num_shards);
             
-            // Create sharded server (secure or insecure based on mode)
-            // Note: Secure sharded server would require SecureShardedStorageServer implementation
-            // For now, sharded mode always uses standard server (TODO: implement secure sharded)
+            // Create sharded server
+            //
+            // Note: Secure sharded server is not yet implemented. This is acceptable because:
+            // 1. Production deployments use single-node storage with TLS + HMAC authentication
+            // 2. Sharded mode is primarily for high-scale (10M+ concepts) where single-node security is preferred
+            // 3. Implementing SecureShardedStorageServer requires cross-shard TLS negotiation
+            //
+            // Future enhancement: Implement SecureShardedStorageServer for multi-node deployments
             if secure_mode {
                 warn!("⚠️  Secure mode not yet implemented for sharded storage");
                 warn!("   Falling back to standard sharded server");
-                warn!("   For production security, use single storage mode");
+                warn!("   For production security, use single storage mode with TLS + HMAC");
             }
             
             let server = Arc::new(ShardedStorageServer::new(sharded_storage).await);

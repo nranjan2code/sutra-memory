@@ -501,12 +501,9 @@ fn adaptive_reconcile_loop(
             // Update metrics
             reconciliations.fetch_add(1, Ordering::Relaxed);
             entries_processed.fetch_add(batch_size as u64, Ordering::Relaxed);
-            
-            // TODO: Disk flush is now handled by ConcurrentMemory::flush()
+
+            // Note: Disk flush is handled by ConcurrentMemory::flush()
             // Adaptive reconciler focuses on memory reconciliation only
-            // if snap.concept_count >= config.disk_flush_threshold {
-            //     disk_flushes.fetch_add(1, Ordering::Relaxed);
-            // }
         }
         
         let cycle_duration = cycle_start.elapsed();
@@ -652,7 +649,7 @@ fn current_timestamp_us() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{AssociationType, ConceptId};
+    use crate::types::ConceptId;
     use crate::write_log::WriteLog;
     use crate::read_view::ReadView;
     use std::sync::Arc;

@@ -481,15 +481,19 @@ impl ReasoningStore {
         }
     }
     
-    /// Vector similarity search (TODO: implement HNSW or brute force)
+    /// Vector similarity search
+    ///
+    /// Note: This is a legacy API. Production code should use `HnswContainer` directly,
+    /// which provides:
+    /// - HNSW index for fast approximate nearest neighbor search
+    /// - Persistent mmap-backed storage
+    /// - Sub-millisecond query latency
     pub fn vector_search(
         &self,
         _query_embedding: &[f32],
         _k: usize,
     ) -> Result<Vec<(ConceptId, f32)>> {
-        // TODO: Implement vector search
-        // For now, we'll add this later when we integrate HNSW index
-        Err(anyhow!("Vector search not yet implemented"))
+        Err(anyhow!("Vector search not implemented in legacy ReasoningStore. Use HnswContainer instead."))
     }
     
     // ========== Statistics ==========

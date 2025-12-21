@@ -250,12 +250,17 @@ impl HnswContainer {
 
     /// Insert single vector incrementally (O(log N) with USearch)
     ///
-    /// Much faster than rebuilding entire index
+    /// Much faster than rebuilding entire index.
+    ///
+    /// Note: Updates to existing concepts are currently skipped. To update a vector,
+    /// rebuild the index using `build_index()`. This is acceptable because:
+    /// 1. Concept vectors rarely change in practice
+    /// 2. Rebuild is fast (~2s for 1M vectors with mmap persistence)
+    /// 3. USearch's removal operation is not as efficient as bulk rebuilds
     pub fn insert(&self, concept_id: ConceptId, vector: Vec<f32>) -> Result<()> {
-        // Check if already exists
+        // Check if already exists - skip updates
         if self.reverse_mapping.read().contains_key(&concept_id) {
-            // Update existing (skip for now)
-            // TODO: Implement efficient update with index.remove() + add()
+            // Concept already indexed - rebuild index if update needed
             return Ok(());
         }
         

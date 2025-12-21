@@ -60,11 +60,18 @@ class GridManager:
     
     async def get_grid_master_client(self):
         """Get gRPC client for Grid Master"""
-        # For testing, return None to use fallback methods
         try:
             logger.info(f"Attempting connection to Grid Master at {self.grid_master_addr}")
-            # TODO: Implement actual gRPC connection when proto files are available
+
+            # Try to connect to Grid Master via TCP
+            # For now, we don't have a Python gRPC client for Grid Master
+            # So we'll rely on querying Sutra Storage for Grid events
+            # This is the "eat our own dogfood" approach - using our own knowledge graph
+
+            # If Grid Master connection is required, implement gRPC client here
+            # For MVP, we'll gracefully return None and use storage fallback
             return None
+
         except Exception as e:
             logger.error(f"Failed to connect to Grid Master: {e}")
             return None
@@ -116,35 +123,37 @@ class GridManager:
         This demonstrates querying our own storage for Grid metadata.
         """
         try:
-            # For testing purposes, return mock data when storage is unavailable
-            logger.info("Fallback: Using mock agent data for testing")
-            return [
-                GridAgent(
-                    agent_id="agent-001",
-                    hostname="localhost",
-                    platform="macOS",
-                    status="healthy",
-                    max_storage_nodes=5,
-                    current_storage_nodes=2,
-                    last_heartbeat=int(datetime.utcnow().timestamp()),
-                    storage_nodes=[
-                        {
-                            "node_id": "node-001",
-                            "status": "running",
-                            "pid": 12345,
-                            "endpoint": "localhost:50053"
-                        },
-                        {
-                            "node_id": "node-002", 
-                            "status": "running",
-                            "pid": 12346,
-                            "endpoint": "localhost:50054"
-                        }
-                    ]
-                )
-            ]
+            from sutra_storage_client import StorageClient
+
+            storage = StorageClient(self.storage_server)
+
+            # Query for AgentRegistered events using semantic search
+            # Events are stored as concepts in the knowledge graph
+            results = storage.semantic_search("AgentRegistered", max_results=100)
+
+            agents_dict = {}
+
+            # Parse results to extract agent information
+            for result in results:
+                # Each result should contain agent metadata
+                content = result.get("content", "")
+
+                # Extract agent_id from content (basic parsing)
+                # In production, this would use structured event storage
+                if "agent_id" in content:
+                    # This is a placeholder - actual implementation would parse event structure
+                    # For now, we return empty list since Grid events may not be in storage yet
+                    pass
+
+            # If no agents found in storage, return empty list
+            # The UI will show "No agents available" state
+            logger.info(f"Queried storage for Grid agents - found {len(agents_dict)} agents")
+            return list(agents_dict.values())
+
         except Exception as e:
             logger.error(f"Failed to query storage for agents: {e}")
+            # Storage unavailable - return empty list
+            # UI will show appropriate "unavailable" state
             return []
     
     async def get_cluster_status(self) -> GridClusterStatus:
@@ -192,38 +201,53 @@ class GridManager:
     ) -> List[GridEvent]:
         """
         Query Grid events from Sutra Storage using natural language or filters.
-        
+
         Examples:
         - query_grid_events(event_type="agent_registered")
         - query_grid_events(event_type="node_crashed", hours=1)
         - query_grid_events(entity_id="agent-001")
-        
+
         This uses Sutra's own reasoning engine to query events!
         """
         try:
-            from sutra_storage_client.client import StorageClient
-            
+            from sutra_storage_client import StorageClient
+
             storage = StorageClient(self.storage_server)
-            
-            # Build natural language query
+
+            # Build search query
             if event_type and entity_id:
-                query = f"Show me all {event_type} events for {entity_id} in the last {hours} hours"
+                query = f"{event_type} {entity_id}"
             elif event_type:
-                query = f"Show me all {event_type} events in the last {hours} hours"
+                query = event_type
             elif entity_id:
-                query = f"Show me all Grid events for {entity_id} in the last {hours} hours"
+                query = f"GridEvent {entity_id}"
             else:
-                query = f"Show me all Grid events in the last {hours} hours"
-            
-            # Query Sutra Storage using our own reasoning engine
-            # In production, this would use the ReasoningEngine to find events
-            # For now, we return the query that would be executed
-            
+                query = "GridEvent"
+
             logger.info(f"Grid event query: {query}")
-            
-            # Placeholder: Would return actual events from storage
-            return []
-            
+
+            # Query Sutra Storage using semantic search
+            results = storage.semantic_search(query, max_results=100)
+
+            # Parse results into GridEvent objects
+            events = []
+            for result in results:
+                # Extract event information from content
+                # This is a simplified parser - production would use structured storage
+                content = result.get("content", "")
+
+                # Basic event extraction
+                event = GridEvent(
+                    event_type=event_type or "unknown",
+                    entity_id=entity_id or "unknown",
+                    timestamp=datetime.utcnow().isoformat(),
+                    details={"content": content}
+                )
+                events.append(event)
+
+            logger.info(f"Found {len(events)} Grid events")
+            return events
+
         except Exception as e:
             logger.error(f"Failed to query Grid events: {e}")
             return []
@@ -295,36 +319,50 @@ class GridManager:
     async def natural_language_grid_query(self, query: str) -> Dict[str, Any]:
         """
         Execute natural language queries against Grid data in Sutra Storage.
-        
+
         Examples:
         - "Show me all agents that went offline today"
         - "Which nodes crashed in the last hour?"
         - "What's the spawn failure rate for agent-001?"
         - "List all agents running on Kubernetes"
-        
+
         This is the killer feature: Grid observability through natural language!
         """
         try:
-            from sutra_storage_client.client import StorageClient
-            
+            from sutra_storage_client import StorageClient
+
             storage = StorageClient(self.storage_server)
-            
-            # Use Sutra's reasoning engine to query Grid events
-            # This would integrate with the ReasoningEngine to:
-            # 1. Parse the natural language query
-            # 2. Find relevant Grid events in the knowledge graph
-            # 3. Aggregate and return results
-            
+
             logger.info(f"Natural language Grid query: {query}")
-            
-            return {
-                "success": True,
-                "query": query,
-                "results": [],
-                "explanation": "Query processed using Sutra reasoning engine",
-                "confidence": 0.85
-            }
-            
+
+            # Perform semantic search on the query
+            results = storage.semantic_search(query, max_results=10)
+
+            # Parse and structure results
+            structured_results = []
+            for result in results:
+                structured_results.append({
+                    "content": result.get("content", ""),
+                    "confidence": result.get("confidence", 0.0)
+                })
+
+            if structured_results:
+                return {
+                    "success": True,
+                    "query": query,
+                    "results": structured_results,
+                    "explanation": f"Found {len(structured_results)} relevant Grid events",
+                    "confidence": 0.85  # TODO: Calculate from results
+                }
+            else:
+                return {
+                    "success": True,
+                    "query": query,
+                    "results": [],
+                    "explanation": "No Grid events found matching your query",
+                    "confidence": 0.0
+                }
+
         except Exception as e:
             logger.error(f"Natural language query failed: {e}")
             return {

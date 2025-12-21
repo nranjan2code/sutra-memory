@@ -176,7 +176,6 @@ pub fn generate_self_signed_cert(output_dir: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
     use tempfile::tempdir;
     
     const TEST_CERT: &str = r#"-----BEGIN CERTIFICATE-----

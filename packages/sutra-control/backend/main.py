@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # Import gRPC client for internal communication
-# from sutra_storage_client.client import StorageClient  # TODO: Add when available
+from sutra_storage_client import StorageClient
 # Import Grid API integration
 from backend.grid_api import GridManager
 # Import dependency scanner
@@ -66,14 +66,20 @@ class ControlGateway:
         self._grid_manager = None
         self.start_time = datetime.utcnow()
         
-    async def get_storage_client(self) -> Optional[Any]:
+    async def get_storage_client(self) -> Optional[StorageClient]:
         """Get storage client with connection handling"""
+        if self._storage_client:
+            return self._storage_client
+
         try:
-            # TODO: Implement when StorageClient is available
-            logger.info(f"Storage client requested for {self.storage_server}")
-            return None
+            logger.info(f"Connecting to storage server: {self.storage_server}")
+            self._storage_client = StorageClient(self.storage_server)
+            logger.info("Successfully connected to storage server")
+            return self._storage_client
         except Exception as e:
             logger.error(f"Storage connection failed: {e}")
+            # In production, we gracefully handle unavailable storage
+            # The UI will show "Storage Unavailable" state
             return None
     
     def get_grid_manager(self) -> GridManager:
@@ -104,16 +110,27 @@ class ControlGateway:
     async def get_system_metrics(self) -> SystemMetrics:
         """Get system metrics - no internal details exposed"""
         try:
-            # For testing, return mock metrics
-            return SystemMetrics(
-                knowledge_items=1250,
-                connections=3420,
-                activity_score=75.0,
-                response_time_ms=1.0,
-                system_load=25.0,
-                memory_usage=60.0,
-                timestamp=datetime.utcnow().isoformat()
-            )
+            storage = await self.get_storage_client()
+
+            if storage:
+                # Get real metrics from storage server
+                stats = storage.stats()
+
+                # Map storage stats to system metrics (abstracted names)
+                return SystemMetrics(
+                    knowledge_items=stats.get("total_concepts", 0),
+                    connections=stats.get("total_edges", 0),
+                    activity_score=min(100.0, (stats.get("writes", 0) / 100.0) * 100.0),  # Normalized
+                    response_time_ms=1.0,  # TODO: Track actual response times
+                    system_load=min(100.0, (stats.get("pending", 0) / 10.0) * 100.0),  # Pending items
+                    memory_usage=0.0,  # TODO: Add memory tracking
+                    timestamp=datetime.utcnow().isoformat()
+                )
+            else:
+                # Storage unavailable - return zeros with timestamp
+                logger.warning("Storage unavailable - returning zero metrics")
+                return SystemMetrics(timestamp=datetime.utcnow().isoformat())
+
         except Exception as e:
             logger.error(f"Metrics collection failed: {e}")
             return SystemMetrics(timestamp=datetime.utcnow().isoformat())
@@ -121,16 +138,44 @@ class ControlGateway:
     async def execute_query(self, query_text: str) -> Dict[str, Any]:
         """Execute query against internal systems - abstract response"""
         try:
-            # For testing, return a mock successful response
-            return {
-                "success": True,
-                "response": f"Mock query processed: '{query_text[:50]}...' ({len(query_text)} characters)",
-                "processing_time_ms": 150,
-                "confidence": 0.85
-            }
+            storage = await self.get_storage_client()
+
+            if not storage:
+                return {
+                    "success": False,
+                    "error": "Storage server unavailable"
+                }
+
+            import time
+            start_time = time.time()
+
+            # Perform semantic search on the query
+            results = storage.semantic_search(query_text, max_results=5)
+
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
+            if results:
+                # Extract meaningful response from results
+                response_text = f"Found {len(results)} relevant concepts."
+                return {
+                    "success": True,
+                    "response": response_text,
+                    "results": results,
+                    "processing_time_ms": processing_time_ms,
+                    "confidence": 0.85  # TODO: Calculate actual confidence
+                }
+            else:
+                return {
+                    "success": True,
+                    "response": "No relevant concepts found in knowledge base.",
+                    "results": [],
+                    "processing_time_ms": processing_time_ms,
+                    "confidence": 0.0
+                }
+
         except Exception as e:
             logger.error(f"Query execution failed: {e}")
-            return {"success": False, "error": "Query processing failed"}
+            return {"success": False, "error": f"Query processing failed: {str(e)}"}
 
 
 # Initialize FastAPI app

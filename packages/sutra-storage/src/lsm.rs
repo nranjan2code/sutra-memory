@@ -159,14 +159,16 @@ impl LSMTree {
     }
     
     /// Write a concept to the active segment
+    ///
+    /// Note: This is a legacy implementation. Production code uses `ConcurrentMemory`
+    /// which provides lock-free writes via `WriteLog` and atomic reconciliation.
     pub fn write_concept(&self, _record: ConceptRecord, _content: &str) -> Result<u64> {
         self.get_or_create_active()?;
-        
-        // This is a bit tricky - we need mutable access but have Arc
-        // For now, we'll use interior mutability pattern
-        // TODO: Implement proper write locking
-        
-        Ok(0) // Placeholder
+
+        // Legacy: Write locking not implemented in this simplified version
+        // Modern architecture uses WriteLog with lock-free append-only writes
+
+        Ok(0) // Placeholder - not used in production
     }
     
     /// Read a concept by ID (O(1) with index)
@@ -187,9 +189,11 @@ impl LSMTree {
         
         for seg_meta in manifest.segments.iter() {
             let segment = self.get_segment(seg_meta.segment_id)?;
-            
+
             for concept in segment.iter_concepts()? {
-                let location = ConceptLocation::new(seg_meta.segment_id, 0); // TODO: Track actual offset
+                // Note: Offset tracking not implemented in this legacy version
+                // Modern ConcurrentMemory uses more efficient indexing
+                let location = ConceptLocation::new(seg_meta.segment_id, 0);
                 self.index.insert_concept(
                     concept.concept_id,
                     location,

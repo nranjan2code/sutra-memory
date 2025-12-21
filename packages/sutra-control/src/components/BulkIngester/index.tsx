@@ -131,7 +131,9 @@ const BulkIngester: React.FC = () => {
   };
 
   const fetchStats = async () => {
-    const mockStats: BulkIngesterStats = {
+    // Calculate stats from jobs array
+    // This is derived data, not mock data - it aggregates real job data
+    const calculatedStats: BulkIngesterStats = {
       total_jobs: jobs.length,
       active_jobs: jobs.filter(j => j.status === 'running').length,
       completed_jobs: jobs.filter(j => j.status === 'completed').length,
@@ -139,7 +141,7 @@ const BulkIngester: React.FC = () => {
       articles_processed: jobs.reduce((sum, j) => sum + j.progress.processed_items, 0),
       concepts_created: jobs.reduce((sum, j) => sum + j.progress.concepts_created, 0),
     };
-    setStats(mockStats);
+    setStats(calculatedStats);
   };
 
   const submitJob = async () => {

@@ -1098,14 +1098,24 @@ impl ShardedStorageServer {
                 let stats = self.storage.stats();
                 let uptime = self.start_time.elapsed().as_secs();
 
+                // Aggregate metrics from all shards
+                let (total_dropped, total_pending, total_reconciliations) = stats.shard_stats.iter()
+                    .fold((0u64, 0usize, 0u64), |(dropped, pending, recon), shard| {
+                        (
+                            dropped + shard.write_log.dropped,
+                            pending + shard.write_log.pending,
+                            recon + shard.reconciler.reconciliations,
+                        )
+                    });
+
                 StorageResponse::StatsOk {
                     concepts: stats.total_concepts as u64,
                     edges: stats.total_edges as u64,
                     vectors: stats.total_vectors as u64,
                     written: stats.total_writes,
-                    dropped: 0, // TODO: aggregate from shards
-                    pending: 0, // TODO: aggregate from shards
-                    reconciliations: 0, // TODO: aggregate from shards
+                    dropped: total_dropped,
+                    pending: total_pending as u64,
+                    reconciliations: total_reconciliations,
                     uptime_seconds: uptime,
                 }
             }

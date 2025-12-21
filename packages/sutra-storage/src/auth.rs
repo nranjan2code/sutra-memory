@@ -431,10 +431,21 @@ mod tests {
             "test-secret-key-with-sufficient-length-32chars".to_string(),
             3600
         );
-        
+
         let token = manager.generate_token("user123", vec![Role::Writer]).unwrap();
-        let tampered = token.replace("user123", "hacker");
-        
+
+        // Properly tamper with the token by modifying the payload
+        // Token format is: base64(payload).base64(signature)
+        let mut chars: Vec<char> = token.chars().collect();
+        if let Some(pos) = chars.iter().position(|&c| c == '.') {
+            // Modify a character in the payload (before the dot)
+            if pos > 0 {
+                chars[pos - 1] = if chars[pos - 1] == 'A' { 'B' } else { 'A' };
+            }
+        }
+        let tampered: String = chars.into_iter().collect();
+
+        // Tampering should cause signature validation to fail
         assert!(manager.validate_token(&tampered).is_err());
     }
 }

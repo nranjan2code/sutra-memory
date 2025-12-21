@@ -195,20 +195,42 @@ impl BulkIngester {
             return Err(anyhow::anyhow!("Adapter '{}' not found", job.adapter_name));
         }
         
-        // For now, use simple synchronous processing to avoid lifetime issues
-        // In production, this would use a proper job queue
+        // Check if mock mode is allowed
+        let allow_mock = std::env::var("SUTRA_ALLOW_MOCK_MODE")
+            .unwrap_or_else(|_| "0".to_string()) == "1";
+
+        if !allow_mock {
+            // PRODUCTION: Job processing not yet fully integrated
+            return Err(anyhow::anyhow!(
+                "Bulk ingestion job processing is not yet fully implemented.\n\
+                 \n\
+                 Current status:\n\
+                 - Adapter system: ✅ Implemented\n\
+                 - Storage client: ✅ Implemented\n\
+                 - Job queue: ⚠️  Mock implementation only\n\
+                 \n\
+                 TODO: Replace mock job processing with real implementation\n\
+                 See: process_job_with_adapter() for reference implementation\n\
+                 \n\
+                 For testing ONLY, set SUTRA_ALLOW_MOCK_MODE=1 to enable mock processing.\n\
+                 WARNING: Mock mode just sleeps and reports success!"
+            ));
+        }
+
+        // MOCK MODE: Simple synchronous processing to avoid lifetime issues
+        // In production, this would use process_job_with_adapter() with proper job queue
         job.status = JobStatus::Running;
-        
-        info!("Started processing job: {}", job_id);
-        
-        // Simulate job processing - replace with real implementation
+
+        warn!("⚠️  MOCK JOB PROCESSING: Job will not actually process data!");
+        warn!("⚠️  Set SUTRA_ALLOW_MOCK_MODE=0 to disable mock mode");
+        info!("Started mock processing for job: {}", job_id);
+
         let job_id_clone = job_id.to_string();
         tokio::spawn(async move {
-            // Mock processing
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-            info!("Mock job processing completed for job: {}", job_id_clone);
+            warn!("⚠️  Mock job {} completed (no actual work done)", job_id_clone);
         });
-        
+
         Ok(())
     }
     

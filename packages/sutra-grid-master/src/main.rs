@@ -199,26 +199,62 @@ async fn handle_client(mut stream: TcpStream, state: GridMasterService) -> std::
             GridMessage::RegisterAgent { agent_id, hostname, platform, max_storage_nodes, version:_, agent_endpoint } => {
                 let record = MasterAgentRecord {
                     agent_id: agent_id.clone(),
-                    hostname,
-                    platform,
-                    agent_endpoint,
+                    hostname: hostname.clone(),
+                    platform: platform.clone(),
+                    agent_endpoint: agent_endpoint.clone(),
                     max_storage_nodes,
                     current_storage_nodes: 0,
                     last_heartbeat: current_timestamp(),
                     status: AgentStatus::Healthy,
                     storage_nodes: Vec::new(),
                 };
+
+                // Emit AgentRegistered event
+                if let Some(events) = &state.events {
+                    events.emit(GridEvent::AgentRegistered {
+                        agent_id: agent_id.clone(),
+                        hostname,
+                        platform,
+                        agent_endpoint,
+                        max_storage_nodes,
+                        timestamp: Utc::now(),
+                    });
+                }
+
                 state.agents.write().await.insert(agent_id.clone(), record);
                 GridResponse::RegisterAgentOk { success: true, master_version: "1.0.0".into(), error_message: None }
             }
             GridMessage::Heartbeat { agent_id, storage_node_count, timestamp:_ } => {
                 if let Some(a) = state.agents.write().await.get_mut(&agent_id) {
+                    let previous_heartbeat = a.last_heartbeat;
+                    let previous_status = a.status.clone();
+
                     a.current_storage_nodes = storage_node_count;
                     a.last_heartbeat = current_timestamp();
-                    
+
+                    // Emit AgentHeartbeat event
+                    if let Some(events) = &state.events {
+                        events.emit(GridEvent::AgentHeartbeat {
+                            agent_id: agent_id.clone(),
+                            storage_node_count,
+                            timestamp: Utc::now(),
+                        });
+                    }
+
                     // Update status to Healthy on successful heartbeat
                     if a.status != AgentStatus::Healthy {
-                        log::info!("✅ Agent {} recovered (status: {:?} → Healthy)", agent_id, a.status);
+                        let downtime_seconds = current_timestamp().saturating_sub(previous_heartbeat);
+                        log::info!("✅ Agent {} recovered (status: {:?} → Healthy)", agent_id, previous_status);
+
+                        // Emit AgentRecovered event
+                        if let Some(events) = &state.events {
+                            events.emit(GridEvent::AgentRecovered {
+                                agent_id: agent_id.clone(),
+                                downtime_seconds,
+                                timestamp: Utc::now(),
+                            });
+                        }
+
                         a.status = AgentStatus::Healthy;
                     }
                 }

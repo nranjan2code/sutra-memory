@@ -12,13 +12,17 @@
 //! - Export/Import functionality
 
 mod app;
-mod local_embedding; // 🔥 NEW: Local AI provider
-mod local_nlg;
+mod config; // Centralized configuration
+mod error; // Comprehensive error types
+mod local_embedding; // 🔥 Local AI provider
+mod local_nlg; // 🔥 Local NLG provider
 mod theme;
 mod types;
-mod ui; // 🔥 NEW: Local NLG provider
+mod ui;
 
 pub use app::SutraApp;
+pub use config::{AppConfig, UserSettings, CONFIG};
+pub use error::{DesktopError, Result, UserError};
 
 /// Application version (matches workspace)
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

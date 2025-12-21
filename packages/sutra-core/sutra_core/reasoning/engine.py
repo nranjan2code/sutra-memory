@@ -152,17 +152,19 @@ class ReasoningEngine:
         # Initialize TCP storage adapter (ONLY backend supported)
         try:
             from ..storage import TcpStorageAdapter
-            
-            # Use EmbeddingGemma dimension (768) for HNSW
-            vector_dim = 768
-            server_address = os.environ.get("SUTRA_STORAGE_SERVER", "storage-server:50051")
-            
+            from ..config.storage import create_storage_config
+
+            # Use centralized storage configuration (eliminates hardcoded values)
+            storage_config = create_storage_config()
+
             self.storage = TcpStorageAdapter(
-                server_address=server_address,
-                vector_dimension=vector_dim,
+                server_address=storage_config.server_address,
+                vector_dimension=storage_config.vector_dimension,
             )
             logger.info(
-                f"TCP storage connected to {server_address} (dim={vector_dim})"
+                f"TCP storage connected to {storage_config.server_address} "
+                f"(dim={storage_config.vector_dimension}, "
+                f"edition={storage_config.edition.value})"
             )
             
             # Get concept count from server

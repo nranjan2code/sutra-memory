@@ -5,18 +5,16 @@ Manages environment variables and application settings.
 """
 
 import os
+import logging
 from typing import Optional
 
 from pydantic_settings import BaseSettings
 
-# Import feature flags for edition-aware configuration
+logger = logging.getLogger(__name__)
+
+# Import centralized edition configuration (single source of truth)
 try:
-    from sutra_core.feature_flags import (
-        Edition,
-        EditionLimits,
-        detect_edition,
-        get_edition_limits,
-    )
+    from sutra_core.config.edition import Edition, get_edition_spec
     FEATURE_FLAGS_AVAILABLE = True
 except ImportError:
     FEATURE_FLAGS_AVAILABLE = False
@@ -93,18 +91,16 @@ class Settings(BaseSettings):
         case_sensitive = False
 
     def get_edition_limits(self):
-        """Get edition-specific limits."""
+        """Get edition-specific limits from centralized configuration."""
         if FEATURE_FLAGS_AVAILABLE:
             try:
-                # Detect edition from environment
-                edition_enum, limits = detect_edition(
-                    license_key=self.license_key,
-                    edition_override=self.edition
-                )
-                return limits
+                # Use centralized edition spec (single source of truth)
+                edition_spec = get_edition_spec(edition_override=self.edition)
+                return edition_spec
             except Exception as e:
-                # Fallback to simple edition on error - create proper instance
+                # Fallback to simple edition on error
                 from dataclasses import make_dataclass
+                logger.warning(f"Failed to load edition spec, using fallback: {e}")
                 Limits = make_dataclass('Limits', [
                     ('learn_per_min', int),
                     ('reason_per_min', int),
@@ -120,7 +116,7 @@ class Settings(BaseSettings):
                     ingest_workers=2,
                 )
         else:
-            # Feature flags not available - create proper instance
+            # Feature flags not available - create fallback
             from dataclasses import make_dataclass
             Limits = make_dataclass('Limits', [
                 ('learn_per_min', int),

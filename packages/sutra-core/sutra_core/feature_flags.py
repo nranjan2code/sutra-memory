@@ -8,12 +8,13 @@ Production-grade edition management with:
 - License validation
 
 Philosophy: All features in all editions. Differentiation = scale + SLA.
+
+NOTE: This module now imports from config.edition for single source of truth.
+Edition specifications are centralized in config/edition.py.
 """
 
 import os
 import logging
-from enum import Enum
-from dataclasses import dataclass
 from typing import Optional
 import hashlib
 import hmac
@@ -21,84 +22,39 @@ import json
 import base64
 from datetime import datetime, timedelta
 
+# Import centralized edition system (single source of truth)
+from .config.edition import Edition, EditionSpec, EDITION_SPECS, get_edition_spec
+
 logger = logging.getLogger(__name__)
 
 
-class Edition(Enum):
-    """Sutra AI editions"""
-    SIMPLE = "simple"        # Free - single-node, low limits
-    COMMUNITY = "community"  # $99/mo - single-node, higher limits
-    ENTERPRISE = "enterprise"  # $999/mo - HA + Grid + highest limits
-
-
-@dataclass
+# Backward compatibility: map EditionSpec to legacy EditionLimits dataclass
 class EditionLimits:
-    """Rate limits and quotas per edition"""
-    # API rate limits (per minute)
-    learn_per_min: int
-    reason_per_min: int
-    
-    # Ingestion limits
-    ingest_workers: int
-    max_dataset_gb: int  # 0 = unlimited
-    
-    # Storage limits
-    max_concepts: int
-    retention_days: int  # Audit log retention
-    
-    # Topology
-    ha_enabled: bool
-    grid_enabled: bool
-    sharded_storage: bool
-    
-    # Security
-    secure_mode_required: bool
-    
-    # Support SLA
-    support_sla_hours: Optional[int]  # Response time in hours, None = community
+    """
+    DEPRECATED: Use EditionSpec from config.edition instead.
+
+    This class provides backward compatibility for code using EditionLimits.
+    """
+    def __init__(self, spec: EditionSpec):
+        self._spec = spec
+        # Map EditionSpec fields to legacy EditionLimits fields
+        self.learn_per_min = spec.learn_per_min
+        self.reason_per_min = spec.reason_per_min
+        self.ingest_workers = spec.ingest_workers
+        self.max_dataset_gb = spec.max_dataset_gb
+        self.max_concepts = spec.max_concepts
+        self.retention_days = spec.retention_days
+        self.ha_enabled = spec.ha_enabled
+        self.grid_enabled = spec.grid_enabled
+        self.sharded_storage = spec.num_shards > 1
+        self.secure_mode_required = spec.secure_mode_required
+        self.support_sla_hours = spec.support_sla_hours
 
 
-# Edition configuration matrix
+# Backward compatibility: legacy EDITION_LIMITS dict
 EDITION_LIMITS = {
-    Edition.SIMPLE: EditionLimits(
-        learn_per_min=10,
-        reason_per_min=50,
-        ingest_workers=2,
-        max_dataset_gb=1,
-        max_concepts=100_000,
-        retention_days=7,
-        ha_enabled=False,
-        grid_enabled=False,
-        sharded_storage=False,
-        secure_mode_required=False,
-        support_sla_hours=None,  # Community support only
-    ),
-    Edition.COMMUNITY: EditionLimits(
-        learn_per_min=100,
-        reason_per_min=500,
-        ingest_workers=4,
-        max_dataset_gb=10,
-        max_concepts=1_000_000,
-        retention_days=30,
-        ha_enabled=False,
-        grid_enabled=False,
-        sharded_storage=False,
-        secure_mode_required=False,
-        support_sla_hours=48,  # 48-hour email support
-    ),
-    Edition.ENTERPRISE: EditionLimits(
-        learn_per_min=1000,
-        reason_per_min=5000,
-        ingest_workers=16,
-        max_dataset_gb=0,  # Unlimited
-        max_concepts=10_000_000,
-        retention_days=365,
-        ha_enabled=True,
-        grid_enabled=True,
-        sharded_storage=True,
-        secure_mode_required=True,
-        support_sla_hours=4,  # 4-hour dedicated support
-    ),
+    edition: EditionLimits(spec)
+    for edition, spec in EDITION_SPECS.items()
 }
 
 
@@ -179,17 +135,12 @@ class FeatureFlags:
     """
     
     def __init__(self):
-        # Detect edition from environment
-        edition_str = os.getenv("SUTRA_EDITION", "simple").lower()
-        try:
-            self.edition = Edition(edition_str)
-        except ValueError:
-            raise ValueError(
-                f"Invalid SUTRA_EDITION: {edition_str}. "
-                f"Must be: simple, community, enterprise"
-            )
-        
-        self.limits = EDITION_LIMITS[self.edition]
+        # Use centralized edition detection
+        edition_spec = get_edition_spec()
+        self.edition = edition_spec.edition
+
+        # Wrap EditionSpec in legacy EditionLimits for backward compatibility
+        self.limits = EditionLimits(edition_spec)
         self.validator = LicenseValidator()
         
         # Validate license for paid editions
@@ -305,14 +256,16 @@ class FeatureFlags:
     
     def get_topology_config(self) -> dict:
         """Get topology configuration for deployment"""
+        # Get spec directly for accurate num_shards (not hardcoded 4)
+        spec = EDITION_SPECS[self.edition]
         return {
             "edition": self.edition.value,
-            "ha_enabled": self.limits.ha_enabled,
-            "grid_enabled": self.limits.grid_enabled,
-            "sharded_storage": self.limits.sharded_storage,
-            "num_shards": 4 if self.limits.sharded_storage else 1,
-            "embedding_replicas": 3 if self.limits.ha_enabled else 1,
-            "nlg_replicas": 3 if self.limits.ha_enabled else 1,
+            "ha_enabled": spec.ha_enabled,
+            "grid_enabled": spec.grid_enabled,
+            "sharded_storage": spec.num_shards > 1,
+            "num_shards": spec.num_shards,
+            "embedding_replicas": spec.embedding_replicas,
+            "nlg_replicas": spec.nlg_replicas,
         }
     
     def get_edition_info(self) -> dict:

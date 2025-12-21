@@ -11,6 +11,11 @@ import uuid
 from typing import Dict, List, Optional, Tuple, Any
 
 from ..graph.concepts import Association, Concept, AssociationType
+from ..config.system import (
+    association_type_to_int,
+    int_to_association_type,
+    SYSTEM_CONFIG,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,15 +63,15 @@ class TcpStorageAdapter:
     
     def _execute_with_retry(self, operation, *args, **kwargs):
         """Execute operation with automatic connection recovery."""
-        max_retries = 3
+        max_retries = SYSTEM_CONFIG.TCP_MAX_RETRIES
         for attempt in range(max_retries):
             try:
                 return operation(*args, **kwargs)
             except (ConnectionError, BrokenPipeError, OSError) as e:
                 logger.warning(f"TCP connection lost (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
-                    # Exponential backoff: 0.5s, 1s, 2s
-                    delay = 0.5 * (2 ** attempt)
+                    # Exponential backoff using system config
+                    delay = SYSTEM_CONFIG.TCP_RETRY_BACKOFF_BASE * (2 ** attempt)
                     logger.info(f"Waiting {delay}s before reconnection attempt...")
                     time.sleep(delay)
                     
@@ -158,15 +163,8 @@ class TcpStorageAdapter:
         confidence: float = 1.0,
     ) -> None:
         """Learn an association via TCP storage server."""
-        # Convert AssociationType to int
-        type_map = {
-            "semantic": 0,
-            "causal": 1,
-            "temporal": 2,
-            "hierarchical": 3,
-            "compositional": 4,
-        }
-        type_int = type_map.get(association_type.value, 0)
+        # Convert AssociationType to int (centralized mapping)
+        type_int = association_type_to_int(association_type)
         
         def _operation():
             return self.client.learn_association(
@@ -186,15 +184,8 @@ class TcpStorageAdapter:
 
     def add_association(self, association: Association) -> None:
         """Add association via TCP storage server."""
-        # Convert AssociationType to int
-        type_map = {
-            "semantic": 0,
-            "causal": 1,
-            "temporal": 2,
-            "hierarchical": 3,
-            "compositional": 4,
-        }
-        type_int = type_map.get(association.assoc_type.value, 0)
+        # Convert AssociationType to int (centralized mapping)
+        type_int = association_type_to_int(association.assoc_type)
         
         def _operation():
             return self.client.learn_association(
@@ -328,23 +319,15 @@ class TcpStorageAdapter:
         """Get association between two concepts via TCP storage server."""
         def _operation():
             return self.client.get_association(source_id, target_id)
-            
+
         try:
             result = self._execute_with_retry(_operation)
-            
+
             if not result:
                 return None
-            
-            # Convert type int back to AssociationType
-            type_map = {
-                0: AssociationType.SEMANTIC,
-                1: AssociationType.CAUSAL,
-                2: AssociationType.TEMPORAL,
-                3: AssociationType.HIERARCHICAL,
-                4: AssociationType.COMPOSITIONAL,
-            }
-            
-            assoc_type = type_map.get(result.get("type", 0), AssociationType.SEMANTIC)
+
+            # Convert type int back to AssociationType (centralized mapping)
+            assoc_type = int_to_association_type(result.get("type", 0))
             
             return Association(
                 source_id=result.get("source_id", source_id),

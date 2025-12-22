@@ -51,6 +51,7 @@ dirs = "5.0"         # Home directory expansion
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = { workspace = true }
 md5 = "0.7"  # For concept ID generation
+once_cell = "1.20"  # Lazy static initialization for CONFIG
 
 # ============================================================================
 # NEW: Graph visualization and analytics

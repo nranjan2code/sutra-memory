@@ -14,7 +14,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone)]
 pub struct AppConfig {
     /// Vector dimension for embeddings (matches all-mpnet-base-v2)
-    pub vector_dimension: u32,
+    pub vector_dimension: usize,
 
     /// Memory threshold for adaptive reconciler (concepts before persistence)
     pub memory_threshold: usize,
@@ -128,7 +128,7 @@ impl UserSettings {
                 match serde_json::from_str(&data) {
                     Ok(settings) => settings,
                     Err(e) => {
-                        log::warn!("Failed to parse settings: {}, using defaults", e);
+                        tracing::warn!("Failed to parse settings: {}, using defaults", e);
                         Default::default()
                     }
                 }
@@ -168,7 +168,7 @@ impl UserSettings {
 
         // Validate theme mode
         if !["dark", "light", "high_contrast"].contains(&self.theme_mode.as_str()) {
-            log::warn!("Invalid theme mode: {}, using dark", self.theme_mode);
+            tracing::warn!("Invalid theme mode: {}, using dark", self.theme_mode);
             self.theme_mode = "dark".to_string();
         }
     }

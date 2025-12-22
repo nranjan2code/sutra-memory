@@ -22,7 +22,7 @@ mod ui;
 
 pub use app::SutraApp;
 pub use config::{AppConfig, UserSettings, CONFIG};
-pub use error::{DesktopError, Result, UserError};
+pub use error::{DesktopError, UserError};
 
 /// Application version (matches workspace)
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

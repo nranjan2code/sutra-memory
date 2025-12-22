@@ -315,11 +315,16 @@ impl SettingsPanel {
             ui.horizontal(|ui| {
                 ui.label(RichText::new("Font Size").size(13.0).color(TEXT_SECONDARY));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.add(
+                    // Phase 3: Track font size changes for persistence
+                    let old_font_size = self.font_size;
+                    let response = ui.add(
                         egui::Slider::new(&mut self.font_size, 10.0..=24.0)
                             .suffix("px")
                             .fixed_decimals(1),
                     );
+                    if response.changed() && self.font_size != old_font_size {
+                        action = Some(SettingsAction::ChangeFontSize(self.font_size));
+                    }
                 });
             });
         });
@@ -449,5 +454,6 @@ pub enum SettingsAction {
     ImportData,
     ClearData,
     ChangeTheme(ThemeMode),
+    ChangeFontSize(f32), // Phase 3: Font size persistence
     StartTour,
 }

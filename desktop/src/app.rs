@@ -116,8 +116,16 @@ impl SutraApp {
         // Phase 2: Create single tokio runtime for ALL async operations
         // This eliminates 50-100ms overhead per operation
         // ====================================================================
-        let runtime = tokio::runtime::Runtime::new()
-            .expect("Failed to create tokio runtime");
+        // Phase 3: Proper error handling (no expect)
+        let runtime = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                error!("CRITICAL: Failed to create tokio runtime: {}", e);
+                error!("This is a fatal error - the application cannot continue.");
+                error!("Please ensure your system has sufficient resources.");
+                std::process::exit(1);
+            }
+        };
 
         // ====================================================================
         // Phase 2: Load user settings (persistent across restarts)
@@ -131,8 +139,16 @@ impl SutraApp {
         let data_dir = get_data_directory();
         info!("Data directory: {:?}", data_dir);
 
-        // Create storage directory
-        std::fs::create_dir_all(&data_dir).expect("Failed to create data directory");
+        // Phase 3: Create storage directory with proper error handling
+        if let Err(e) = std::fs::create_dir_all(&data_dir) {
+            error!("CRITICAL: Failed to create data directory: {}", e);
+            error!("Path: {:?}", data_dir);
+            error!("Please ensure:");
+            error!("  1. You have write permissions to this location");
+            error!("  2. The disk has sufficient space");
+            error!("  3. The path is not read-only");
+            std::process::exit(1);
+        }
 
         // ====================================================================
         // Initialize storage using EXISTING sutra_storage crate
@@ -157,10 +173,19 @@ impl SutraApp {
             stats.snapshot.concept_count, stats.snapshot.edge_count,
         );
 
-        // Initialize settings with data path
+        // Phase 3: Initialize settings from UserSettings
         let mut settings = SettingsPanel::default();
         settings.data_path = data_dir.display().to_string();
         settings.stats = convert_to_ui_stats(&stats);
+        settings.font_size = user_settings.font_size;
+
+        // Convert theme_mode string to ThemeMode enum
+        use crate::theme::ThemeMode;
+        settings.theme_mode = match user_settings.theme_mode.as_str() {
+            "light" => ThemeMode::Light,
+            "high_contrast" => ThemeMode::HighContrast,
+            _ => ThemeMode::Dark, // Default to dark
+        };
 
         // Initialize status bar
         let mut status_bar = StatusBar::default();
@@ -201,29 +226,29 @@ impl SutraApp {
                         Arc::new(pipeline)
                     }
                     Err(e) => {
-                        error!("❌ Failed to initialize learning pipeline: {}", e);
-                        // TODO: Show error dialog to user with recovery options
-                        // For now, panic (but with better error message)
-                        panic!("Critical: Failed to initialize learning pipeline: {}\n\
-                                This is required for the application to function.\n\
-                                Please check:\n\
-                                1. Network connectivity\n\
-                                2. Disk space (models require ~500MB)\n\
-                                3. Write permissions in application directory", e);
+                        // Phase 3: Proper error handling (no panic)
+                        error!("CRITICAL: Failed to initialize learning pipeline: {}", e);
+                        error!("This is a fatal error - embedding is required for the application.");
+                        error!("Recovery steps:");
+                        error!("  1. Check network connectivity");
+                        error!("  2. Ensure sufficient disk space (~500MB for models)");
+                        error!("  3. Verify write permissions in application directory");
+                        error!("  4. Try restarting the application");
+                        std::process::exit(1);
                     }
                 }
             }
             Err(e) => {
-                error!("❌ Failed to initialize embedding provider: {}", e);
-                // TODO: Show error dialog with UserError::from_desktop_error
-                // For now, panic (but with better error message than before)
-                panic!("Critical: Failed to initialize embedding model: {}\n\
-                        This is required for the application to function.\n\
-                        Please check:\n\
-                        1. Network connectivity (for model download)\n\
-                        2. Disk space (models require ~500MB)\n\
-                        3. Firewall settings\n\
-                        4. Proxy configuration if applicable", e);
+                // Phase 3: Proper error handling (no panic)
+                error!("CRITICAL: Failed to initialize embedding provider: {}", e);
+                error!("This is a fatal error - embedding is required for the application.");
+                error!("Recovery steps:");
+                error!("  1. Check network connectivity (for model download)");
+                error!("  2. Ensure sufficient disk space (~500MB for models)");
+                error!("  3. Check firewall settings");
+                error!("  4. If using a proxy, ensure it's configured correctly");
+                error!("  5. Try restarting the application");
+                std::process::exit(1);
             }
         };
 
@@ -1519,6 +1544,28 @@ impl SutraApp {
                 self.status_bar
                     .set_activity(format!("Theme changed to {}", mode.name()));
                 info!("Theme changed to {:?}", mode);
+
+                // Phase 3: Persist theme to UserSettings
+                use crate::theme::ThemeMode;
+                self.user_settings.theme_mode = match mode {
+                    ThemeMode::Dark => "dark",
+                    ThemeMode::Light => "light",
+                    ThemeMode::HighContrast => "high_contrast",
+                }.to_string();
+                if let Err(e) = self.user_settings.save() {
+                    warn!("Failed to save theme preference: {}", e);
+                }
+            }
+            SettingsAction::ChangeFontSize(size) => {
+                // Phase 3: Persist font size to UserSettings
+                self.user_settings.font_size = size;
+                if let Err(e) = self.user_settings.save() {
+                    warn!("Failed to save font size preference: {}", e);
+                } else {
+                    info!("Font size changed to {:.1}px", size);
+                    self.status_bar
+                        .set_activity(format!("Font size changed to {:.1}px", size));
+                }
             }
             SettingsAction::StartTour => {
                 self.onboarding.start();

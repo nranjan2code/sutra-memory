@@ -189,8 +189,9 @@ impl ReasoningPathsPanel {
 
         // Convert to PathCluster and score
         let total_paths = self.paths.len();
-        let mut scored_clusters: Vec<PathCluster> = clusters.into_values().map(|paths| {
-                let last_step = paths[0].path.last().unwrap();
+        let mut scored_clusters: Vec<PathCluster> = clusters.into_values().filter_map(|paths| {
+                // Phase 3: Safe access (no unwrap) - skip malformed paths
+                let last_step = paths.get(0)?.path.last()?;
                 let support_ratio = paths.len() as f32 / total_paths as f32;
                 let avg_confidence =
                     paths.iter().map(|p| p.confidence).sum::<f32>() / paths.len() as f32;
@@ -205,20 +206,21 @@ impl ReasoningPathsPanel {
                 let consensus_weight =
                     avg_confidence * support_ratio * consensus_bonus * outlier_penalty;
 
-                PathCluster {
+                // Phase 3: Return Some for filter_map
+                Some(PathCluster {
                     destination: last_step.concept_id,
                     destination_content: last_step.content.clone(),
                     paths,
                     avg_confidence,
                     consensus_weight,
                     support_ratio,
-                }
+                })
             })
             .collect();
 
-        // Sort by consensus weight
+        // Phase 3: Sort by consensus weight (safe comparison)
         scored_clusters
-            .sort_by(|a, b| b.consensus_weight.partial_cmp(&a.consensus_weight).unwrap());
+            .sort_by(|a, b| b.consensus_weight.partial_cmp(&a.consensus_weight).unwrap_or(std::cmp::Ordering::Equal));
 
         let primary = scored_clusters.remove(0);
         let primary_support = (primary.support_ratio * 100.0) as usize;
@@ -269,8 +271,9 @@ impl ReasoningPathsPanel {
 
         // Convert to PathCluster and score
         let total_paths = paths.len();
-        let mut scored_clusters: Vec<PathCluster> = clusters.into_values().map(|paths| {
-                let last_step = paths[0].path.last().unwrap();
+        let mut scored_clusters: Vec<PathCluster> = clusters.into_values().filter_map(|paths| {
+                // Phase 3: Safe access (no unwrap) - skip malformed paths
+                let last_step = paths.get(0)?.path.last()?;
                 let support_ratio = paths.len() as f32 / total_paths as f32;
                 let avg_confidence =
                     paths.iter().map(|p| p.confidence).sum::<f32>() / paths.len() as f32;
@@ -285,20 +288,21 @@ impl ReasoningPathsPanel {
                 let consensus_weight =
                     avg_confidence * support_ratio * consensus_bonus * outlier_penalty;
 
-                PathCluster {
+                // Phase 3: Return Some for filter_map
+                Some(PathCluster {
                     destination: last_step.concept_id,
                     destination_content: last_step.content.clone(),
                     paths,
                     avg_confidence,
                     consensus_weight,
                     support_ratio,
-                }
+                })
             })
             .collect();
 
-        // Sort by consensus weight
+        // Phase 3: Sort by consensus weight (safe comparison)
         scored_clusters
-            .sort_by(|a, b| b.consensus_weight.partial_cmp(&a.consensus_weight).unwrap());
+            .sort_by(|a, b| b.consensus_weight.partial_cmp(&a.consensus_weight).unwrap_or(std::cmp::Ordering::Equal));
 
         let primary = scored_clusters.remove(0);
         let primary_support = (primary.support_ratio * 100.0) as usize;

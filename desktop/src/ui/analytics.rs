@@ -74,7 +74,8 @@ impl AnalyticsDashboard {
         // Calculate latency percentiles
         if !self.latency_samples.is_empty() {
             let mut sorted: Vec<f32> = self.latency_samples.iter().cloned().collect();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            // Phase 3: Safe comparison (handles NaN gracefully)
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
             self.metrics.avg_query_latency_ms = sorted.iter().sum::<f32>() / sorted.len() as f32;
             self.metrics.p95_query_latency_ms = sorted

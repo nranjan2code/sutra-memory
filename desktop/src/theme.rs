@@ -401,3 +401,151 @@ pub fn button_frame(selected: bool) -> Frame {
 pub fn highlight_color(base: Color32, intensity: f32) -> Color32 {
     base.gamma_multiply(intensity)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // ThemeMode Tests
+    // ========================================================================
+
+    #[test]
+    fn test_theme_mode_default() {
+        let mode = ThemeMode::default();
+        assert_eq!(mode, ThemeMode::Dark);
+    }
+
+    #[test]
+    fn test_theme_mode_name() {
+        assert_eq!(ThemeMode::Dark.name(), "Dark");
+        assert_eq!(ThemeMode::Light.name(), "Light");
+        assert_eq!(ThemeMode::HighContrast.name(), "High Contrast");
+    }
+
+    #[test]
+    fn test_theme_mode_description() {
+        assert!(ThemeMode::Dark.description().contains("purple"));
+        assert!(ThemeMode::Light.description().contains("bright"));
+        assert!(ThemeMode::HighContrast.description().contains("contrast"));
+    }
+
+    #[test]
+    fn test_theme_mode_clone() {
+        let mode1 = ThemeMode::Dark;
+        let mode2 = mode1.clone();
+        assert_eq!(mode1, mode2);
+    }
+
+    #[test]
+    fn test_theme_mode_copy() {
+        let mode1 = ThemeMode::Light;
+        let mode2 = mode1; // Copy
+        assert_eq!(mode1, mode2);
+    }
+
+    #[test]
+    fn test_theme_mode_eq() {
+        assert_eq!(ThemeMode::Dark, ThemeMode::Dark);
+        assert_eq!(ThemeMode::Light, ThemeMode::Light);
+        assert_ne!(ThemeMode::Dark, ThemeMode::Light);
+    }
+
+    // ========================================================================
+    // Theme State Tests
+    // ========================================================================
+
+    #[test]
+    fn test_set_and_get_theme() {
+        set_theme(ThemeMode::Light);
+        assert_eq!(current_theme(), ThemeMode::Light);
+
+        set_theme(ThemeMode::HighContrast);
+        assert_eq!(current_theme(), ThemeMode::HighContrast);
+
+        set_theme(ThemeMode::Dark);
+        assert_eq!(current_theme(), ThemeMode::Dark);
+    }
+
+    #[test]
+    fn test_theme_persistence_across_calls() {
+        set_theme(ThemeMode::Light);
+        assert_eq!(current_theme(), ThemeMode::Light);
+        assert_eq!(current_theme(), ThemeMode::Light); // Second call
+    }
+
+    // ========================================================================
+    // Color Constant Tests
+    // ========================================================================
+
+    #[test]
+    fn test_primary_colors_valid() {
+        // Just verify they're defined and not black
+        assert_ne!(PRIMARY, Color32::BLACK);
+        assert_ne!(SECONDARY, Color32::BLACK);
+        assert_ne!(ACCENT, Color32::BLACK);
+    }
+
+    #[test]
+    fn test_background_colors_valid() {
+        assert_ne!(BG_DARK, Color32::BLACK);
+        assert_ne!(BG_PANEL, Color32::BLACK);
+        assert_ne!(BG_WIDGET, Color32::BLACK);
+    }
+
+    #[test]
+    fn test_text_colors_valid() {
+        assert_ne!(TEXT_PRIMARY, Color32::BLACK);
+        assert_ne!(TEXT_SECONDARY, Color32::BLACK);
+        assert_ne!(TEXT_MUTED, Color32::BLACK);
+    }
+
+    #[test]
+    fn test_status_colors_valid() {
+        assert_ne!(SUCCESS, Color32::BLACK);
+        assert_ne!(WARNING, Color32::BLACK);
+        assert_ne!(ERROR, Color32::BLACK);
+        assert_ne!(INFO, Color32::BLACK);
+    }
+
+    // ========================================================================
+    // Helper Function Tests
+    // ========================================================================
+
+    #[test]
+    fn test_highlight_color() {
+        let base = Color32::from_rgb(100, 100, 100);
+        let highlighted = highlight_color(base, 1.5);
+
+        // Should be brighter
+        assert_ne!(highlighted, base);
+    }
+
+    #[test]
+    fn test_highlight_color_zero_intensity() {
+        let base = Color32::from_rgb(100, 100, 100);
+        let result = highlight_color(base, 0.0);
+
+        // gamma_multiply(0.0) returns transparent black (all channels including alpha become 0)
+        assert_eq!(result, Color32::from_rgba_premultiplied(0, 0, 0, 0));
+    }
+
+    #[test]
+    fn test_elevated_card_frame() {
+        let frame = elevated_card();
+        // Just verify it creates a frame without panicking
+        assert!(frame.inner_margin.left > 0.0);
+    }
+
+    #[test]
+    fn test_button_frame_not_selected() {
+        let frame = button_frame(false);
+        assert!(frame.inner_margin.left > 0.0);
+    }
+
+    #[test]
+    fn test_button_frame_selected() {
+        let frame = button_frame(true);
+        assert!(frame.inner_margin.left > 0.0);
+    }
+}

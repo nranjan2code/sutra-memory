@@ -178,6 +178,10 @@ impl UserSettings {
 mod tests {
     use super::*;
 
+    // ========================================================================
+    // AppConfig Tests
+    // ========================================================================
+
     #[test]
     fn test_config_defaults() {
         let config = AppConfig::default();
@@ -187,27 +191,127 @@ mod tests {
     }
 
     #[test]
-    fn test_user_settings_validation() {
-        let mut settings = UserSettings::default();
+    fn test_config_all_fields() {
+        let config = AppConfig::default();
+        assert_eq!(config.reconciler_interval_ms, 100);
+        assert_eq!(config.undo_max_history, 100);
+        assert_eq!(config.activity_log_max, 100);
+        assert_eq!(config.default_font_size, 14.0);
+        assert_eq!(config.batch_chunk_size, 50);
+        assert_eq!(config.default_window_width, 1200.0);
+        assert_eq!(config.default_window_height, 800.0);
+    }
 
-        // Test font size clamping
+    #[test]
+    fn test_config_singleton() {
+        // Verify CONFIG is accessible
+        assert_eq!(CONFIG.vector_dimension, 768);
+        assert_eq!(CONFIG.memory_threshold, 10_000);
+    }
+
+    #[test]
+    fn test_config_clone() {
+        let config1 = AppConfig::default();
+        let config2 = config1.clone();
+        assert_eq!(config1.vector_dimension, config2.vector_dimension);
+        assert_eq!(config1.memory_threshold, config2.memory_threshold);
+    }
+
+    // ========================================================================
+    // UserSettings Tests
+    // ========================================================================
+
+    #[test]
+    fn test_user_settings_defaults() {
+        let settings = UserSettings::default();
+        assert_eq!(settings.theme_mode, "dark");
+        assert_eq!(settings.font_size, 14.0);
+        assert_eq!(settings.window_width, 1200.0);
+        assert_eq!(settings.window_height, 800.0);
+        assert_eq!(settings.show_onboarding, true);
+        assert_eq!(settings.last_data_dir, None);
+        assert_eq!(settings.auto_save_interval, 300);
+    }
+
+    #[test]
+    fn test_font_size_validation_upper_bound() {
+        let mut settings = UserSettings::default();
         settings.font_size = 100.0;
         settings.validate();
         assert_eq!(settings.font_size, 32.0);
+    }
 
+    #[test]
+    fn test_font_size_validation_lower_bound() {
+        let mut settings = UserSettings::default();
         settings.font_size = 4.0;
         settings.validate();
         assert_eq!(settings.font_size, 8.0);
+    }
 
-        // Test window size clamping
+    #[test]
+    fn test_font_size_validation_valid_range() {
+        let mut settings = UserSettings::default();
+        settings.font_size = 16.0;
+        settings.validate();
+        assert_eq!(settings.font_size, 16.0);
+    }
+
+    #[test]
+    fn test_window_width_validation() {
+        let mut settings = UserSettings::default();
         settings.window_width = 10000.0;
         settings.validate();
         assert_eq!(settings.window_width, 4096.0);
 
-        // Test invalid theme
+        settings.window_width = 500.0;
+        settings.validate();
+        assert_eq!(settings.window_width, 800.0);
+    }
+
+    #[test]
+    fn test_window_height_validation() {
+        let mut settings = UserSettings::default();
+        settings.window_height = 3000.0;
+        settings.validate();
+        assert_eq!(settings.window_height, 2160.0);
+
+        settings.window_height = 400.0;
+        settings.validate();
+        assert_eq!(settings.window_height, 600.0);
+    }
+
+    #[test]
+    fn test_auto_save_interval_validation() {
+        let mut settings = UserSettings::default();
+        settings.auto_save_interval = 5000;
+        settings.validate();
+        assert_eq!(settings.auto_save_interval, 3600);
+
+        settings.auto_save_interval = 0;
+        settings.validate();
+        assert_eq!(settings.auto_save_interval, 0); // 0 is valid (disabled)
+    }
+
+    #[test]
+    fn test_theme_mode_validation_invalid() {
+        let mut settings = UserSettings::default();
         settings.theme_mode = "invalid".to_string();
         settings.validate();
         assert_eq!(settings.theme_mode, "dark");
+    }
+
+    #[test]
+    fn test_theme_mode_validation_valid() {
+        let mut settings = UserSettings::default();
+
+        settings.theme_mode = "light".to_string();
+        settings.validate();
+        assert_eq!(settings.theme_mode, "light");
+
+        settings.theme_mode = "high_contrast".to_string();
+        settings.validate();
+        assert_eq!(settings.theme_mode, "high_contrast");
     }
 
     #[test]
@@ -218,5 +322,56 @@ mod tests {
 
         assert_eq!(settings.theme_mode, deserialized.theme_mode);
         assert_eq!(settings.font_size, deserialized.font_size);
+        assert_eq!(settings.window_width, deserialized.window_width);
+        assert_eq!(settings.window_height, deserialized.window_height);
+    }
+
+    #[test]
+    fn test_settings_with_last_data_dir() {
+        let mut settings = UserSettings::default();
+        settings.last_data_dir = Some("/custom/path".to_string());
+
+        let json = serde_json::to_string(&settings).unwrap();
+        let deserialized: UserSettings = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.last_data_dir, Some("/custom/path".to_string()));
+    }
+
+    #[test]
+    fn test_settings_clone() {
+        let settings1 = UserSettings::default();
+        let settings2 = settings1.clone();
+        assert_eq!(settings1.theme_mode, settings2.theme_mode);
+        assert_eq!(settings1.font_size, settings2.font_size);
+    }
+
+    // ========================================================================
+    // Validation Edge Cases
+    // ========================================================================
+
+    #[test]
+    fn test_multiple_validation_calls() {
+        let mut settings = UserSettings::default();
+        settings.font_size = 100.0;
+        settings.window_width = 10000.0;
+        settings.theme_mode = "invalid".to_string();
+
+        settings.validate();
+
+        assert_eq!(settings.font_size, 32.0);
+        assert_eq!(settings.window_width, 4096.0);
+        assert_eq!(settings.theme_mode, "dark");
+    }
+
+    #[test]
+    fn test_validation_idempotent() {
+        let mut settings = UserSettings::default();
+        settings.font_size = 100.0;
+
+        settings.validate();
+        let first_result = settings.font_size;
+
+        settings.validate();
+        assert_eq!(settings.font_size, first_result);
     }
 }

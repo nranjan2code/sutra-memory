@@ -241,21 +241,177 @@ impl UserError {
 mod tests {
     use super::*;
 
+    // ========================================================================
+    // DesktopError Display Tests
+    // ========================================================================
+
     #[test]
-    fn test_error_display() {
-        let err = DesktopError::EmbeddingInit("network timeout".to_string());
-        assert!(err.to_string().contains("embedding provider"));
+    fn test_storage_init_error_display() {
+        let err = DesktopError::StorageInit("disk full".to_string());
+        assert!(err.to_string().contains("Failed to initialize storage"));
+        assert!(err.to_string().contains("disk full"));
     }
 
     #[test]
-    fn test_user_error_creation() {
+    fn test_embedding_init_error_display() {
+        let err = DesktopError::EmbeddingInit("network timeout".to_string());
+        assert!(err.to_string().contains("embedding provider"));
+        assert!(err.to_string().contains("network timeout"));
+    }
+
+    #[test]
+    fn test_nlg_init_error_display() {
+        let err = DesktopError::NlgInit("model load failed".to_string());
+        assert!(err.to_string().contains("NLG provider"));
+        assert!(err.to_string().contains("model load failed"));
+    }
+
+    #[test]
+    fn test_data_directory_error_display() {
+        let err = DesktopError::DataDirectory("permission denied".to_string());
+        assert!(err.to_string().contains("data directory"));
+        assert!(err.to_string().contains("permission denied"));
+    }
+
+    #[test]
+    fn test_settings_error_display() {
+        let err = DesktopError::Settings("corrupted file".to_string());
+        assert!(err.to_string().contains("Settings error"));
+        assert!(err.to_string().contains("corrupted file"));
+    }
+
+    #[test]
+    fn test_learning_error_display() {
+        let err = DesktopError::Learning("invalid content".to_string());
+        assert!(err.to_string().contains("Learning failed"));
+        assert!(err.to_string().contains("invalid content"));
+    }
+
+    #[test]
+    fn test_query_error_display() {
+        let err = DesktopError::Query("syntax error".to_string());
+        assert!(err.to_string().contains("Query failed"));
+        assert!(err.to_string().contains("syntax error"));
+    }
+
+    #[test]
+    fn test_serialization_error_display() {
+        let err = DesktopError::Serialization("invalid JSON".to_string());
+        assert!(err.to_string().contains("Serialization error"));
+        assert!(err.to_string().contains("invalid JSON"));
+    }
+
+    #[test]
+    fn test_runtime_error_display() {
+        let err = DesktopError::Runtime("thread panic".to_string());
+        assert!(err.to_string().contains("Runtime error"));
+        assert!(err.to_string().contains("thread panic"));
+    }
+
+    #[test]
+    fn test_invalid_config_error_display() {
+        let err = DesktopError::InvalidConfig("bad value".to_string());
+        assert!(err.to_string().contains("Invalid configuration"));
+        assert!(err.to_string().contains("bad value"));
+    }
+
+    // ========================================================================
+    // UserError Tests
+    // ========================================================================
+
+    #[test]
+    fn test_embedding_init_user_error() {
         let err = DesktopError::EmbeddingInit("test error".to_string());
         let user_err = UserError::from_desktop_error(&err);
 
+        assert_eq!(user_err.title, "Embedding Model Download Failed");
         assert!(user_err.recoverable);
         assert!(!user_err.actions.is_empty());
         assert!(user_err.message.contains("test error"));
+        assert!(user_err.message.contains("text-only mode"));
     }
+
+    #[test]
+    fn test_nlg_init_user_error() {
+        let err = DesktopError::NlgInit("model missing".to_string());
+        let user_err = UserError::from_desktop_error(&err);
+
+        assert_eq!(user_err.title, "NLG Model Unavailable");
+        assert!(user_err.recoverable);
+        assert!(user_err.message.contains("model missing"));
+        assert!(user_err.message.contains("without NLG"));
+    }
+
+    #[test]
+    fn test_storage_init_user_error() {
+        let err = DesktopError::StorageInit("disk error".to_string());
+        let user_err = UserError::from_desktop_error(&err);
+
+        assert_eq!(user_err.title, "Storage Initialization Failed");
+        assert!(!user_err.recoverable); // Critical error
+        assert!(user_err.message.contains("disk error"));
+        assert!(user_err.message.contains("critical error"));
+    }
+
+    #[test]
+    fn test_data_directory_user_error() {
+        let err = DesktopError::DataDirectory("no permission".to_string());
+        let user_err = UserError::from_desktop_error(&err);
+
+        assert_eq!(user_err.title, "Data Directory Error");
+        assert!(user_err.recoverable);
+        assert!(user_err.message.contains("no permission"));
+    }
+
+    #[test]
+    fn test_settings_user_error() {
+        let err = DesktopError::Settings("parse failed".to_string());
+        let user_err = UserError::from_desktop_error(&err);
+
+        assert_eq!(user_err.title, "Settings Error");
+        assert!(user_err.recoverable);
+        assert!(user_err.message.contains("Default settings will be used"));
+    }
+
+    #[test]
+    fn test_learning_user_error() {
+        let err = DesktopError::Learning("content too large".to_string());
+        let user_err = UserError::from_desktop_error(&err);
+
+        assert_eq!(user_err.title, "Learning Failed");
+        assert!(user_err.recoverable);
+        assert!(user_err.message.contains("content too large"));
+    }
+
+    #[test]
+    fn test_query_user_error() {
+        let err = DesktopError::Query("invalid syntax".to_string());
+        let user_err = UserError::from_desktop_error(&err);
+
+        assert_eq!(user_err.title, "Query Failed");
+        assert!(user_err.recoverable);
+        assert!(user_err.message.contains("invalid syntax"));
+    }
+
+    #[test]
+    fn test_user_error_actions_not_empty() {
+        let errors = vec![
+            DesktopError::EmbeddingInit("test".into()),
+            DesktopError::NlgInit("test".into()),
+            DesktopError::StorageInit("test".into()),
+            DesktopError::DataDirectory("test".into()),
+            DesktopError::Settings("test".into()),
+        ];
+
+        for err in errors {
+            let user_err = UserError::from_desktop_error(&err);
+            assert!(!user_err.actions.is_empty(), "Error type should have actions: {:?}", err);
+        }
+    }
+
+    // ========================================================================
+    // Error Conversion Tests
+    // ========================================================================
 
     #[test]
     fn test_io_error_conversion() {
@@ -266,5 +422,67 @@ mod tests {
             DesktopError::Io(_) => (),
             _ => panic!("Expected Io variant"),
         }
+    }
+
+    #[test]
+    fn test_serde_json_error_conversion() {
+        let json_str = "{invalid json}";
+        let result: std::result::Result<serde_json::Value, serde_json::Error> = serde_json::from_str(json_str);
+        let json_err = result.unwrap_err();
+
+        let desktop_err: DesktopError = json_err.into();
+
+        match desktop_err {
+            DesktopError::Serialization(msg) => {
+                assert!(!msg.is_empty());
+            }
+            _ => panic!("Expected Serialization variant"),
+        }
+    }
+
+    // ========================================================================
+    // Error Trait Implementation Tests
+    // ========================================================================
+
+    #[test]
+    fn test_error_trait_implemented() {
+        let err = DesktopError::StorageInit("test".to_string());
+        let _err_ref: &dyn std::error::Error = &err;
+    }
+
+    #[test]
+    fn test_error_source() {
+        use std::error::Error;
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let desktop_err: DesktopError = io_err.into();
+
+        assert!(desktop_err.source().is_none()); // DesktopError doesn't expose source currently
+    }
+
+    // ========================================================================
+    // Edge Cases
+    // ========================================================================
+
+    #[test]
+    fn test_empty_error_message() {
+        let err = DesktopError::StorageInit("".to_string());
+        let display = err.to_string();
+        assert!(display.contains("Failed to initialize storage"));
+    }
+
+    #[test]
+    fn test_very_long_error_message() {
+        let long_msg = "x".repeat(10000);
+        let err = DesktopError::Learning(long_msg.clone());
+        let display = err.to_string();
+        assert!(display.contains(&long_msg));
+    }
+
+    #[test]
+    fn test_error_with_special_characters() {
+        let msg = "Error: \n\t\r special \"chars\" and 'quotes'";
+        let err = DesktopError::Query(msg.to_string());
+        let display = err.to_string();
+        assert!(display.contains(msg));
     }
 }

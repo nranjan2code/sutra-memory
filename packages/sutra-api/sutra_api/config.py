@@ -50,10 +50,24 @@ class Settings(BaseSettings):
     save_interval_seconds: int = 300  # 5 minutes
 
     # Authentication Configuration
-    jwt_secret_key: str = "INSECURE_DEFAULT_SECRET_CHANGE_IN_PRODUCTION"
+    # REQUIRED: Set SUTRA_JWT_SECRET_KEY environment variable (minimum 32 characters)
+    jwt_secret_key: Optional[str] = None
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 24  # Token expires in 24 hours
     jwt_refresh_expiration_days: int = 7  # Refresh token expires in 7 days
+
+    def __post_init__(self):
+        """Validate security-critical settings after initialization."""
+        if not self.jwt_secret_key:
+            raise ValueError(
+                "JWT secret key is required. Set SUTRA_JWT_SECRET_KEY environment variable. "
+                "Generate with: openssl rand -hex 32"
+            )
+        if len(self.jwt_secret_key) < 32:
+            raise ValueError(
+                "JWT secret key must be at least 32 characters. "
+                "Generate with: openssl rand -hex 32"
+            )
 
     # AI Configuration
     use_semantic_embeddings: bool = True
@@ -136,6 +150,18 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+# Validate security-critical settings
+if not settings.jwt_secret_key:
+    raise ValueError(
+        "JWT secret key is required. Set SUTRA_JWT_SECRET_KEY environment variable. "
+        "Generate with: openssl rand -hex 32"
+    )
+if len(settings.jwt_secret_key) < 32:
+    logger.warning(
+        "JWT secret key is less than 32 characters. "
+        "For production use, generate a stronger key with: openssl rand -hex 32"
+    )
 
 # Apply edition-based rate limits at startup
 if FEATURE_FLAGS_AVAILABLE:
